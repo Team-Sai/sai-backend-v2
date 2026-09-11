@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.settlement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.dto.PaymentRecordDTO;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
@@ -35,7 +35,7 @@ public class SettlementPaymentHistoryService {
                         SettlementPaymentObligationResponse::getParticipantName
                 ));
 
-        List<PaymentRecordDTO> records = paymentRecordService.findConfirmedRecordsByTargetIds(
+        List<PaymentRecordEntity> records = paymentRecordService.findConfirmedRecordsByTargetIds(
                 PaymentTargetType.SETTLEMENT,
                 List.copyOf(payerNameByObligationId.keySet())
         );
@@ -46,7 +46,7 @@ public class SettlementPaymentHistoryService {
     }
 
     private SettlementPaymentHistoryResponse toResponse(
-            PaymentRecordDTO record,
+            PaymentRecordEntity record,
             Map<Long, String> payerNameByObligationId
     ) {
         BankTransactionDTO transaction = bankTransactionMapper

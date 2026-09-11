@@ -6,15 +6,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.dto.PaymentRecordDTO;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentRecordMapper;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,84 +27,244 @@ import static org.mockito.Mockito.verify;
 class PaymentRecordServiceTest {
 
     @Mock
-    private PaymentRecordMapper paymentRecordMapper;
+    private PaymentRecordRepository paymentRecordRepository;
 
     @InjectMocks
     private PaymentRecordService paymentRecordService;
 
     @Test
-    @DisplayName("targetId 목록으로 확정된 납부기록을 조회한다")
-    void findConfirmedRecordsByTargetIdsDelegatesToMapper() {
+    @DisplayName("특정 대상의 확정 납부 금액을 조회한다")
+    void sumConfirmedAmountByTarget() {
+        // given
+        PaymentTargetType targetType =
+                PaymentTargetType.SETTLEMENT;
 
-        List<Long> targetIds = List.of(1L, 2L);
+        Long targetId = 1L;
 
-        List<PaymentRecordDTO> records = List.of(
-                record(1L, 1L, "10000"),
-                record(2L, 2L, "20000")
-        );
+        BigDecimal confirmedAmount =
+                new BigDecimal("30000");
 
         given(
-                paymentRecordMapper.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        targetIds
+                paymentRecordRepository.sumConfirmedAmountByTarget(
+                        targetType,
+                        targetId,
+                        RecordStatus.CONFIRMED
+                )
+        ).willReturn(confirmedAmount);
+
+        // when
+        BigDecimal result =
+                paymentRecordService.sumConfirmedAmountByTarget(
+                        targetType,
+                        targetId
+                );
+
+        // then
+        assertThat(result)
+                .isEqualByComparingTo(confirmedAmount);
+
+        verify(paymentRecordRepository)
+                .sumConfirmedAmountByTarget(
+                        targetType,
+                        targetId,
+                        RecordStatus.CONFIRMED
+                );
+    }
+
+    @Test
+    @DisplayName("대상 ID 목록으로 확정 납부 기록을 조회한다")
+    void findConfirmedRecordsByTargetIds() {
+        // given
+        PaymentTargetType targetType =
+                PaymentTargetType.SETTLEMENT;
+
+        List<Long> targetIds =
+                List.of(1L, 2L);
+
+        List<PaymentRecordEntity> records =
+                List.of(
+                        createRecord(1L, 1L, "10000"),
+                        createRecord(2L, 2L, "20000")
+                );
+
+        given(
+                paymentRecordRepository.findConfirmedByTargetIds(
+                        targetType,
+                        targetIds,
+                        RecordStatus.CONFIRMED
                 )
         ).willReturn(records);
 
-
-        List<PaymentRecordDTO> result =
+        // when
+        List<PaymentRecordEntity> result =
                 paymentRecordService.findConfirmedRecordsByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
+                        targetType,
                         targetIds
                 );
 
+        // then
+        assertThat(result)
+                .hasSize(2)
+                .isEqualTo(records);
 
-        assertThat(result).isEqualTo(records);
+        verify(paymentRecordRepository)
+                .findConfirmedByTargetIds(
+                        targetType,
+                        targetIds,
+                        RecordStatus.CONFIRMED
+                );
     }
 
     @Test
-    @DisplayName("targetId 목록이 비어있으면 매퍼를 호출하지 않고 빈 목록을 반환한다")
-    void findConfirmedRecordsByTargetIdsReturnsEmptyListWhenTargetIdsIsEmpty() {
-
-        List<PaymentRecordDTO> result =
+    @DisplayName("targetIds가 비어 있으면 Repository를 호출하지 않고 빈 목록을 반환한다")
+    void findConfirmedRecordsReturnsEmptyListWhenTargetIdsIsEmpty() {
+        // when
+        List<PaymentRecordEntity> result =
                 paymentRecordService.findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
-                        Collections.emptyList()
+                        List.of()
                 );
 
+        // then
+        assertThat(result)
+                .isEmpty();
 
-        assertThat(result).isEmpty();
-
-        verify(paymentRecordMapper, never())
-                .findConfirmedByTargetIds(any(), any());
+        verify(paymentRecordRepository, never())
+                .findConfirmedByTargetIds(
+                        any(),
+                        any(),
+                        any()
+                );
     }
 
     @Test
-    @DisplayName("targetId 목록이 null이면 매퍼를 호출하지 않고 빈 목록을 반환한다")
-    void findConfirmedRecordsByTargetIdsReturnsEmptyListWhenTargetIdsIsNull() {
-
-        List<PaymentRecordDTO> result =
+    @DisplayName("targetIds가 null이면 Repository를 호출하지 않고 빈 목록을 반환한다")
+    void findConfirmedRecordsReturnsEmptyListWhenTargetIdsIsNull() {
+        // when
+        List<PaymentRecordEntity> result =
                 paymentRecordService.findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
                         null
                 );
 
+        // then
+        assertThat(result)
+                .isEmpty();
 
-        assertThat(result).isEmpty();
-
-        verify(paymentRecordMapper, never())
-                .findConfirmedByTargetIds(any(), any());
+        verify(paymentRecordRepository, never())
+                .findConfirmedByTargetIds(
+                        any(),
+                        any(),
+                        any()
+                );
     }
 
-    private PaymentRecordDTO record(Long paymentRecordId, Long targetId, String amount) {
-        return PaymentRecordDTO.builder()
-                .paymentRecordId(paymentRecordId)
-                .bankTransactionId(100L + paymentRecordId)
-                .paymentTargetType(PaymentTargetType.SETTLEMENT)
-                .targetId(targetId)
-                .amount(new BigDecimal(amount))
-                .sourceType(SourceType.MANUAL)
-                .recordStatus(RecordStatus.CONFIRMED)
-                .recordedAt(LocalDateTime.of(2026, 8, 18, 12, 0))
-                .build();
+    @Test
+    @DisplayName("은행 거래 ID로 납부 기록 존재 여부를 조회한다")
+    void existsByBankTransactionId() {
+        // given
+        Long bankTransactionId = 100L;
+
+        given(
+                paymentRecordRepository.existsByBankTransactionId(
+                        bankTransactionId
+                )
+        ).willReturn(true);
+
+        // when
+        boolean result =
+                paymentRecordService.existsByBankTransactionId(
+                        bankTransactionId
+                );
+
+        // then
+        assertThat(result)
+                .isTrue();
+
+        verify(paymentRecordRepository)
+                .existsByBankTransactionId(
+                        bankTransactionId
+                );
+    }
+
+    @Test
+    @DisplayName("확정 납부 기록을 저장하고 생성된 ID를 반환한다")
+    void createConfirmedRecord() {
+        // given
+        Long bankTransactionId = 100L;
+        PaymentTargetType targetType =
+                PaymentTargetType.SETTLEMENT;
+        Long targetId = 1L;
+        BigDecimal amount =
+                new BigDecimal("10000");
+        SourceType sourceType =
+                SourceType.MANUAL;
+
+        given(
+                paymentRecordRepository.existsByBankTransactionId(
+                        bankTransactionId
+                )
+        ).willReturn(false);
+
+        PaymentRecordEntity savedRecord =
+                org.mockito.Mockito.mock(
+                        PaymentRecordEntity.class
+                );
+
+        given(
+                savedRecord.getPaymentRecordId()
+        ).willReturn(1L);
+
+        given(
+                paymentRecordRepository.saveAndFlush(
+                        any(PaymentRecordEntity.class)
+                )
+        ).willReturn(savedRecord);
+
+        // when
+        Long result =
+                paymentRecordService.createConfirmedRecord(
+                        bankTransactionId,
+                        targetType,
+                        targetId,
+                        amount,
+                        sourceType
+                );
+
+        // then
+        assertThat(result)
+                .isEqualTo(1L);
+
+        verify(paymentRecordRepository)
+                .existsByBankTransactionId(
+                        bankTransactionId
+                );
+
+        verify(paymentRecordRepository)
+                .saveAndFlush(
+                        any(PaymentRecordEntity.class)
+                );
+    }
+
+    private PaymentRecordEntity createRecord(
+            Long bankTransactionId,
+            Long targetId,
+            String amount
+    ) {
+        return new PaymentRecordEntity(
+                bankTransactionId,
+                PaymentTargetType.SETTLEMENT,
+                targetId,
+                new BigDecimal(amount),
+                SourceType.MANUAL,
+                RecordStatus.CONFIRMED,
+                LocalDateTime.of(
+                        2026,
+                        8,
+                        18,
+                        12,
+                        0
+                )
+        );
     }
 }

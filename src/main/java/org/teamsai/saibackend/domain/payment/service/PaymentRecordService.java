@@ -1,12 +1,12 @@
 package org.teamsai.saibackend.domain.payment.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.dto.PaymentRecordDTO;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentRecordMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
@@ -19,7 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PaymentRecordService {
 
-    private final PaymentRecordMapper paymentRecordMapper;
+    private final PaymentRecordRepository paymentRecordRepository;
 
     @Transactional(readOnly = true)
     public BigDecimal sumConfirmedAmountByTarget(
@@ -28,9 +28,10 @@ public class PaymentRecordService {
     ) {
         validateTarget(paymentTargetType, targetId);
 
-        return paymentRecordMapper.sumConfirmedAmountByTarget(
+        return paymentRecordRepository.sumConfirmedAmountByTarget(
                 paymentTargetType,
-                targetId
+                targetId,
+                RecordStatus.CONFIRMED
         );
     }
 
@@ -49,32 +50,30 @@ public class PaymentRecordService {
 
         validateNotDuplicateBankTransaction(bankTransactionId);
 
-        PaymentRecordDTO paymentRecord = PaymentRecordDTO.builder()
-                .bankTransactionId(bankTransactionId)
-                .paymentTargetType(paymentTargetType)
-                .targetId(targetId)
-                .amount(amount)
-                .sourceType(sourceType)
-                .recordStatus(RecordStatus.CONFIRMED)
-                .recordedAt(LocalDateTime.now())
-                .build();
+        PaymentRecordEntity paymentRecord =
+                new PaymentRecordEntity(
+                        bankTransactionId,
+                        paymentTargetType,
+                        targetId,
+                        amount,
+                        sourceType,
+                        RecordStatus.CONFIRMED,
+                        LocalDateTime.now()
+                );
 
-        int insertedCount;
         try {
-            insertedCount = paymentRecordMapper.insert(paymentRecord);
-        } catch (DuplicateKeyException exception) {
+            PaymentRecordEntity savedPaymentRecord =
+                    paymentRecordRepository.saveAndFlush(paymentRecord);
+
+            return savedPaymentRecord.getPaymentRecordId();
+
+        } catch (DataIntegrityViolationException exception) {
             throw PaymentErrorCode.DUPLICATE_PAYMENT_RECORD.toException();
         }
-
-        if (insertedCount != 1) {
-            throw PaymentErrorCode.PAYMENT_RECORD_CREATE_FAILED.toException();
-        }
-
-        return paymentRecord.getPaymentRecordId();
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentRecordDTO> findConfirmedRecordsByTargetIds(
+    public List<PaymentRecordEntity> findConfirmedRecordsByTargetIds(
             PaymentTargetType paymentTargetType,
             List<Long> targetIds
     ) {
@@ -82,19 +81,22 @@ public class PaymentRecordService {
             return List.of();
         }
 
-        return paymentRecordMapper.findConfirmedByTargetIds(paymentTargetType, targetIds);
-    }
+        return paymentRecordRepository.findConfirmedByTargetIds(
+                paymentTargetType,
+                targetIds,
+                RecordStatus.CONFIRMED
+        );    }
 
     @Transactional(readOnly = true)
     public boolean existsByBankTransactionId(Long bankTransactionId) {
 
         validateBankTransactionId(bankTransactionId);
 
-        return paymentRecordMapper.existsByBankTransactionId(bankTransactionId);
+        return paymentRecordRepository.existsByBankTransactionId(bankTransactionId);
     }
 
     private void validateNotDuplicateBankTransaction(Long bankTransactionId) {
-        if (paymentRecordMapper.existsByBankTransactionId(bankTransactionId)) {
+        if (paymentRecordRepository.existsByBankTransactionId(bankTransactionId)) {
             throw PaymentErrorCode.DUPLICATE_PAYMENT_RECORD.toException();
         }
     }

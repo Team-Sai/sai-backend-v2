@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.dto.PaymentRecordDTO;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
@@ -71,8 +71,7 @@ class SettlementPaymentHistoryServiceTest {
                 )
         ).willReturn(
                 List.of(
-                        paymentRecord(1L, 100L, 200L, "10000")
-                )
+                        paymentRecord(100L, 200L, "10000"))
         );
 
         given(
@@ -124,8 +123,8 @@ class SettlementPaymentHistoryServiceTest {
                 )
         ).willReturn(
                 List.of(
-                        paymentRecord(1L, 100L, 999L, "10000")
-                )
+                        paymentRecord(100L, 999L, "10000"))
+
         );
 
         given(
@@ -212,22 +211,20 @@ class SettlementPaymentHistoryServiceTest {
                 .build();
     }
 
-    private PaymentRecordDTO paymentRecord(
-            Long paymentRecordId,
+    private PaymentRecordEntity paymentRecord(
             Long targetId,
             Long bankTransactionId,
             String amount
     ) {
-        return PaymentRecordDTO.builder()
-                .paymentRecordId(paymentRecordId)
-                .bankTransactionId(bankTransactionId)
-                .paymentTargetType(PaymentTargetType.SETTLEMENT)
-                .targetId(targetId)
-                .amount(new BigDecimal(amount))
-                .sourceType(SourceType.AUTO_MATCH)
-                .recordStatus(RecordStatus.CONFIRMED)
-                .recordedAt(LocalDateTime.of(2026, 8, 18, 12, 0))
-                .build();
+        return new PaymentRecordEntity(
+                bankTransactionId,
+                PaymentTargetType.SETTLEMENT,
+                targetId,
+                new BigDecimal(amount),
+                SourceType.AUTO_MATCH,
+                RecordStatus.CONFIRMED,
+                LocalDateTime.of(2026, 8, 18, 12, 0)
+        );
     }
 
     private BankTransactionDTO bankTransaction(
