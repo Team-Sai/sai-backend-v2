@@ -2,15 +2,23 @@ package org.teamsai.saibackend.domain.contract.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.teamsai.saibackend.domain.contract.repository.RiskCheckRepository;
+import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
+import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
+import org.teamsai.saibackend.domain.contract.type.ContractRelationType;
 
 @Service
 @RequiredArgsConstructor
 public class RiskCheckService {
 
-    private final RiskCheckRepository riskCheckRepository;
+    private final LoanContractRepository loanContractRepository;
 
-    public Long getPreviousTotalAmount(Long userId) {
-        return riskCheckRepository.sumCompletedPrincipalByCreditor(userId);
+    @Transactional(readOnly = true)
+    public Long sumCompletedPrincipalByCreditor(Long userId) {
+        return loanContractRepository.sumPrincipalByCreditorAndStatusAndRelationType(
+                userId,
+                ContractStatus.COMPLETED,
+                ContractRelationType.FAMILY
+        );
     }
 }
