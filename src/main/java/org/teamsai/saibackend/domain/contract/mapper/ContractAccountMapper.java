@@ -2,7 +2,6 @@ package org.teamsai.saibackend.domain.contract.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.teamsai.saibackend.domain.contract.dto.ContractAccountDTO;
 import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
 
 import java.util.List;

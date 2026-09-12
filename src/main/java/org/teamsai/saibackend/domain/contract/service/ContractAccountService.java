@@ -6,30 +6,32 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.contract.dto.ContractAccountDTO;
 import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
+import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
+import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
-import org.teamsai.saibackend.domain.contract.mapper.ContractAccountMapper;
-import org.teamsai.saibackend.domain.contract.mapper.LoanContractMapper;
+import org.teamsai.saibackend.domain.contract.repository.ContractAccountRepository;
+import org.teamsai.saibackend.domain.contract.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Objects;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ContractAccountService {
 
-    private final ContractAccountMapper contractAccountMapper;
-    private final LoanContractMapper loanContractMapper;
+    private final ContractAccountRepository contractAccountRepository;
+    private final LoanContractRepository loanContractRepository;
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
     private final LinkedBankAccountService linkedBankAccountService;
 
     @Transactional(readOnly = true)
     public List<LinkedBankAccountResponse> getSelectableAccounts(Long userId) {
         return linkedBankAccountService.getLinkedAccounts(userId).stream()
-                .filter(account -> ConnectionStatus.AVAILABLE.name().equals(account.connectionStatus()))
+                .filter(account -> ConnectionStatus.AVAILABLE.name()
+                        .equals(account.connectionStatus()))
                 .toList();
     }
 
@@ -38,23 +40,17 @@ public class ContractAccountService {
             Long contractId,
             Long userId
     ) {
-        LoanContractResponse contract = findContract(contractId);
+        LoanContract contract = findContract(contractId);
         validateCreditor(contract, userId);
 
-        ContractAccountDTO contractAccount = contractAccountMapper
-                .findActiveAccountByContractId(contractId)
-                .stream()
-                .findFirst()
-                .orElseThrow(
-                        LoanContractErrorCode.CONTRACT_ACCOUNT_NOT_FOUND
-                                ::toException
-                );
+        ContractAccount activeAccount = contractAccountRepository
+                .findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
+                .orElseThrow(LoanContractErrorCode.CONTRACT_ACCOUNT_NOT_FOUND::toException);
+
+        Long activeLinkedAccountId = activeAccount.getLinkedAccount().getLinkedAccountId();
 
         return linkedBankAccountService.getLinkedAccounts(userId).stream()
-                .filter(account -> Objects.equals(
-                        account.linkedAccountId(),
-                        contractAccount.getLinkedAccountId()
-                ))
+                .filter(account -> Objects.equals(account.linkedAccountId(), activeLinkedAccountId))
                 .findFirst()
                 .orElseThrow(
                         LoanContractErrorCode.INVALID_LINKED_ACCOUNT
@@ -66,7 +62,7 @@ public class ContractAccountService {
     public void createContractAccount(Long contractId, Long userId, Long linkedAccountId) {
         if (linkedAccountId == null) return;
 
-        contractAccountMapper.selectContractForUpdate(contractId);
+        loanContractRepository.findWithLockByContractId(contractId);
 
         validateSelectable(userId, linkedAccountId);
 
@@ -80,7 +76,7 @@ public class ContractAccountService {
 
     @Transactional
     public void changeContractAccount(Long contractId, Long userId, Long newLinkedAccountId) {
-        contractAccountMapper.selectContractForUpdate(contractId);
+        loanContractRepository.findWithLockByContractId(contractId);
 
         validateContractOwner(contractId, userId);
         validateSelectable(userId, newLinkedAccountId);
@@ -91,39 +87,36 @@ public class ContractAccountService {
 
     @Transactional
     public void deactivateContractAccount(Long contractId, Long userId) {
-        contractAccountMapper.selectContractForUpdate(contractId);
+        loanContractRepository.findWithLockByContractId(contractId);
 
         validateContractOwner(contractId, userId);
         retireActiveAccount(contractId, ContractAccountStatus.DISABLED);
     }
 
     private void retireActiveAccount(Long contractId, ContractAccountStatus status) {
+        ContractAccount activeAccount = contractAccountRepository
+                .findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
+                .orElseThrow(LoanContractErrorCode.CONTRACT_ACCOUNT_NOT_FOUND::toException);
 
-        int updatedRows = contractAccountMapper.updateContractAccountStatus(contractId, status);
-        if (updatedRows == 0) {
-            throw LoanContractErrorCode.CONTRACT_ACCOUNT_NOT_FOUND.toException();
-        }
+        activeAccount.deactivate(status);
     }
 
     private void validateContractOwner(Long contractId, Long userId) {
-        LoanContractResponse contract = findContract(contractId);
+        LoanContract contract = findContract(contractId);
         validateCreditor(contract, userId);
-
 
         if (contract.getStatus() != ContractStatus.DRAFT && contract.getStatus() != ContractStatus.PENDING) {
             throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
         }
     }
 
-    private LoanContractResponse findContract(Long contractId) {
-        return loanContractMapper.findContractById(contractId)
-                .orElseThrow(
-                        LoanContractErrorCode.CONTRACT_NOT_FOUND::toException
-                );
+    private LoanContract findContract(Long contractId) {
+        return loanContractRepository.findById(contractId)
+                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND.toException());
     }
 
     private void validateCreditor(
-            LoanContractResponse contract,
+            LoanContract contract,
             Long userId
     ) {
         if (!Objects.equals(contract.getCreditorId(), userId)) {
@@ -141,13 +134,12 @@ public class ContractAccountService {
     }
 
     private void insertActiveAccount(Long contractId, Long linkedAccountId) {
-        ContractAccountDTO contractAccount = ContractAccountDTO.builder()
-                .contractId(contractId)
-                .linkedAccountId(linkedAccountId)
+        ContractAccount contractAccount = ContractAccount.builder()
+                .linkedAccount(linkedBankAccountRepository.getReferenceById(linkedAccountId))
+                .loanContract(loanContractRepository.getReferenceById(contractId))
                 .accountStatus(ContractAccountStatus.ACTIVE)
-                .selectedAt(LocalDateTime.now())
                 .build();
 
-        contractAccountMapper.insertContractAccount(contractAccount);
+        contractAccountRepository.save(contractAccount);
     }
 }
