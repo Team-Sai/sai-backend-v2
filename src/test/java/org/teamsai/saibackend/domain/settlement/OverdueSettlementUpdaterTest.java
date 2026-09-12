@@ -44,7 +44,9 @@ class OverdueSettlementUpdaterTest {
         PaymentObligationEntity first = new PaymentObligationEntity(101L, java.math.BigDecimal.TEN);
         PaymentObligationEntity second = new PaymentObligationEntity(101L, java.math.BigDecimal.TEN);
         when(paymentObligationRepository.findUnpaidByParticipantIds(
-                List.of(101L), PaymentStatus.UNPAID, ObligationStatus.ACTIVE))
+                List.of(101L),
+                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID),
+                ObligationStatus.ACTIVE))
                 .thenReturn(List.of(first, second));
 
         sut.updateOverdueForSettlement(settlement, referenceDate);
@@ -64,7 +66,9 @@ class OverdueSettlementUpdaterTest {
         ));
         PaymentObligationEntity obligation = new PaymentObligationEntity(101L, java.math.BigDecimal.TEN);
         when(paymentObligationRepository.findUnpaidByParticipantIds(
-                List.of(101L), PaymentStatus.UNPAID, ObligationStatus.ACTIVE))
+                List.of(101L),
+                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID),
+                ObligationStatus.ACTIVE))
                 .thenReturn(List.of(obligation));
 
         sut.updateOverdueForSettlement(settlement, referenceDate);
@@ -91,10 +95,14 @@ class OverdueSettlementUpdaterTest {
                 participant(101L, SettlementParticipantStatus.ACTIVE)
         ));
         when(paymentObligationRepository.findUnpaidByParticipantIds(
-                List.of(101L), PaymentStatus.UNPAID, ObligationStatus.ACTIVE))
+                List.of(101L),
+                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID),
+                ObligationStatus.ACTIVE))
                 .thenReturn(List.of());
         sut.updateOverdueForSettlement(settlement, referenceDate);
         verify(paymentObligationRepository).findUnpaidByParticipantIds(
-                List.of(101L), PaymentStatus.UNPAID, ObligationStatus.ACTIVE);
+                List.of(101L),
+                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID),
+                ObligationStatus.ACTIVE);
     }
 }

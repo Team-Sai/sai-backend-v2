@@ -38,7 +38,10 @@ public class OverdueSettlementUpdater {
         List<PaymentObligationEntity> unpaidObligations =
                 paymentObligationRepository.findUnpaidByParticipantIds(
                         activeParticipantIds,
-                        PaymentStatus.UNPAID,
+                        List.of(
+                                PaymentStatus.UNPAID,
+                                PaymentStatus.PARTIALLY_PAID
+                        ),
                         ObligationStatus.ACTIVE);
 
         if (unpaidObligations.isEmpty()) {

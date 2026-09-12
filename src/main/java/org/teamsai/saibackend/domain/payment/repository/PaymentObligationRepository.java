@@ -76,17 +76,18 @@ public interface PaymentObligationRepository
             SELECT paymentObligation
             FROM PaymentObligationEntity paymentObligation
             WHERE paymentObligation.participantId IN :participantIds
-              AND paymentObligation.paymentStatus <> :paymentStatus
+              AND paymentObligation.paymentStatus IN :paymentStatuses
               AND paymentObligation.obligationStatus =
                   :obligationStatus
               AND paymentObligation.overdueSince IS NULL
             """)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<PaymentObligationEntity> findUnpaidByParticipantIds(
             @Param("participantIds")
             List<Long> participantIds,
 
-            @Param("paymentStatus")
-            PaymentStatus paymentStatus,
+            @Param("paymentStatuses")
+            List<PaymentStatus> paymentStatuses,
 
             @Param("obligationStatus")
             ObligationStatus obligationStatus

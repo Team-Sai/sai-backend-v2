@@ -8,9 +8,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.dto.PaymentObligationDTO;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
@@ -21,12 +23,12 @@ import org.teamsai.saibackend.domain.payment.type.SourceType;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -44,7 +46,7 @@ class PaymentServiceTest {
             new BigDecimal("150000");
 
     @Mock
-    private PaymentObligationMapper paymentObligationMapper;
+    private PaymentObligationRepository paymentObligationRepository;
 
     @Mock
     private PaymentRecordService paymentRecordService;
@@ -62,18 +64,21 @@ class PaymentServiceTest {
                 "남은 금액과 같은 금액을 납부하면 납부기록을 생성하고 완납 상태로 변경한다"
         )
         void applyPaymentFullyPaid() {
+            PaymentObligationEntity obligation = createActiveObligation();
+            LocalDateTime overdueSince = LocalDateTime.of(2026, 1, 1, 0, 0);
+            obligation.markOverdue(overdueSince);
 
             BigDecimal amount =
                     new BigDecimal("70000");
 
             given(
-                    paymentObligationMapper
+                    paymentObligationRepository
                             .findByIdForUpdate(
                                     PAYMENT_OBLIGATION_ID
                             )
             ).willReturn(
                     Optional.of(
-                            createActiveObligation()
+                            obligation
                     )
             );
 
@@ -87,13 +92,6 @@ class PaymentServiceTest {
                     new BigDecimal("30000")
             );
 
-            given(
-                    paymentObligationMapper
-                            .updatePaymentStatus(
-                                    PAYMENT_OBLIGATION_ID,
-                                    PaymentStatus.PAID
-                            )
-            ).willReturn(1);
 
 
             paymentService.applyAutoMatchedPayment(
@@ -112,11 +110,8 @@ class PaymentServiceTest {
                             SourceType.AUTO_MATCH
                     );
 
-            verify(paymentObligationMapper)
-                    .updatePaymentStatus(
-                            PAYMENT_OBLIGATION_ID,
-                            PaymentStatus.PAID
-                    );
+            assertThat(obligation.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+            assertThat(obligation.getOverdueSince()).isNull();
         }
 
 
@@ -125,18 +120,21 @@ class PaymentServiceTest {
                 "남은 금액보다 적은 금액을 납부하면 부분납 상태로 변경한다"
         )
         void applyPaymentPartiallyPaid() {
+            PaymentObligationEntity obligation = createActiveObligation();
+            LocalDateTime overdueSince = LocalDateTime.of(2026, 1, 1, 0, 0);
+            obligation.markOverdue(overdueSince);
 
             BigDecimal amount =
                     new BigDecimal("50000");
 
             given(
-                    paymentObligationMapper
+                    paymentObligationRepository
                             .findByIdForUpdate(
                                     PAYMENT_OBLIGATION_ID
                             )
             ).willReturn(
                     Optional.of(
-                            createActiveObligation()
+                            obligation
                     )
             );
 
@@ -150,13 +148,6 @@ class PaymentServiceTest {
                     new BigDecimal("30000")
             );
 
-            given(
-                    paymentObligationMapper
-                            .updatePaymentStatus(
-                                    PAYMENT_OBLIGATION_ID,
-                                    PaymentStatus.PARTIALLY_PAID
-                            )
-            ).willReturn(1);
 
 
             paymentService.applyAutoMatchedPayment(
@@ -166,11 +157,8 @@ class PaymentServiceTest {
             );
 
 
-            verify(paymentObligationMapper)
-                    .updatePaymentStatus(
-                            PAYMENT_OBLIGATION_ID,
-                            PaymentStatus.PARTIALLY_PAID
-                    );
+            assertThat(obligation.getPaymentStatus()).isEqualTo(PaymentStatus.PARTIALLY_PAID);
+            assertThat(obligation.getOverdueSince()).isEqualTo(overdueSince);
         }
     }
 
@@ -186,7 +174,7 @@ class PaymentServiceTest {
         void applyPaymentFailsWhenObligationDoesNotExist() {
 
             given(
-                    paymentObligationMapper
+                    paymentObligationRepository
                             .findByIdForUpdate(
                                     PAYMENT_OBLIGATION_ID
                             )
@@ -228,7 +216,7 @@ class PaymentServiceTest {
         void applyPaymentFailsWhenObligationIsNotActive() {
 
             given(
-                    paymentObligationMapper
+                    paymentObligationRepository
                             .findByIdForUpdate(
                                     PAYMENT_OBLIGATION_ID
                             )
@@ -298,7 +286,7 @@ class PaymentServiceTest {
             );
 
             verify(
-                    paymentObligationMapper,
+                    paymentObligationRepository,
                     never()
             ).findByIdForUpdate(
                     PAYMENT_OBLIGATION_ID
@@ -337,7 +325,7 @@ class PaymentServiceTest {
             );
 
             verify(
-                    paymentObligationMapper,
+                    paymentObligationRepository,
                     never()
             ).findByIdForUpdate(
                     PAYMENT_OBLIGATION_ID
@@ -350,64 +338,18 @@ class PaymentServiceTest {
                 "같은 은행 거래 ID로 이미 반영된 납부기록이 있으면 예외가 발생한다"
         )
         void applyPaymentFailsWhenBankTransactionIsAlreadyApplied() {
-
-            given(
-                    paymentObligationMapper
-                            .findByIdForUpdate(
-                                    PAYMENT_OBLIGATION_ID
-                            )
-            ).willReturn(
-                    Optional.of(
-                            createActiveObligation()
-                    )
-            );
-
-            given(
-                    paymentRecordService
-                            .sumConfirmedAmountByTarget(
-                                    PaymentTargetType.SETTLEMENT,
-                                    PAYMENT_OBLIGATION_ID
-                            )
-            ).willReturn(
-                    BigDecimal.ZERO
-            );
-
-            willThrow(
-                    PaymentErrorCode
-                            .DUPLICATE_PAYMENT_RECORD
-                            .toException()
-            ).given(
-                    paymentRecordService
-            ).createConfirmedRecord(
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any()
-            );
-
+            given(paymentRecordService.existsByBankTransactionId(BANK_TRANSACTION_ID))
+                    .willReturn(true);
 
             assertPaymentExceptionThrownBy(
-                    () ->
-                            paymentService
-                                    .applyAutoMatchedPayment(
-                                            PAYMENT_OBLIGATION_ID,
-                                            BANK_TRANSACTION_ID,
-                                            new BigDecimal("10000")
-                                    ),
-                    PaymentErrorCode
-                            .DUPLICATE_PAYMENT_RECORD
+                    () -> paymentService.applyAutoMatchedPayment(
+                            PAYMENT_OBLIGATION_ID, BANK_TRANSACTION_ID, new BigDecimal("10000")),
+                    PaymentErrorCode.DUPLICATE_PAYMENT_RECORD
             );
 
-
-            verify(paymentRecordService)
-                    .createConfirmedRecord(
-                            eq(BANK_TRANSACTION_ID),
-                            eq(PaymentTargetType.SETTLEMENT),
-                            eq(PAYMENT_OBLIGATION_ID),
-                            eq(new BigDecimal("10000")),
-                            eq(SourceType.AUTO_MATCH)
-                    );
+            verify(paymentObligationRepository, never()).findByIdForUpdate(any());
+            verify(paymentRecordService, never())
+                    .createConfirmedRecord(any(), any(), any(), any(), any());
         }
 
 
@@ -418,7 +360,7 @@ class PaymentServiceTest {
         void applyPaymentFailsWhenAmountExceedsRemainingAmount() {
 
             given(
-                    paymentObligationMapper
+                    paymentObligationRepository
                             .findByIdForUpdate(
                                     PAYMENT_OBLIGATION_ID
                             )
@@ -470,15 +412,16 @@ class PaymentServiceTest {
                 "납부기록 생성에 실패하면 예외가 발생한다"
         )
         void applyPaymentFailsWhenPaymentRecordCreateFails() {
+            PaymentObligationEntity obligation = createActiveObligation();
 
             given(
-                    paymentObligationMapper
+                    paymentObligationRepository
                             .findByIdForUpdate(
                                     PAYMENT_OBLIGATION_ID
                             )
             ).willReturn(
                     Optional.of(
-                            createActiveObligation()
+                            obligation
                     )
             );
 
@@ -520,30 +463,25 @@ class PaymentServiceTest {
             );
 
 
-            verify(
-                    paymentObligationMapper,
-                    never()
-            ).updatePaymentStatus(
-                    PAYMENT_OBLIGATION_ID,
-                    PaymentStatus.PARTIALLY_PAID
-            );
+            assertThat(obligation.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
         }
 
 
         @Test
         @DisplayName(
-                "납부기록 생성 중 중복 오류가 발생하면 중복 반영 예외로 변환한다"
+                "납부기록 서비스의 중복 예외를 전달하고 납부 상태를 변경하지 않는다"
         )
         void applyPaymentFailsWhenDuplicateKeyExceptionOccursOnInsert() {
+            PaymentObligationEntity obligation = createActiveObligation();
 
             given(
-                    paymentObligationMapper
+                    paymentObligationRepository
                             .findByIdForUpdate(
                                     PAYMENT_OBLIGATION_ID
                             )
             ).willReturn(
                     Optional.of(
-                            createActiveObligation()
+                            obligation
                     )
             );
 
@@ -585,63 +523,29 @@ class PaymentServiceTest {
             );
 
 
-            verify(
-                    paymentObligationMapper,
-                    never()
-            ).updatePaymentStatus(
-                    any(),
-                    any()
-            );
+            assertThat(obligation.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
         }
 
 
         @Test
         @DisplayName(
-                "납부 상태 변경에 실패하면 예외가 발생한다"
+                "이미 완납된 납부의무에는 추가 납부를 반영하지 않는다"
         )
-        void applyPaymentFailsWhenPaymentStatusUpdateFails() {
-
-            given(
-                    paymentObligationMapper
-                            .findByIdForUpdate(
-                                    PAYMENT_OBLIGATION_ID
-                            )
-            ).willReturn(
-                    Optional.of(
-                            createActiveObligation()
-                    )
-            );
-
-            given(
-                    paymentRecordService
-                            .sumConfirmedAmountByTarget(
-                                    PaymentTargetType.SETTLEMENT,
-                                    PAYMENT_OBLIGATION_ID
-                            )
-            ).willReturn(
-                    BigDecimal.ZERO
-            );
-
-            given(
-                    paymentObligationMapper
-                            .updatePaymentStatus(
-                                    PAYMENT_OBLIGATION_ID,
-                                    PaymentStatus.PARTIALLY_PAID
-                            )
-            ).willReturn(0);
-
+        void applyPaymentFailsWhenObligationIsAlreadyPaid() {
+            PaymentObligationEntity obligation = createActiveObligation();
+            obligation.changePaymentStatus(PaymentStatus.PAID);
+            given(paymentObligationRepository.findByIdForUpdate(PAYMENT_OBLIGATION_ID))
+                    .willReturn(Optional.of(obligation));
 
             assertPaymentExceptionThrownBy(
-                    () ->
-                            paymentService
-                                    .applyAutoMatchedPayment(
-                                            PAYMENT_OBLIGATION_ID,
-                                            BANK_TRANSACTION_ID,
-                                            new BigDecimal("10000")
-                                    ),
-                    PaymentErrorCode
-                            .PAYMENT_STATUS_UPDATE_FAILED
+                    () -> paymentService.applyAutoMatchedPayment(
+                            PAYMENT_OBLIGATION_ID, BANK_TRANSACTION_ID, new BigDecimal("10000")),
+                    PaymentErrorCode.PAYMENT_OBLIGATION_NOT_ACTIVE
             );
+
+            assertThat(obligation.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+            verify(paymentRecordService, never())
+                    .createConfirmedRecord(any(), any(), any(), any(), any());
         }
 
 
@@ -656,32 +560,38 @@ class PaymentServiceTest {
             void createObligationSucceeds() {
 
                 given(
-                        paymentObligationMapper.insert(
+                        paymentObligationRepository.saveAndFlush(
                                 any(
-                                        PaymentObligationDTO.class
+                                        PaymentObligationEntity.class
                                 )
                         )
-                ).willReturn(1);
+                ).willAnswer(invocation -> {
+                    PaymentObligationEntity entity = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(entity, "paymentObligationId", PAYMENT_OBLIGATION_ID);
+                    return entity;
+                });
 
 
-                paymentService.createObligation(
+                Long createdId = paymentService.createObligation(
                         PARTICIPANT_ID,
                         EXPECTED_AMOUNT
                 );
 
 
-                ArgumentCaptor<PaymentObligationDTO> captor =
+                assertThat(createdId).isEqualTo(PAYMENT_OBLIGATION_ID);
+
+                ArgumentCaptor<PaymentObligationEntity> captor =
                         ArgumentCaptor.forClass(
-                                PaymentObligationDTO.class
+                                PaymentObligationEntity.class
                         );
 
-                verify(paymentObligationMapper)
-                        .insert(
+                verify(paymentObligationRepository)
+                        .saveAndFlush(
                                 captor.capture()
                         );
 
 
-                PaymentObligationDTO savedObligation =
+                PaymentObligationEntity savedObligation =
                         captor.getValue();
 
 
@@ -736,11 +646,11 @@ class PaymentServiceTest {
 
 
                 verify(
-                        paymentObligationMapper,
+                        paymentObligationRepository,
                         never()
-                ).insert(
+                ).saveAndFlush(
                         any(
-                                PaymentObligationDTO.class
+                                PaymentObligationEntity.class
                         )
                 );
             }
@@ -765,11 +675,11 @@ class PaymentServiceTest {
 
 
                 verify(
-                        paymentObligationMapper,
+                        paymentObligationRepository,
                         never()
-                ).insert(
+                ).saveAndFlush(
                         any(
-                                PaymentObligationDTO.class
+                                PaymentObligationEntity.class
                         )
                 );
             }
@@ -794,11 +704,11 @@ class PaymentServiceTest {
 
 
                 verify(
-                        paymentObligationMapper,
+                        paymentObligationRepository,
                         never()
-                ).insert(
+                ).saveAndFlush(
                         any(
-                                PaymentObligationDTO.class
+                                PaymentObligationEntity.class
                         )
                 );
             }
@@ -806,63 +716,38 @@ class PaymentServiceTest {
 
             @Test
             @DisplayName(
-                    "납부 의무 INSERT 결과가 1건이 아니면 예외가 발생한다"
+                    "납부 의무 저장 실패 시 저장 예외가 호출자에게 전달된다"
             )
-            void createObligationFailsWhenInsertCountIsInvalid() {
+            void createObligationPropagatesSaveFailure() {
+                DataIntegrityViolationException failure =
+                        new DataIntegrityViolationException("납부 의무 저장 실패");
+                given(paymentObligationRepository.saveAndFlush(any(PaymentObligationEntity.class)))
+                        .willThrow(failure);
 
-                given(
-                        paymentObligationMapper.insert(
-                                any(
-                                        PaymentObligationDTO.class
-                                )
-                        )
-                ).willReturn(0);
-
-
-                assertPaymentExceptionThrownBy(
-                        () ->
-                                paymentService
-                                        .createObligation(
-                                                PARTICIPANT_ID,
-                                                EXPECTED_AMOUNT
-                                        ),
-                        PaymentErrorCode
-                                .PAYMENT_OBLIGATION_CREATE_FAILED
-                );
+                assertThatThrownBy(() -> paymentService.createObligation(PARTICIPANT_ID, EXPECTED_AMOUNT))
+                        .isSameAs(failure);
             }
         }
     }
 
 
-    private PaymentObligationDTO createActiveObligation() {
+    private PaymentObligationEntity createActiveObligation() {
         return createObligation(
                 ObligationStatus.ACTIVE
         );
     }
 
 
-    private PaymentObligationDTO createObligation(
+    private PaymentObligationEntity createObligation(
             ObligationStatus obligationStatus
     ) {
 
-        return PaymentObligationDTO.builder()
-                .paymentObligationId(
-                        PAYMENT_OBLIGATION_ID
-                )
-                .participantId(1L)
-                .expectedAmount(
-                        new BigDecimal("100000")
-                )
-                .paymentStatus(
-                        PaymentStatus.UNPAID
-                )
-                .reviewStatus(
-                        ReviewStatus.NORMAL
-                )
-                .obligationStatus(
-                        obligationStatus
-                )
-                .build();
+        PaymentObligationEntity obligation =
+                new PaymentObligationEntity(1L, new BigDecimal("100000"));
+        // DB에서 조회된 ID와 상태를 테스트용 Entity에 재현한다.
+        ReflectionTestUtils.setField(obligation, "paymentObligationId", PAYMENT_OBLIGATION_ID);
+        ReflectionTestUtils.setField(obligation, "obligationStatus", obligationStatus);
+        return obligation;
     }
 
 
