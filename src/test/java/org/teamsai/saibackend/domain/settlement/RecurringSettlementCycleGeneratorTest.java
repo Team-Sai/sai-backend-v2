@@ -6,9 +6,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.dto.PaymentObligationDTO;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.settlement.dto.RecurringSettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
@@ -35,7 +36,7 @@ import static org.mockito.Mockito.*;
 class RecurringSettlementCycleGeneratorTest {
     @Mock private SettlementMapper settlementMapper;
     @Mock private SettlementParticipantMapper participantMapper;
-    @Mock private PaymentObligationMapper paymentObligationMapper;
+    @Mock private PaymentObligationRepository paymentObligationRepository;
     @Mock private SettlementPaymentService settlementPaymentService;
     @Mock private SettlementAmountCalculator settlementAmountCalculator;
     @Mock private SettlementAccountMapper settlementAccountMapper;
@@ -74,12 +75,16 @@ class RecurringSettlementCycleGeneratorTest {
                 .participantStatus(SettlementParticipantStatus.ACTIVE)
                 .build();
     }
-    private PaymentObligationDTO obligation(Long obligationId, Long participantId, BigDecimal expectedAmount) {
-        return PaymentObligationDTO.builder()
-                .paymentObligationId(obligationId)
-                .participantId(participantId)
-                .expectedAmount(expectedAmount)
-                .build();
+    private PaymentObligationEntity obligation(Long participantId, BigDecimal expectedAmount) {
+        return new PaymentObligationEntity(participantId, expectedAmount);
+    }
+    private List<ObligationStatus> allObligationStatuses() {
+        return List.of(
+                ObligationStatus.ACTIVE,
+                ObligationStatus.EXCLUDED,
+                ObligationStatus.CANCELLED,
+                ObligationStatus.WRITTEN_OFF
+        );
     }
     // 직전 회차(settlementId=10L)에 연결된 계좌가 없다고 가정 - 계좌 승계 로직이 조용히 스킵되도록
     private void givenNoPreviousAccount() {
@@ -156,7 +161,8 @@ class RecurringSettlementCycleGeneratorTest {
             assertThat(outcome.settlement()).isNotNull();
             verify(settlementAmountCalculator).calculateEqualAmount(BigDecimal.valueOf(300000), 1);
             verify(settlementPaymentService).createObligation(any(), eq(BigDecimal.valueOf(150000)));
-            verify(paymentObligationMapper, never()).findLatestByParticipantIdsIncludingWrittenOff(any());
+            verify(paymentObligationRepository, never())
+                    .findLatestByParticipantIdsAndObligationStatuses(any(), any());
         }
         @Test
         @DisplayName("EQUAL - 참여자가 여러 명이면 calculateEqualAmount로 계산된 동일 금액이 모든 참여자에게 배정된다")
@@ -191,13 +197,15 @@ class RecurringSettlementCycleGeneratorTest {
             ));
             when(settlementMapper.insertSettlement(any())).thenReturn(1);
             when(participantMapper.insert(any())).thenReturn(1);
-            when(paymentObligationMapper.findLatestByParticipantIdsIncludingWrittenOff(List.of(1L)))
-                    .thenReturn(List.of(obligation(500L, 1L, BigDecimal.valueOf(150000))));
+            when(paymentObligationRepository.findLatestByParticipantIdsAndObligationStatuses(
+                    List.of(1L), allObligationStatuses()))
+                    .thenReturn(List.of(obligation(1L, BigDecimal.valueOf(150000))));
             CycleGenerationOutcome outcome = sut.generateOneCycle(recurring, previous, LocalDate.of(2026, 2, 28));
             assertThat(outcome.result()).isEqualTo(CycleGenerationResult.CREATED);
             verify(settlementPaymentService).createObligation(any(), eq(BigDecimal.valueOf(150000)));
             verify(settlementAmountCalculator, never()).calculateEqualAmount(any(), anyInt());
-            verify(paymentObligationMapper, times(1)).findLatestByParticipantIdsIncludingWrittenOff(any());
+            verify(paymentObligationRepository, times(1))
+                    .findLatestByParticipantIdsAndObligationStatuses(List.of(1L), allObligationStatuses());
         }
         @Test
         @DisplayName("CUSTOM인데 직전 회차 납부의무가 없으면 PAYMENT_OBLIGATION_NOT_FOUND 예외를 던진다")
@@ -209,7 +217,8 @@ class RecurringSettlementCycleGeneratorTest {
                     activeParticipant(1L, 100L)
             ));
             when(settlementMapper.insertSettlement(any())).thenReturn(1);
-            when(paymentObligationMapper.findLatestByParticipantIdsIncludingWrittenOff(List.of(1L))).thenReturn(List.of());
+            when(paymentObligationRepository.findLatestByParticipantIdsAndObligationStatuses(
+                    List.of(1L), allObligationStatuses())).thenReturn(List.of());
             assertThatThrownBy(() -> sut.generateOneCycle(recurring, previous, LocalDate.of(2026, 2, 28)))
                     .isInstanceOf(DomainException.class)
                     .extracting(e -> ((DomainException) e).getErrorCode())
@@ -255,16 +264,18 @@ class RecurringSettlementCycleGeneratorTest {
             ));
             when(settlementMapper.insertSettlement(any())).thenReturn(1);
             when(participantMapper.insert(any())).thenReturn(1);
-            when(paymentObligationMapper.findLatestByParticipantIdsIncludingWrittenOff(List.of(1L, 2L, 3L)))
+            when(paymentObligationRepository.findLatestByParticipantIdsAndObligationStatuses(
+                    List.of(1L, 2L, 3L), allObligationStatuses()))
                     .thenReturn(List.of(
-                            obligation(500L, 1L, BigDecimal.valueOf(100000)),
-                            obligation(501L, 2L, BigDecimal.valueOf(120000)),
-                            obligation(502L, 3L, BigDecimal.valueOf(80000))
+                            obligation(1L, BigDecimal.valueOf(100000)),
+                            obligation(2L, BigDecimal.valueOf(120000)),
+                            obligation(3L, BigDecimal.valueOf(80000))
                     ));
             CycleGenerationOutcome outcome = sut.generateOneCycle(recurring, previous, LocalDate.of(2026, 2, 28));
             assertThat(outcome.result()).isEqualTo(CycleGenerationResult.CREATED);
             verify(participantMapper, times(3)).insert(any());
-            verify(paymentObligationMapper, times(1)).findLatestByParticipantIdsIncludingWrittenOff(any());
+            verify(paymentObligationRepository, times(1))
+                    .findLatestByParticipantIdsAndObligationStatuses(List.of(1L, 2L, 3L), allObligationStatuses());
             verify(settlementPaymentService).createObligation(any(), eq(BigDecimal.valueOf(100000)));
             verify(settlementPaymentService).createObligation(any(), eq(BigDecimal.valueOf(120000)));
             verify(settlementPaymentService).createObligation(any(), eq(BigDecimal.valueOf(80000)));
