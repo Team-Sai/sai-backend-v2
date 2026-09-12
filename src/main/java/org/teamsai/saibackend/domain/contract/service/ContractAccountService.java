@@ -112,7 +112,7 @@ public class ContractAccountService {
 
     private LoanContract findContract(Long contractId) {
         return loanContractRepository.findById(contractId)
-                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND.toException());
+                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
     }
 
     private void validateCreditor(
