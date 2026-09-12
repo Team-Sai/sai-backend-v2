@@ -6,10 +6,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
-import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.dto.ChangeRequestDetailDTO;
@@ -41,12 +42,44 @@ class ChangeRequestDetailServiceTest {
     @InjectMocks
     private ChangeRequestDetailService changeRequestDetailService;
 
-    private LoanContractChangeDTO createChangeRequestWithDifferentContractId(){
-        return LoanContractChangeDTO.builder()
-                .changeRequestId(CHANGE_REQUEST_ID)
-                .status(ChangeRequestStatus.PENDING)
-                .contractId(999L)
-                .build();
+    private LoanContractChangeRequestEntity buildChangeRequest(
+            Long changeRequestId,
+            Long contractId,
+            Long userId,
+            ChangeRequestStatus status,
+            LocalDate newMaturityDate,
+            BigDecimal newInterestRate,
+            String newRepaymentType,
+            Integer newRepaymentDate,
+            String changeReason,
+            String returnReason,
+            LocalDateTime createdAt
+    ) {
+        LoanContractChangeRequestEntity entity = new LoanContractChangeRequestEntity(
+                contractId,
+                userId,
+                changeReason,
+                newMaturityDate,
+                newInterestRate,
+                newRepaymentType,
+                newRepaymentDate,
+                null,
+                status,
+                createdAt,
+                createdAt
+        );
+        ReflectionTestUtils.setField(entity, "changeRequestId", changeRequestId);
+        if (returnReason != null) {
+            ReflectionTestUtils.setField(entity, "returnReason", returnReason);
+        }
+        return entity;
+    }
+
+    private LoanContractChangeRequestEntity createChangeRequestWithDifferentContractId() {
+        return buildChangeRequest(
+                CHANGE_REQUEST_ID, 999L, null, ChangeRequestStatus.PENDING,
+                null, null, null, null, null, null, LocalDateTime.now()
+        );
     }
 
     @Test
@@ -96,19 +129,12 @@ class ChangeRequestDetailServiceTest {
                 .build();
     }
 
-    private LoanContractChangeDTO createChangeRequest() {
-        return LoanContractChangeDTO.builder()
-                .changeRequestId(CHANGE_REQUEST_ID)
-                .status(ChangeRequestStatus.PENDING)
-                .newMaturityDate(LocalDate.of(2026, 12, 31))
-                .newInterestRate(BigDecimal.valueOf(4.2))
-                .newRepaymentType("EQUAL_PRINCIPAL_AND_INTEREST")
-                .newRepaymentDate(15)
-                .changeReason("자금 사정으로 인한 연장 요청")
-                .createdAt(LocalDateTime.now())
-                .contractId(CONTRACT_ID)
-                .userId(USER_ID)
-                .build();
+    private LoanContractChangeRequestEntity createChangeRequest() {
+        return buildChangeRequest(
+                CHANGE_REQUEST_ID, CONTRACT_ID, USER_ID, ChangeRequestStatus.PENDING,
+                LocalDate.of(2026, 12, 31), BigDecimal.valueOf(4.2), "EQUAL_PRINCIPAL_AND_INTEREST", 15,
+                "자금 사정으로 인한 연장 요청", null, LocalDateTime.now()
+        );
     }
 
     @Test
@@ -116,18 +142,11 @@ class ChangeRequestDetailServiceTest {
     void getDetail_fallsBackToCurrentMaturityDate_whenNewMaturityDateIsNull() {
         LoanContractResponse contract = createContract();
 
-        LoanContractChangeDTO changeDTO = LoanContractChangeDTO.builder()
-                .changeRequestId(CHANGE_REQUEST_ID)
-                .status(ChangeRequestStatus.PENDING)
-                .newMaturityDate(null)
-                .newInterestRate(BigDecimal.valueOf(4.2))
-                .newRepaymentType("EQUAL_PRINCIPAL_AND_INTEREST")
-                .newRepaymentDate(15)
-                .changeReason("자금 사정으로 인한 연장 요청")
-                .createdAt(LocalDateTime.now())
-                .contractId(CONTRACT_ID)
-                .userId(USER_ID)
-                .build();
+        LoanContractChangeRequestEntity changeDTO = buildChangeRequest(
+                CHANGE_REQUEST_ID, CONTRACT_ID, USER_ID, ChangeRequestStatus.PENDING,
+                null, BigDecimal.valueOf(4.2), "EQUAL_PRINCIPAL_AND_INTEREST", 15,
+                "자금 사정으로 인한 연장 요청", null, LocalDateTime.now()
+        );
 
         given(contractChangeService.getContract(CONTRACT_ID, USER_ID)).willReturn(contract);
         given(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeDTO);
@@ -152,13 +171,10 @@ class ChangeRequestDetailServiceTest {
     @DisplayName("채무자가 요청자면 requesterName이 채무자 이름으로 결정된다")
     void getDetail_requesterIsDebtor() {
         LoanContractResponse contract = createContract();
-        LoanContractChangeDTO changeDTO = LoanContractChangeDTO.builder()
-                .changeRequestId(CHANGE_REQUEST_ID)
-                .contractId(CONTRACT_ID)
-                .userId(contract.getDebtorId())
-                .status(ChangeRequestStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        LoanContractChangeRequestEntity changeDTO = buildChangeRequest(
+                CHANGE_REQUEST_ID, CONTRACT_ID, contract.getDebtorId(), ChangeRequestStatus.PENDING,
+                null, null, null, null, null, null, LocalDateTime.now()
+        );
 
         when(contractChangeService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
         when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeDTO);
@@ -172,14 +188,10 @@ class ChangeRequestDetailServiceTest {
     @DisplayName("반려 사유(returnReason)가 응답에 그대로 채워진다")
     void getDetail_includesReturnReason() {
         LoanContractResponse contract = createContract();
-        LoanContractChangeDTO changeDTO = LoanContractChangeDTO.builder()
-                .changeRequestId(CHANGE_REQUEST_ID)
-                .contractId(CONTRACT_ID)
-                .userId(contract.getCreditorId())
-                .status(ChangeRequestStatus.REJECTED)
-                .returnReason("이율이 너무 높습니다")
-                .createdAt(LocalDateTime.now())
-                .build();
+        LoanContractChangeRequestEntity changeDTO = buildChangeRequest(
+                CHANGE_REQUEST_ID, CONTRACT_ID, contract.getCreditorId(), ChangeRequestStatus.REJECTED,
+                null, null, null, null, null, "이율이 너무 높습니다", LocalDateTime.now()
+        );
 
         when(contractChangeService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
         when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeDTO);
