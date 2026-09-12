@@ -44,6 +44,10 @@ public class ContractChangeService {
     private final ApplicationEventPublisher eventPublisher;
     private final ContractChangeRepository contractChangeRepository;
 
+    public LoanContractChangeRequestEntity getChangeRequestForUpdate(Long changeRequestId) {
+        return contractChangeRepository.findByIdForUpdate(changeRequestId)
+                .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
+    }
 
     public LoanContractResponse getContract(Long contractId, Long userID) {
         LoanContractResponse contract = loanContractService.findContract(contractId, userID);
@@ -163,7 +167,7 @@ public class ContractChangeService {
     public LoanContractChangeRequestEntity rejectChange(Long contractId, Long changeRequestId, String returnReason, Long userId) {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
-        LoanContractChangeRequestEntity changeRequest = getChangeRequest(changeRequestId);
+        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
         boolean requesterIsCreditor = Objects.equals(contract.getCreditorId(), changeRequest.getUserId());
         Long approverId = requesterIsCreditor ? contract.getDebtorId() : contract.getCreditorId();
@@ -236,6 +240,8 @@ public class ContractChangeService {
                 .findFirst()
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
 
+        changeRequest = getChangeRequestForUpdate(changeRequest.getChangeRequestId());
+
         if (changeRequest.getStatus() != ChangeRequestStatus.PENDING) {
             throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
         }
@@ -296,7 +302,7 @@ public class ContractChangeService {
 
     @Transactional
     public void cancelChangeRequest(Long contractId, Long changeRequestId, Long userId) {
-        LoanContractChangeRequestEntity changeRequest = getChangeRequest(changeRequestId);
+        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
         if (!changeRequest.getContractId().equals(contractId)) {
             throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
@@ -337,7 +343,7 @@ public class ContractChangeService {
 
         identityService.consume(userId, identityVerificationId, IdentityPurpose.LOAN_CONTRACT);
 
-        LoanContractChangeRequestEntity changeRequest = getChangeRequest(changeRequestId);
+        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
         if (!changeRequest.getContractId().equals(contractId)) {
             throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();

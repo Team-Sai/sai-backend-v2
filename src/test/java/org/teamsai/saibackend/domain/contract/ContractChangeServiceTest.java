@@ -79,7 +79,6 @@ class ContractChangeServiceTest {
     @InjectMocks
     private ContractChangeService contractChangeService;
 
-    // 생성자에 없는 값(번호표 등)은 만든 뒤 ReflectionTestUtils로 강제로 채워 넣는다.
     private LoanContractChangeRequestEntity entity(
             Long changeRequestId,
             Long contractId,
@@ -316,6 +315,9 @@ class ContractChangeServiceTest {
                     .willReturn(pendingV2Contract());
             given(contractChangeRepository.findByContractId(V1_CONTRACT_ID))
                     .willReturn(List.of(changeRequest));
+            // 후보를 찾은 뒤 잠금 걸고 다시 조회하는 단계 -> 같은 상자를 그대로 돌려줌 (정상 흐름)
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
+                    .willReturn(Optional.of(changeRequest));
             given(fileService.saveSignatureFile(V2_CONTRACT_ID, signature))
                     .willReturn(SAVED_PATH);
             given(loanContractService.buildCompletedSnapshot(any(), eq(false), eq(SAVED_PATH)))
@@ -331,6 +333,38 @@ class ContractChangeServiceTest {
             assertThat(changeRequest.getStatus()).isEqualTo(ChangeRequestStatus.APPROVED);
             verify(loanContractService).supersedeContract(V1_CONTRACT_ID);
             verify(repaymentScheduleService).generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+        }
+
+        @Test
+        @DisplayName("잠금 후 재확인 시 이미 다른 요청에 의해 처리되어 있으면 승인하지 않는다")
+        void approveChangeFailsWhenAlreadyProcessedAtRecheck() {
+            MultipartFile signature = mock(MultipartFile.class);
+
+            // 1단계(후보 찾기) 시점에는 아직 PENDING으로 보였음
+            LoanContractChangeRequestEntity snapshotWhenFound = pendingChangeRequest();
+
+            // 2단계(잠금 걸고 재조회) 시점에는, 그 사이 다른 요청이 먼저 승인 처리를 끝내버린 상태
+            LoanContractChangeRequestEntity latestState =
+                    entity(CHANGE_REQUEST_ID, V1_CONTRACT_ID, USER_ID, ChangeRequestStatus.APPROVED, null);
+
+            given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
+                    .willReturn(pendingV2Contract());
+            given(contractChangeRepository.findByContractId(V1_CONTRACT_ID))
+                    .willReturn(List.of(snapshotWhenFound));
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
+                    .willReturn(Optional.of(latestState));
+
+            assertThatThrownBy(() ->
+                    contractChangeService.approveChange(V2_CONTRACT_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID))
+                    .isInstanceOfSatisfying(
+                            DomainException.class,
+                            exception -> assertThat(exception.getErrorCode())
+                                    .isEqualTo(ContractChangeErrorCode.ALREADY_BEING_REQUEST)
+                    );
+
+            verify(loanContractService, never()).supersedeContract(any());
+            verify(repaymentScheduleService, never()).generateChangedSchedule(any(), any());
+            verify(contractChangeRepository, never()).save(any());
         }
     }
 
@@ -359,7 +393,7 @@ class ContractChangeServiceTest {
         void rejectChangeSuccessWhenRequesterIsDebtor() {
             given(loanContractService.findContract(CONTRACT_ID, USER_ID))
                     .willReturn(createContract(ContractStatus.COMPLETED));
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(pendingChangeRequest(DEBTOR_ID)));
             given(loanContractService.findPendingContractByPreviousId(CONTRACT_ID))
                     .willReturn(Optional.of(pendingV2()));
@@ -378,7 +412,7 @@ class ContractChangeServiceTest {
 
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
                     .willReturn(createContract(ContractStatus.COMPLETED));
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
             given(loanContractService.findPendingContractByPreviousId(CONTRACT_ID))
                     .willReturn(Optional.of(pendingV2()));
@@ -398,7 +432,7 @@ class ContractChangeServiceTest {
         void rejectChangeFailsWhenRequesterIsCreditor() {
             given(loanContractService.findContract(CONTRACT_ID, USER_ID))
                     .willReturn(createContract(ContractStatus.COMPLETED));
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(pendingChangeRequest(USER_ID)));
 
             assertThatThrownBy(() ->
@@ -421,7 +455,7 @@ class ContractChangeServiceTest {
 
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
                     .willReturn(createContract(ContractStatus.COMPLETED));
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(otherContractRequest));
 
             assertThatThrownBy(() ->
@@ -441,7 +475,7 @@ class ContractChangeServiceTest {
 
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
                     .willReturn(createContract(ContractStatus.COMPLETED));
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(approvedRequest));
 
             assertThatThrownBy(() ->
@@ -460,7 +494,7 @@ class ContractChangeServiceTest {
         void rejectChangeFailsWhenChangeRequestNotFound() {
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
                     .willReturn(createContract(ContractStatus.COMPLETED));
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.empty());
 
             assertThatThrownBy(() ->
@@ -471,7 +505,6 @@ class ContractChangeServiceTest {
                                     .isEqualTo(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND)
                     );
         }
-
     }
 
     @Nested
@@ -496,7 +529,7 @@ class ContractChangeServiceTest {
             MultipartFile signature = mock(MultipartFile.class);
             LoanContractChangeRequestEntity changeRequest = pendingChangeRequest(DEBTOR_ID, CONTRACT_ID);
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
             given(fileService.saveSignatureFile(CHANGE_REQUEST_ID, signature))
                     .willReturn(SAVED_PATH);
@@ -522,7 +555,7 @@ class ContractChangeServiceTest {
             MultipartFile signature = mock(MultipartFile.class);
             LoanContractChangeRequestEntity changeRequest = pendingChangeRequest(USER_ID, CONTRACT_ID);
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
             given(fileService.saveSignatureFile(CHANGE_REQUEST_ID, signature))
                     .willReturn(SAVED_PATH);
@@ -545,7 +578,7 @@ class ContractChangeServiceTest {
         void submitRequesterSignatureFailsWhenNotRequester() {
             MultipartFile signature = mock(MultipartFile.class);
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(pendingChangeRequest(USER_ID, CONTRACT_ID)));
 
             assertThatThrownBy(() ->
@@ -565,7 +598,7 @@ class ContractChangeServiceTest {
         void submitRequesterSignatureFailsWhenAlreadyProcessed() {
             MultipartFile signature = mock(MultipartFile.class);
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequestWithStatus(ChangeRequestStatus.APPROVED, USER_ID, CONTRACT_ID)));
 
             assertThatThrownBy(() ->
@@ -586,7 +619,7 @@ class ContractChangeServiceTest {
             MultipartFile signature = mock(MultipartFile.class);
             Long otherContractId = 999L;
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(pendingChangeRequest(USER_ID, otherContractId)));
 
             assertThatThrownBy(() ->
@@ -606,7 +639,7 @@ class ContractChangeServiceTest {
         void submitRequesterSignatureFailsWhenChangeRequestNotFound() {
             MultipartFile signature = mock(MultipartFile.class);
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.empty());
 
             assertThatThrownBy(() ->
@@ -648,7 +681,7 @@ class ContractChangeServiceTest {
             LoanContractChangeRequestEntity changeRequest =
                     changeRequestEntity(ChangeRequestStatus.PENDING, USER_ID, CONTRACT_ID, null);
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
             given(loanContractService.findPendingContractByPreviousId(CONTRACT_ID))
                     .willReturn(Optional.of(pendingV2()));
@@ -663,7 +696,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("이미 서명을 제출한 요청은 취소할 수 없다")
         void cancelChangeRequestFailsWhenAlreadySigned() {
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequestEntity(
                             ChangeRequestStatus.PENDING, USER_ID, CONTRACT_ID, "uploads/signatures/change_300_signature.png"
                     )));
@@ -683,7 +716,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("요청을 등록한 당사자가 아니면 취소할 수 없다")
         void cancelChangeRequestFailsWhenNotRequester() {
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequestEntity(ChangeRequestStatus.PENDING, USER_ID, CONTRACT_ID, null)));
 
             assertThatThrownBy(() ->
@@ -701,7 +734,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("이미 처리된(승인/반려/취소) 요청이면 취소할 수 없다")
         void cancelChangeRequestFailsWhenAlreadyProcessed() {
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequestEntity(ChangeRequestStatus.APPROVED, USER_ID, CONTRACT_ID, null)));
 
             assertThatThrownBy(() ->
@@ -721,7 +754,7 @@ class ContractChangeServiceTest {
         void cancelChangeRequestFailsWhenContractIdMismatch() {
             Long otherContractId = 999L;
 
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequestEntity(ChangeRequestStatus.PENDING, USER_ID, otherContractId, null)));
 
             assertThatThrownBy(() ->
@@ -738,7 +771,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("존재하지 않는 변경 요청이면 취소할 수 없다")
         void cancelChangeRequestFailsWhenChangeRequestNotFound() {
-            given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.empty());
 
             assertThatThrownBy(() ->
