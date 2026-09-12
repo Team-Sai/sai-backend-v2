@@ -112,4 +112,8 @@ public interface PaymentObligationRepository
             @Param("cutoffDateTime")
             java.time.LocalDateTime cutoffDateTime
     );
+
+    List<PaymentObligationEntity> findByParticipantIdIn(
+            List<Long> participantIds
+    );
 }

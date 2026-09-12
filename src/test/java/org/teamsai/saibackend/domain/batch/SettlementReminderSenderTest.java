@@ -8,8 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.dto.PaymentObligationDTO;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
@@ -29,7 +29,7 @@ class SettlementReminderSenderTest {
     @Mock
     private SettlementParticipantMapper participantMapper;
     @Mock
-    private PaymentObligationMapper paymentObligationMapper;
+    private PaymentObligationRepository paymentObligationRepository;
     @Mock
     private NotificationService notificationService;
 
@@ -49,13 +49,12 @@ class SettlementReminderSenderTest {
         return dto;
     }
 
-    private PaymentObligationDTO obligation(Long obligationId, Long participantId, PaymentStatus status, boolean unresolved) {
-        PaymentObligationDTO dto = mock(PaymentObligationDTO.class);
-        lenient().when(dto.getPaymentObligationId()).thenReturn(obligationId);
-        lenient().when(dto.getParticipantId()).thenReturn(participantId);
-        PaymentStatus mockedStatus = status != null ? status : mock(PaymentStatus.class);
-        lenient().when(dto.getPaymentStatus()).thenReturn(mockedStatus);
-        return dto;
+    private PaymentObligationEntity obligation(Long obligationId, Long participantId, PaymentStatus status) {
+        PaymentObligationEntity entity = mock(PaymentObligationEntity.class);
+        lenient().when(entity.getPaymentObligationId()).thenReturn(obligationId);
+        lenient().when(entity.getParticipantId()).thenReturn(participantId);
+        lenient().when(entity.getPaymentStatus()).thenReturn(status);
+        return entity;
     }
 
     @Nested
@@ -69,7 +68,7 @@ class SettlementReminderSenderTest {
             int result = sender.sendForSettlement(s, ReminderStage.D3);
 
             assertThat(result).isZero();
-            verifyNoInteractions(paymentObligationMapper, notificationService);
+            verifyNoInteractions(paymentObligationRepository, notificationService);
         }
     }
 
@@ -82,19 +81,15 @@ class SettlementReminderSenderTest {
             SettlementParticipantDTO p1 = participant(10L, 100L);
             when(participantMapper.findActiveBySettlementId(1L)).thenReturn(List.of(p1));
 
-            PaymentObligationDTO unresolvedOb = mock(PaymentObligationDTO.class);
+            PaymentObligationEntity unresolvedOb = mock(PaymentObligationEntity.class);
             when(unresolvedOb.getParticipantId()).thenReturn(10L);
             when(unresolvedOb.getPaymentObligationId()).thenReturn(500L);
-            PaymentStatus unresolvedStatus = mock(PaymentStatus.class);
-            when(unresolvedStatus.isUnresolved()).thenReturn(true);
-            when(unresolvedOb.getPaymentStatus()).thenReturn(unresolvedStatus);
+            when(unresolvedOb.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            PaymentObligationDTO resolvedOb = mock(PaymentObligationDTO.class);
-            PaymentStatus resolvedStatus = mock(PaymentStatus.class);
-            when(resolvedStatus.isUnresolved()).thenReturn(false);
-            when(resolvedOb.getPaymentStatus()).thenReturn(resolvedStatus);
+            PaymentObligationEntity resolvedOb = mock(PaymentObligationEntity.class);
+            when(resolvedOb.getPaymentStatus()).thenReturn(PaymentStatus.PAID);
 
-            when(paymentObligationMapper.findByParticipantIds(List.of(10L)))
+            when(paymentObligationRepository.findByParticipantIdIn(List.of(10L)))
                     .thenReturn(List.of(unresolvedOb, resolvedOb));
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
@@ -116,13 +111,11 @@ class SettlementReminderSenderTest {
             when(participantMapper.findActiveBySettlementId(1L)).thenReturn(List.of(p1));
 
             // obligation의 participantId가 activeParticipants에 없는 20L (매핑 실패 상황)
-            PaymentObligationDTO orphanOb = mock(PaymentObligationDTO.class);
+            PaymentObligationEntity orphanOb = mock(PaymentObligationEntity.class);
             when(orphanOb.getParticipantId()).thenReturn(20L);
-            PaymentStatus unresolvedStatus = mock(PaymentStatus.class);
-            when(unresolvedStatus.isUnresolved()).thenReturn(true);
-            when(orphanOb.getPaymentStatus()).thenReturn(unresolvedStatus);
+            when(orphanOb.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            when(paymentObligationMapper.findByParticipantIds(List.of(10L)))
+            when(paymentObligationRepository.findByParticipantIdIn(List.of(10L)))
                     .thenReturn(List.of(orphanOb));
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
@@ -142,21 +135,17 @@ class SettlementReminderSenderTest {
             SettlementParticipantDTO p2 = participant(11L, 101L);
             when(participantMapper.findActiveBySettlementId(1L)).thenReturn(List.of(p1, p2));
 
-            PaymentObligationDTO ob1 = mock(PaymentObligationDTO.class);
+            PaymentObligationEntity ob1 = mock(PaymentObligationEntity.class);
             when(ob1.getParticipantId()).thenReturn(10L);
             when(ob1.getPaymentObligationId()).thenReturn(500L);
-            PaymentStatus status1 = mock(PaymentStatus.class);
-            when(status1.isUnresolved()).thenReturn(true);
-            when(ob1.getPaymentStatus()).thenReturn(status1);
+            when(ob1.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            PaymentObligationDTO ob2 = mock(PaymentObligationDTO.class);
+            PaymentObligationEntity ob2 = mock(PaymentObligationEntity.class);
             when(ob2.getParticipantId()).thenReturn(11L);
             when(ob2.getPaymentObligationId()).thenReturn(501L);
-            PaymentStatus status2 = mock(PaymentStatus.class);
-            when(status2.isUnresolved()).thenReturn(true);
-            when(ob2.getPaymentStatus()).thenReturn(status2);
+            when(ob2.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            when(paymentObligationMapper.findByParticipantIds(List.of(10L, 11L)))
+            when(paymentObligationRepository.findByParticipantIdIn(List.of(10L, 11L)))
                     .thenReturn(List.of(ob1, ob2));
 
             doThrow(new RuntimeException("알림 발송 실패"))
