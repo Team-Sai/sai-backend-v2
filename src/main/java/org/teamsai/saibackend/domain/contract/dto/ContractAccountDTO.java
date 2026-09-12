@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
+
 import java.time.LocalDateTime;
 
 @Getter

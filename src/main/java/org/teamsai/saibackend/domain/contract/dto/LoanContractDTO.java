@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractRelationType;
+import org.teamsai.saibackend.domain.contract.type.ContractRelationType;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 
 import java.math.BigDecimal;

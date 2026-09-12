@@ -2,15 +2,15 @@ package org.teamsai.saibackend.domain.contract.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.teamsai.saibackend.domain.contract.mapper.RiskCheckMapper;
+import org.teamsai.saibackend.domain.contract.repository.RiskCheckRepository;
 
 @Service
 @RequiredArgsConstructor
 public class RiskCheckService {
 
-    private final RiskCheckMapper riskCheckMapper;
+    private final RiskCheckRepository riskCheckRepository;
 
     public Long getPreviousTotalAmount(Long userId) {
-        return riskCheckMapper.sumCompletedPrincipalByCreditor(userId);
+        return riskCheckRepository.sumCompletedPrincipalByCreditor(userId);
     }
 }
