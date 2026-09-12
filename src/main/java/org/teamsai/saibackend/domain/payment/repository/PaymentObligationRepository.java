@@ -116,4 +116,19 @@ public interface PaymentObligationRepository
     List<PaymentObligationEntity> findByParticipantIdIn(
             List<Long> participantIds
     );
+
+    @Query(
+            value = """
+                SELECT DISTINCT sp.settlement_id
+                FROM payment_obligation po
+                JOIN settlement_participant sp
+                  ON sp.participant_id = po.participant_id
+                WHERE po.payment_obligation_id IN (:obligationIds)
+                """,
+            nativeQuery = true
+    )
+    List<Long> findSettlementIdsByObligationIds(
+            @Param("obligationIds")
+            List<Long> obligationIds
+    );
 }
