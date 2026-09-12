@@ -9,10 +9,10 @@ import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.contract.dto.ContractAccountDTO;
 import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
+import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.mapper.ContractAccountMapper;
-import org.teamsai.saibackend.domain.contract.mapper.LoanContractMapper;
+import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,7 +23,7 @@ import java.util.Objects;
 public class ContractAccountService {
 
     private final ContractAccountMapper contractAccountMapper;
-    private final LoanContractMapper loanContractMapper;
+    private final LoanContractRepository loanContractRepository;
     private final LinkedBankAccountService linkedBankAccountService;
 
     @Transactional(readOnly = true)
@@ -38,7 +38,7 @@ public class ContractAccountService {
             Long contractId,
             Long userId
     ) {
-        LoanContractResponse contract = findContract(contractId);
+        LoanContract contract = findContract(contractId);
         validateCreditor(contract, userId);
 
         ContractAccountDTO contractAccount = contractAccountMapper
@@ -106,7 +106,7 @@ public class ContractAccountService {
     }
 
     private void validateContractOwner(Long contractId, Long userId) {
-        LoanContractResponse contract = findContract(contractId);
+        LoanContract contract = findContract(contractId);
         validateCreditor(contract, userId);
 
 
@@ -115,18 +115,18 @@ public class ContractAccountService {
         }
     }
 
-    private LoanContractResponse findContract(Long contractId) {
-        return loanContractMapper.findContractById(contractId)
+    private LoanContract findContract(Long contractId) {
+        return loanContractRepository.findById(contractId)
                 .orElseThrow(
                         LoanContractErrorCode.CONTRACT_NOT_FOUND::toException
                 );
     }
 
     private void validateCreditor(
-            LoanContractResponse contract,
+            LoanContract contract,
             Long userId
     ) {
-        if (!Objects.equals(contract.getCreditorId(), userId)) {
+        if (!Objects.equals(contract.getCreditor().getUserId(), userId)) {
             throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
         }
     }
