@@ -14,7 +14,7 @@ import java.util.Optional;
 
 public interface RepaymentScheduleRepository extends JpaRepository<RepaymentScheduleEntity, Long> {
 
-    List<RepaymentScheduleEntity> findByContractId(Long contractId);
+    List<RepaymentScheduleEntity> findByContractIdOrderBySequenceASC(Long contractId);
 
     List<RepaymentScheduleEntity> findByStatusAndDueDateBefore(RepaymentScheduleStatus status, LocalDate date);
 
@@ -60,4 +60,8 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
         ORDER BY r.sequence ASC
         """, nativeQuery = true)
     List<RepaymentScheduleWithRemainingProjection> findByContractIds(@Param("contractIds") List<Long> contractIds);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM RepaymentScheduleEntity r WHERE r.contractId = :contractId ORDER BY r.sequence Asc")
+    List<RepaymentScheduleEntity> findByContractIdForUpdate(@Param("contractId")Long contractId);
 }

@@ -131,7 +131,7 @@ class RepaymentScheduleServiceTest {
                 buildRow(3, RepaymentScheduleStatus.PENDING, "800000"),
                 buildRow(4, RepaymentScheduleStatus.PENDING, "800000")
         );
-        when(repaymentScheduleRepository.findByContractId(contractId)).thenReturn(schedules);
+        when(repaymentScheduleRepository.findByContractIdOrderBySequenceASC(contractId)).thenReturn(schedules);
 
         RepaymentScheduleSummaryResponse summary = repaymentScheduleService.getScheduleSummary(contractId, userId);
 
@@ -155,7 +155,7 @@ class RepaymentScheduleServiceTest {
         assertThatThrownBy(() -> repaymentScheduleService.getScheduleSummary(contractId, otherUserId))
                 .isInstanceOf(DomainException.class);
 
-        verify(repaymentScheduleRepository, never()).findByContractId(any());
+        verify(repaymentScheduleRepository, never()).findByContractIdOrderBySequenceASC(any());
     }
 
     @Test

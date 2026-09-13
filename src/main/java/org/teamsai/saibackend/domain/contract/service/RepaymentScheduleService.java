@@ -97,7 +97,7 @@ public class RepaymentScheduleService {
     }
 
     public List<RepaymentScheduleEntity> getSchedule(Long contractId) {
-        return repaymentScheduleRepository.findByContractId(contractId);
+        return repaymentScheduleRepository.findByContractIdOrderBySequenceASC(contractId);
     }
 
     public Optional<RepaymentScheduleEntity> findNextPendingSchedule(Long contractId) {
@@ -119,7 +119,7 @@ public class RepaymentScheduleService {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
 
-        List<RepaymentScheduleEntity> schedules = repaymentScheduleRepository.findByContractId(contractId);
+        List<RepaymentScheduleEntity> schedules = repaymentScheduleRepository.findByContractIdOrderBySequenceASC(contractId);
 
         BigDecimal totalScheduledAmount = schedules.stream()
                 .map(RepaymentScheduleEntity::getTotalPaymentDue)
@@ -161,7 +161,7 @@ public class RepaymentScheduleService {
 
     @Transactional
     public void generateChangedSchedule(Long v1ContractId, Long v2ContractId) {
-        List<RepaymentScheduleEntity> v1Schedules = repaymentScheduleRepository.findByContractId(v1ContractId);
+        List<RepaymentScheduleEntity> v1Schedules = repaymentScheduleRepository.findByContractIdOrderBySequenceASC(v1ContractId);
 
         Optional<RepaymentScheduleEntity> lastPaid = v1Schedules.stream()
                 .filter(s -> s.getStatus() == RepaymentScheduleStatus.PAID)
