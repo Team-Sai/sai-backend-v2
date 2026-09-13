@@ -6,9 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
-import org.teamsai.saibackend.domain.archive.dto.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.dto.FileDTO;
-import org.teamsai.saibackend.domain.archive.mapper.ArchiveMapper;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.entity.File;
+import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
@@ -43,7 +43,7 @@ public class SettlementArchiveService {
     private static final String SETTLEMENT_DISPLAY_ID_PREFIX = "ST-";
 
     private final TemplateEngine templateEngine;
-    private final ArchiveMapper archiveMapper;
+    private final ArchiveRepository archiveRepository;
     private final HtmlToPdfRenderer htmlToPdfRenderer;
     private final SettlementQueryService settlementQueryService;
     private final SettlementPaymentStatusService settlementPaymentStatusService;
@@ -123,8 +123,8 @@ public class SettlementArchiveService {
     }
 
     private Optional<byte[]> findExistingPdf(Long settlementId) {
-        List<FileDTO> savedFiles = archiveMapper.findFilesByReference(
-                ArchiveStatus.SETTLEMENT.name(),
+        List<File> savedFiles = archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(
+                ArchiveStatus.SETTLEMENT,
                 settlementId
         );
 
@@ -132,7 +132,7 @@ public class SettlementArchiveService {
             return Optional.empty();
         }
 
-        FileDTO latestFile = savedFiles.get(0);
+        File latestFile = savedFiles.get(0);
         try {
             Path filePath = Paths.get(uploadDir).resolve(latestFile.getSavedFilename());
             return Optional.of(Files.readAllBytes(filePath));
@@ -152,17 +152,16 @@ public class SettlementArchiveService {
             String savedFilename = ArchiveStatus.SETTLEMENT.name() + "_" + settlementId + "_" + UUID.randomUUID() + ".pdf";
             Files.write(dirPath.resolve(savedFilename), pdfBytes);
 
-            FileDTO fileDTO = FileDTO.builder()
-                    .domainType(ArchiveStatus.SETTLEMENT)
-                    .referenceId(settlementId)
-                    .originalFilename("정산_" + settlementId + ".pdf")
-                    .savedFilename(savedFilename)
-                    .fileSize((long) pdfBytes.length)
-                    .fileType("application/pdf")
-                    .createdAt(LocalDateTime.now())
-                    .build();
+            File file = File.builder()
+                        .domainType(ArchiveStatus.SETTLEMENT)
+                        .referenceId(settlementId)
+                        .originalFilename("정산_" + settlementId + ".pdf")
+                        .savedFilename(savedFilename)
+                        .fileSize((long) pdfBytes.length)
+                        .fileType("application/pdf")
+                        .build();
 
-            archiveMapper.insertFile(fileDTO);
+            archiveRepository.save(file);
 
             log.info("[정산 PDF Saved] settlementId: {} -> {}", settlementId, savedFilename);
         } catch (IOException e) {
