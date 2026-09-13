@@ -3,23 +3,22 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.event.ContractCompletedEvent;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
-import org.teamsai.saibackend.domain.contract.service.LoanContractFileService;
-import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
-import org.teamsai.saibackend.domain.contract.mapper.ContractChangeMapper;
+import org.teamsai.saibackend.domain.contract.repository.ContractChangeRepository;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
@@ -38,7 +37,6 @@ import java.util.Objects;
 @Transactional(readOnly = true)
 public class ContractChangeService {
 
-    private final ContractChangeMapper contractChangeMapper;
     private final LoanContractService loanContractService;
     private final RepaymentScheduleService repaymentScheduleService;
     private final NotificationService notificationService;
@@ -46,7 +44,31 @@ public class ContractChangeService {
     private final LoanContractFileService fileService;
     private final IdentityService identityService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ContractChangeRepository contractChangeRepository;
 
+    private LoanContractChangeDTO toDTO(LoanContractChangeRequestEntity entity) {
+        return LoanContractChangeDTO.builder()
+                .changeRequestId(entity.getChangeRequestId())
+                .contractId(entity.getContractId())
+                .userId(entity.getUserId())
+                .changeReason(entity.getChangeReason())
+                .newMaturityDate(entity.getNewMaturityDate())
+                .newInterestRate(entity.getNewInterestRate())
+                .newRepaymentType(entity.getNewRepaymentType())
+                .newRepaymentDate(entity.getNewRepaymentDate())
+                .newTerms(entity.getNewTerms())
+                .status(entity.getStatus())
+                .returnReason(entity.getReturnReason())
+                .requesterSignature(entity.getRequesterSignature())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
+
+    public LoanContractChangeRequestEntity getChangeRequestForUpdate(Long changeRequestId) {
+        return contractChangeRepository.findByIdForUpdate(changeRequestId)
+                .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
+    }
 
     public LoanContractResponse getContract(Long contractId, Long userID) {
         LoanContractResponse contract = loanContractService.findContract(contractId, userID);
@@ -58,8 +80,8 @@ public class ContractChangeService {
     }
 
 
-    public LoanContractChangeDTO getChangeRequest(Long changeRequestId) {
-        return contractChangeMapper.findByChangeRequestId(changeRequestId)
+    public LoanContractChangeRequestEntity getChangeRequest(Long changeRequestId) {
+        return contractChangeRepository.findById(changeRequestId)
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
 
     }
@@ -100,7 +122,7 @@ public class ContractChangeService {
             throw ContractChangeErrorCode.INVALID_MATURITY_DATE.toException();
         }
 
-        List<LoanContractChangeDTO> existingRequests = contractChangeMapper.findByContractId(contractId);
+        List<LoanContractChangeRequestEntity> existingRequests = contractChangeRepository.findByContractId(contractId);
 
         boolean hasPendingRequest = existingRequests.stream()
                 .anyMatch(changeRequest -> ChangeRequestStatus.PENDING.equals(changeRequest.getStatus()));
@@ -118,21 +140,26 @@ public class ContractChangeService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        LoanContractChangeDTO changeDTO = LoanContractChangeDTO.builder()
-                .changeReason(request.getChangeReason())
-                .newMaturityDate(request.getNewMaturityDate())
-                .newInterestRate(request.getNewInterestRate())
-                .newRepaymentType(request.getNewRepaymentType())
-                .newRepaymentDate(request.getNewRepaymentDate())
-                .newTerms(request.getNewTerms())
-                .userId(userId)
-                .contractId(contractId)
-                .status(ChangeRequestStatus.PENDING)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        LoanContractChangeRequestEntity changeEntity = new LoanContractChangeRequestEntity(
+                contractId,
+                userId,
+                request.getChangeReason(),
+                request.getNewMaturityDate(),
+                request.getNewInterestRate(),
+                request.getNewRepaymentType(),
+                request.getNewRepaymentDate(),
+                request.getNewTerms(),
+                ChangeRequestStatus.PENDING,
+                now,
+                now
+        );
 
-        contractChangeMapper.insert(changeDTO);
+        LoanContractChangeRequestEntity savedEntity;
+        try {
+            savedEntity = contractChangeRepository.saveAndFlush(changeEntity);
+        } catch (DataIntegrityViolationException e) {
+            throw ContractChangeErrorCode.DUPLICATE_PENDING_REQUEST.toException();
+        }
 
         ChangeLoanContractResponse newContractDTO = ChangeLoanContractResponse.builder()
                 .previousContractId(contractId)
@@ -159,14 +186,14 @@ public class ContractChangeService {
         log.info("계약 변경 요청 생성 및 차용증 재저장 완료: contractId={}, userId={}",
                 contractId, userId);
 
-        return changeDTO;
+        return toDTO(savedEntity);
     }
 
     @Transactional
     public LoanContractChangeDTO rejectChange(Long contractId, Long changeRequestId, String returnReason, Long userId) {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
-        LoanContractChangeDTO changeRequest = getChangeRequest(changeRequestId);
+        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
         boolean requesterIsCreditor = Objects.equals(contract.getCreditorId(), changeRequest.getUserId());
         Long approverId = requesterIsCreditor ? contract.getDebtorId() : contract.getCreditorId();
@@ -183,10 +210,9 @@ public class ContractChangeService {
             throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
         }
 
-        int updatedRows = contractChangeMapper.updateStatusWithReturnReason(changeRequestId, ChangeRequestStatus.REJECTED, returnReason);
-        if(updatedRows == 0) {
-            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
-        }
+        changeRequest.reject(returnReason);
+        contractChangeRepository.save(changeRequest);
+
         try {
             UserResponse rejectorInfo = userService.getMyInfo(userId);
 
@@ -209,7 +235,7 @@ public class ContractChangeService {
 
         log.info("계약 변경 요청 반려 처리 완료: contractId={}, changeRequestId={}", contractId, changeRequestId);
 
-        return getChangeRequest(changeRequestId);
+        return toDTO(changeRequest);
 
     }
 
@@ -235,10 +261,16 @@ public class ContractChangeService {
 
         Long v1ContractId = contract.getPreviousContractId();
 
-        LoanContractChangeDTO changeRequest = contractChangeMapper.findByContractId(v1ContractId).stream()
+        LoanContractChangeRequestEntity changeRequest = contractChangeRepository.findByContractId(v1ContractId).stream()
                 .filter(r -> r.getStatus() == ChangeRequestStatus.PENDING)
                 .findFirst()
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
+
+        changeRequest = getChangeRequestForUpdate(changeRequest.getChangeRequestId());
+
+        if (changeRequest.getStatus() != ChangeRequestStatus.PENDING) {
+            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
+        }
 
         boolean requesterIsCreditor = Objects.equals(contract.getCreditorId(), changeRequest.getUserId());
         Long approverId = requesterIsCreditor ? contract.getDebtorId() : contract.getCreditorId();
@@ -257,10 +289,8 @@ public class ContractChangeService {
             loanContractService.updateDebtorSignatureOnly(contractId, savedPath);
         }
 
-        int updatedRows = contractChangeMapper.updateStatus(changeRequest.getChangeRequestId(), ChangeRequestStatus.APPROVED);
-        if (updatedRows == 0) {
-            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
-        }
+        changeRequest.approve();
+        contractChangeRepository.save(changeRequest);
 
         loanContractService.supersedeContract(v1ContractId);
 
@@ -291,31 +321,33 @@ public class ContractChangeService {
     }
 
     public boolean hasPendingChangeRequest(Long contractId) {
-        List<LoanContractChangeDTO> existingRequests = contractChangeMapper.findByContractId(contractId);
+        List<LoanContractChangeRequestEntity> existingRequests = contractChangeRepository.findByContractId(contractId);
         return existingRequests.stream()
                 .anyMatch(changeRequest -> ChangeRequestStatus.PENDING.equals(changeRequest.getStatus()));
     }
 
     @Transactional
     public void cancelChangeRequest(Long contractId, Long changeRequestId, Long userId) {
-        LoanContractChangeDTO changeDTO = getChangeRequest(changeRequestId);
+        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
-        if (!changeDTO.getContractId().equals(contractId)) {
+        if (!changeRequest.getContractId().equals(contractId)) {
             throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
         }
 
-        if (!changeDTO.getUserId().equals(userId)) {
+        if (!changeRequest.getUserId().equals(userId)) {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
         }
 
-        if (changeDTO.getStatus() != ChangeRequestStatus.PENDING) {
+        if (changeRequest.getStatus() != ChangeRequestStatus.PENDING) {
             throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
         }
 
-        int updatedRows = contractChangeMapper.cancelPendingUnsignedRequest(changeRequestId);
-        if (updatedRows == 0) {
+        if (changeRequest.getRequesterSignature() != null) {
             throw ContractChangeErrorCode.ALREADY_SIGNED.toException();
         }
+
+        changeRequest.cancel();
+        contractChangeRepository.save(changeRequest);
 
         LoanContractResponse v2 = getPendingChangedContract(contractId);
         loanContractService.rejectChangedContract(v2.getContractId());
@@ -337,26 +369,28 @@ public class ContractChangeService {
 
         identityService.consume(userId, identityVerificationId, IdentityPurpose.LOAN_CONTRACT);
 
-        LoanContractChangeDTO changeDTO = getChangeRequest(changeRequestId);
+        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
-        if (!changeDTO.getContractId().equals(contractId)) {
+        if (!changeRequest.getContractId().equals(contractId)) {
             throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
         }
 
-        if (!changeDTO.getUserId().equals(userId)) {
+        if (!changeRequest.getUserId().equals(userId)) {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
         }
 
-        if (changeDTO.getStatus() != ChangeRequestStatus.PENDING) {
+        if (changeRequest.getStatus() != ChangeRequestStatus.PENDING) {
             throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
+        }
+
+        if (changeRequest.getRequesterSignature() != null) {
+            throw ContractChangeErrorCode.ALREADY_SIGNED.toException();
         }
 
         String savedPath = fileService.saveSignatureFile(changeRequestId, signature);
 
-        int updatedRows = contractChangeMapper.updateRequesterSignature(changeRequestId, savedPath);
-        if (updatedRows == 0) {
-            throw ContractChangeErrorCode.ALREADY_SIGNED.toException();
-        }
+        changeRequest.attachRequesterSignature(savedPath);
+        contractChangeRepository.save(changeRequest);
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         UserResponse requesterInfo = userService.getMyInfo(userId);
@@ -378,6 +412,6 @@ public class ContractChangeService {
             contractId, changeRequestId);
         }
 
-        return getChangeRequest(changeRequestId);
+        return toDTO(changeRequest);
     }
 }

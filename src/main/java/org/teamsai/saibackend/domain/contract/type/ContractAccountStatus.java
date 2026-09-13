@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.contract.dto;
+package org.teamsai.saibackend.domain.contract.type;
 
 public enum ContractAccountStatus {
     ACTIVE,

@@ -3,8 +3,7 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
-import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.dto.ChangeRequestDetailDTO;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
@@ -33,7 +32,7 @@ public class ChangeRequestDetailService {
     public ChangeRequestDetailDTO getDetail(Long contractId, Long changeRequestId, Long userId) {
 
         LoanContractResponse contract = contractChangeService.getContract(contractId, userId);
-        LoanContractChangeDTO changeDTO = contractChangeService.getChangeRequest(changeRequestId);
+        LoanContractChangeRequestEntity changeDTO = contractChangeService.getChangeRequest(changeRequestId);
 
         if (!changeDTO.getContractId().equals(contractId)) {
             throw ChangeRequestDetailErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
