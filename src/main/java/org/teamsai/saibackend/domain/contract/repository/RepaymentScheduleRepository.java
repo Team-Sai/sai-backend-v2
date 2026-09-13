@@ -14,7 +14,7 @@ import java.util.Optional;
 
 public interface RepaymentScheduleRepository extends JpaRepository<RepaymentScheduleEntity, Long> {
 
-    List<RepaymentScheduleEntity> findByContractIdOrderBySequenceASC(Long contractId);
+    List<RepaymentScheduleEntity> findByContractIdOrderBySequenceAsc(Long contractId);
 
     List<RepaymentScheduleEntity> findByStatusAndDueDateBefore(RepaymentScheduleStatus status, LocalDate date);
 
