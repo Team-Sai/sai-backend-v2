@@ -32,6 +32,6 @@ public class RiskCheckController {
     public Long getPreviousTotalAmount(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return riskCheckService.getPreviousTotalAmount(userDetails.getUserId());
+        return riskCheckService.sumCompletedPrincipalByCreditor(userDetails.getUserId());
     }
 }
