@@ -87,11 +87,12 @@ public class LoanContract {
     private LocalDateTime updatedAt;
 
     @Builder
-    public LoanContract(LoanContract previousContract, ContractRelationType relationType,
+    public LoanContract(Long contractId, LoanContract previousContract, ContractRelationType relationType,
                         BigDecimal principalAmount, BigDecimal interestRate, RepaymentMethod repaymentType,
                         LocalDate startDate, LocalDate maturityDate, Integer repaymentDay, ContractStatus status,
                         String creditorAddress, String debtorAddress, String contractAlias, String terms,
                         User creditor, User debtor, String creditorSignature, String debtorSignature) {
+        this.contractId = contractId;
         this.previousContract = previousContract;
         this.relationType = (relationType != null) ? relationType : ContractRelationType.ACQUAINTANCE;
         this.principalAmount = principalAmount;
