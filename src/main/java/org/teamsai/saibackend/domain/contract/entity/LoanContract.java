@@ -17,7 +17,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name= "loan_contract")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LoanContract {
 
