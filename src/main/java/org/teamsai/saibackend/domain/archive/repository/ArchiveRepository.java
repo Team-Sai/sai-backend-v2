@@ -15,7 +15,7 @@ public interface ArchiveRepository extends JpaRepository<File, Long> {
     @Query("""
             SELECT f FROM File f
             JOIN LoanContract c ON c.contractId = f.referenceId
-            WHERE c.creditorId = :userId OR c.debtorId = :userId
+            WHERE c.creditor.userId = :userId OR c.debtor.userId = :userId
             ORDER BY f.createdAt DESC
             """)
     List<File> findAllByUserId(@Param("userId") Long userId);
