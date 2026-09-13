@@ -3,9 +3,11 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
@@ -44,6 +46,25 @@ public class ContractChangeService {
     private final ApplicationEventPublisher eventPublisher;
     private final ContractChangeRepository contractChangeRepository;
 
+    private LoanContractChangeDTO toDTO(LoanContractChangeRequestEntity entity) {
+        return LoanContractChangeDTO.builder()
+                .changeRequestId(entity.getChangeRequestId())
+                .contractId(entity.getContractId())
+                .userId(entity.getUserId())
+                .changeReason(entity.getChangeReason())
+                .newMaturityDate(entity.getNewMaturityDate())
+                .newInterestRate(entity.getNewInterestRate())
+                .newRepaymentType(entity.getNewRepaymentType())
+                .newRepaymentDate(entity.getNewRepaymentDate())
+                .newTerms(entity.getNewTerms())
+                .status(entity.getStatus())
+                .returnReason(entity.getReturnReason())
+                .requesterSignature(entity.getRequesterSignature())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
+
     public LoanContractChangeRequestEntity getChangeRequestForUpdate(Long changeRequestId) {
         return contractChangeRepository.findByIdForUpdate(changeRequestId)
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
@@ -76,7 +97,7 @@ public class ContractChangeService {
 
 
     @Transactional
-    public LoanContractChangeRequestEntity requestChange(
+    public LoanContractChangeDTO requestChange(
             Long contractId,
             ContractChangeRequest request,
             Long userId
@@ -133,7 +154,12 @@ public class ContractChangeService {
                 now
         );
 
-        LoanContractChangeRequestEntity savedEntity = contractChangeRepository.save(changeEntity);
+        LoanContractChangeRequestEntity savedEntity;
+        try {
+            savedEntity = contractChangeRepository.saveAndFlush(changeEntity);
+        } catch (DataIntegrityViolationException e) {
+            throw ContractChangeErrorCode.DUPLICATE_PENDING_REQUEST.toException();
+        }
 
         ChangeLoanContractResponse newContractDTO = ChangeLoanContractResponse.builder()
                 .previousContractId(contractId)
@@ -160,11 +186,11 @@ public class ContractChangeService {
         log.info("계약 변경 요청 생성 및 차용증 재저장 완료: contractId={}, userId={}",
                 contractId, userId);
 
-        return savedEntity;
+        return toDTO(savedEntity);
     }
 
     @Transactional
-    public LoanContractChangeRequestEntity rejectChange(Long contractId, Long changeRequestId, String returnReason, Long userId) {
+    public LoanContractChangeDTO rejectChange(Long contractId, Long changeRequestId, String returnReason, Long userId) {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
@@ -209,7 +235,7 @@ public class ContractChangeService {
 
         log.info("계약 변경 요청 반려 처리 완료: contractId={}, changeRequestId={}", contractId, changeRequestId);
 
-        return changeRequest;
+        return toDTO(changeRequest);
 
     }
 
@@ -331,7 +357,7 @@ public class ContractChangeService {
     }
 
     @Transactional
-    public LoanContractChangeRequestEntity submitRequesterSignature(
+    public LoanContractChangeDTO submitRequesterSignature(
             Long contractId,
             Long changeRequestId,
             Long userId,
@@ -386,6 +412,6 @@ public class ContractChangeService {
             contractId, changeRequestId);
         }
 
-        return changeRequest;
+        return toDTO(changeRequest);
     }
 }

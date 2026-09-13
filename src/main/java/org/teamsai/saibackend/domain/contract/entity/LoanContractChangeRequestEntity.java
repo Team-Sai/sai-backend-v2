@@ -78,6 +78,7 @@ public class LoanContractChangeRequestEntity {
 
     public void attachRequesterSignature(String requesterSignature) {
         this.requesterSignature = requesterSignature;
+        this.updatedAt = LocalDateTime.now();
     }
 
     public LoanContractChangeRequestEntity(
