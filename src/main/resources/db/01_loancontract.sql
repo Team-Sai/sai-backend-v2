@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS loan_contract (
 
     creditor_id          BIGINT NOT NULL,
     debtor_id            BIGINT NULL,
-    relation_type        VARCHAR(20) NOT NULL DEFAULT 'ACQUAINTANCE',
+    relation_type        VARCHAR(50) NULL,
 
     principal_amount     DECIMAL(15,2) NOT NULL,
     interest_rate        DECIMAL(5,2) NOT NULL,
@@ -53,4 +53,3 @@ CREATE TABLE IF NOT EXISTS loan_contract_file (
     ) ENGINE=InnoDB
     DEFAULT CHARSET=utf8mb4
     COLLATE=utf8mb4_unicode_ci;
-ALTER TABLE loan_contract ADD COLUMN IF NOT EXISTS relation_type VARCHAR(50) DEFAULT NULL;

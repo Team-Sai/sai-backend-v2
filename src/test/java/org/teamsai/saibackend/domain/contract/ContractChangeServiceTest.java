@@ -186,12 +186,12 @@ class ContractChangeServiceTest {
                     .willReturn(createContract(ContractStatus.COMPLETED));
             given(contractChangeRepository.findByContractId(CONTRACT_ID))
                     .willReturn(List.of());
-            given(contractChangeRepository.save(any(LoanContractChangeRequestEntity.class)))
+            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequestEntity.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
 
             contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID);
 
-            verify(contractChangeRepository).save(any(LoanContractChangeRequestEntity.class));
+            verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequestEntity.class));
 
             ArgumentCaptor<ChangeLoanContractResponse> captor =
                     ArgumentCaptor.forClass(ChangeLoanContractResponse.class);
@@ -270,12 +270,12 @@ class ContractChangeServiceTest {
                     .willReturn(contract);
             given(contractChangeRepository.findByContractId(CONTRACT_ID))
                     .willReturn(List.of());
-            given(contractChangeRepository.save(any(LoanContractChangeRequestEntity.class)))
+            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequestEntity.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
 
             contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID);
 
-            verify(contractChangeRepository).save(any(LoanContractChangeRequestEntity.class));
+            verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequestEntity.class));
             verify(loanContractService).insertChangedContract(any());
         }
     }

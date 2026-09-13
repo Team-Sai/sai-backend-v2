@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountRespo
 import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
