@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.account.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -11,6 +12,7 @@ import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
 import org.teamsai.saibackend.domain.user.service.UserService;
@@ -27,6 +29,7 @@ public class LinkedBankAccountService {
     private final LinkedBankAccountMapper linkedBankAccountMapper;
     private final UserService userService;
     private final MockBankClient mockBankClient;
+    private final EntityManager entityManager;
 
     public List<LinkedBankAccountResponse> linkSelectedAccounts(Long userId, LinkAccountRequest request) {
         String userKey = userService.getUserKeyByUserId(userId);
@@ -90,6 +93,10 @@ public class LinkedBankAccountService {
         return linkedAccounts.stream()
                 .map(LinkedBankAccountResponse::from)
                 .toList();
+    }
+
+    public LinkedBankAccount getReferenceById(Long linkedAccountId) {
+        return entityManager.getReference(LinkedBankAccount.class, linkedAccountId);
     }
 
     public List<Long> getLinkedAccountIds(Long userId) {
