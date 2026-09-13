@@ -2,11 +2,12 @@ package org.teamsai.saibackend.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.teamsai.saibackend.domain.settlement.dto.RecurringSettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.mapper.RecurringSettlementMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
+import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.repository.RecurringSettlementRepository;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -19,19 +20,19 @@ public class RecurringSettlementGenerationService {
 
     private static final int MAX_CATCHUP_CYCLES_PER_SETTLEMENT = 31;
 
-    private final RecurringSettlementMapper recurringSettlementMapper;
-    private final SettlementMapper settlementMapper;
+    private final RecurringSettlementRepository recurringSettlementRepository;
+    private final SettlementRepository settlementRepository;
     private final RecurringSettlementCycleGenerator cycleGenerator;
 
     public RecurringSettlementBatchResult generateTodaySettlements(LocalDate baseDate) {
-        List<RecurringSettlementDTO> candidates =
-                recurringSettlementMapper.findActiveInRange(baseDate);
+        List<RecurringSettlement> candidates =
+                recurringSettlementRepository.findActiveInRange(baseDate);
 
         int succeeded = 0;
         int failed = 0;
         List<Long> failedRecurringIds = new ArrayList<>();
 
-        for (RecurringSettlementDTO recurring : candidates) {
+        for (RecurringSettlement recurring : candidates) {
             boolean ok = catchUpCycles(recurring, baseDate);
             if (ok) {
                 succeeded++;
@@ -51,17 +52,26 @@ public class RecurringSettlementGenerationService {
     /**
      * @return 이 정기정산 처리 중 예외 없이 정상 종료됐으면 true, 캐치업 도중 예외로 중단됐으면 false
      */
-    private boolean catchUpCycles(RecurringSettlementDTO recurring, LocalDate baseDate) {
-        SettlementDTO cursorSettlement =
-                settlementMapper.findLatestByRecurringId(recurring.getRecurringSettlementId());
+    private boolean catchUpCycles(RecurringSettlement recurring, LocalDate baseDate) {
+        Settlement cursorSettlement =
+                settlementRepository.findLatestByRecurringId(
+                                recurring.getRecurringSettlementId(),
+                                PageRequest.of(0, 1)
+                        )
+                        .stream()
+                        .findFirst()
+                        .orElse(null);
 
         if (cursorSettlement == null) {
             log.warn("직전 회차 없음, 생성 스킵 recurringId={}", recurring.getRecurringSettlementId());
             return true; // 데이터 이상은 아니고 정상적인 "생성 대상 아님" 케이스
         }
 
-        int cycleCount = settlementMapper.countByRecurringId(recurring.getRecurringSettlementId());
-        int generatedThisRun = 0;
+        int cycleCount = Math.toIntExact(
+                settlementRepository.countByRecurringId(
+                        recurring.getRecurringSettlementId()
+                )
+        );        int generatedThisRun = 0;
 
         while (true) {
             LocalDate theoreticalNextDate =

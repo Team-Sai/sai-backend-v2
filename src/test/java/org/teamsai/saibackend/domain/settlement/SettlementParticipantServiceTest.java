@@ -7,13 +7,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementParticipantService;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantRole;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
-import org.teamsai.saibackend.global.exception.DomainException;
+import org.teamsai.saibackend.domain.user.entity.User;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,7 +34,13 @@ class SettlementParticipantServiceTest {
     private static final Long PARTICIPANT_ID = 100L;
 
     @Mock
-    private SettlementParticipantMapper participantMapper;
+    private SettlementParticipantRepository participantRepository;
+
+    @Mock
+    private SettlementRepository settlementRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private SettlementParticipantService participantService;
@@ -42,22 +52,49 @@ class SettlementParticipantServiceTest {
     )
     void createParticipantSuccess() {
 
+        Settlement settlement =
+                Settlement.builder()
+                        .settlementId(SETTLEMENT_ID)
+                        .build();
+
+        User user =
+                User.builder()
+                        .userId(USER_ID)
+                        .build();
+
         when(
-                participantMapper.insert(
-                        any(SettlementParticipantDTO.class)
+                settlementRepository.findById(
+                        SETTLEMENT_ID
+                )
+        ).thenReturn(
+                Optional.of(settlement)
+        );
+
+        when(
+                userRepository.findById(
+                        USER_ID
+                )
+        ).thenReturn(
+                Optional.of(user)
+        );
+
+        when(
+                participantRepository.save(
+                        any(SettlementParticipant.class)
                 )
         ).thenAnswer(invocation -> {
 
-            SettlementParticipantDTO participant =
+            SettlementParticipant participant =
                     invocation.getArgument(0);
 
-            ReflectionTestUtils.setField(
-                    participant,
-                    "participantId",
-                    PARTICIPANT_ID
-            );
-
-            return 1;
+            return SettlementParticipant.builder()
+                    .participantId(PARTICIPANT_ID)
+                    .settlement(participant.getSettlement())
+                    .user(participant.getUser())
+                    .participantRole(participant.getParticipantRole())
+                    .participantStatus(participant.getParticipantStatus())
+                    .joinedAt(participant.getJoinedAt())
+                    .build();
         });
 
 
@@ -68,27 +105,31 @@ class SettlementParticipantServiceTest {
                 );
 
 
-        ArgumentCaptor<SettlementParticipantDTO> captor =
+        ArgumentCaptor<SettlementParticipant> captor =
                 ArgumentCaptor.forClass(
-                        SettlementParticipantDTO.class
+                        SettlementParticipant.class
                 );
 
-        verify(participantMapper)
-                .insert(captor.capture());
+        verify(participantRepository)
+                .save(captor.capture());
 
 
-        SettlementParticipantDTO savedParticipant =
+        SettlementParticipant savedParticipant =
                 captor.getValue();
 
 
         assertThat(result)
                 .isEqualTo(PARTICIPANT_ID);
 
-        assertThat(savedParticipant.getSettlementId())
-                .isEqualTo(SETTLEMENT_ID);
+        assertThat(
+                savedParticipant.getSettlement()
+                        .getSettlementId()
+        ).isEqualTo(SETTLEMENT_ID);
 
-        assertThat(savedParticipant.getUserId())
-                .isEqualTo(USER_ID);
+        assertThat(
+                savedParticipant.getUser()
+                        .getUserId()
+        ).isEqualTo(USER_ID);
 
         assertThat(savedParticipant.getParticipantRole())
                 .isEqualTo(
@@ -107,15 +148,43 @@ class SettlementParticipantServiceTest {
 
     @Test
     @DisplayName(
-            "참여자 저장 결과가 1건이 아니면 예외가 발생한다"
+            "참여자 저장 중 예외가 발생하면 예외를 그대로 전달한다"
     )
-    void createParticipantFailsWhenInsertCountIsInvalid() {
+    void createParticipantFailsWhenSaveFails() {
+
+        Settlement settlement =
+                Settlement.builder()
+                        .settlementId(SETTLEMENT_ID)
+                        .build();
+
+        User user =
+                User.builder()
+                        .userId(USER_ID)
+                        .build();
 
         when(
-                participantMapper.insert(
-                        any(SettlementParticipantDTO.class)
+                settlementRepository.findById(
+                        SETTLEMENT_ID
                 )
-        ).thenReturn(0);
+        ).thenReturn(
+                Optional.of(settlement)
+        );
+
+        when(
+                userRepository.findById(
+                        USER_ID
+                )
+        ).thenReturn(
+                Optional.of(user)
+        );
+
+        when(
+                participantRepository.save(
+                        any(SettlementParticipant.class)
+                )
+        ).thenThrow(
+                new RuntimeException("저장 실패")
+        );
 
 
         assertThatThrownBy(
@@ -125,13 +194,13 @@ class SettlementParticipantServiceTest {
                                 USER_ID
                         )
         ).isInstanceOf(
-                DomainException.class
+                RuntimeException.class
         );
 
 
-        verify(participantMapper)
-                .insert(
-                        any(SettlementParticipantDTO.class)
+        verify(participantRepository)
+                .save(
+                        any(SettlementParticipant.class)
                 );
     }
 }

@@ -5,14 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementObligationStatusResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementPaymentStatusMapper;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,8 +28,7 @@ public class SettlementPaymentStatusService {
     private static final BigDecimal HUNDRED =
             BigDecimal.valueOf(100);
     private static final int RATE_SCALE = 2;
-
-    private final SettlementMapper settlementMapper;
+    private final SettlementRepository settlementRepository;
     private final SettlementPaymentStatusMapper paymentStatusMapper;
     private final SettlementValidator settlementValidator;
 
@@ -38,8 +37,8 @@ public class SettlementPaymentStatusService {
             Long settlementId,
             Long userId
     ) {
-        SettlementDTO settlement =
-                settlementMapper.findById(settlementId)
+        Settlement settlement =
+                settlementRepository.findById(settlementId)
                         .orElseThrow(
                                 SettlementErrorCode
                                         .SETTLEMENT_NOT_FOUND
