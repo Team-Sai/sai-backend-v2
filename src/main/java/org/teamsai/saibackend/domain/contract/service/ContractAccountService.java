@@ -8,11 +8,16 @@ import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
+<<<<<<< HEAD
 import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractAccountRepository;
 import org.teamsai.saibackend.domain.contract.repository.LinkedBankAccountRepository;
+=======
+import org.teamsai.saibackend.domain.contract.entity.LoanContract;
+import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
+>>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 
 import java.util.Objects;
@@ -22,9 +27,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ContractAccountService {
 
+<<<<<<< HEAD
     private final ContractAccountRepository contractAccountRepository;
     private final LoanContractRepository loanContractRepository;
     private final LinkedBankAccountRepository linkedBankAccountRepository;
+=======
+    
+    private final LoanContractRepository loanContractRepository;
+>>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
     private final LinkedBankAccountService linkedBankAccountService;
 
     @Transactional(readOnly = true)
@@ -112,14 +122,18 @@ public class ContractAccountService {
 
     private LoanContract findContract(Long contractId) {
         return loanContractRepository.findById(contractId)
+<<<<<<< HEAD
                 .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
+=======
+                
+>>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
     }
 
     private void validateCreditor(
             LoanContract contract,
             Long userId
     ) {
-        if (!Objects.equals(contract.getCreditorId(), userId)) {
+        if (!Objects.equals(contract.getCreditor().getUserId(), userId)) {
             throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
         }
     }

@@ -13,14 +13,21 @@ import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
+<<<<<<< HEAD
 import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
 import org.teamsai.saibackend.domain.contract.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractAccountRepository;
 import org.teamsai.saibackend.domain.contract.repository.LinkedBankAccountRepository;
+=======
+import org.teamsai.saibackend.domain.contract.entity.LoanContract;
+import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
+import org.teamsai.saibackend.domain.contract.mapper.ContractAccountMapper;
+>>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.service.ContractAccountService;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.util.List;
@@ -48,9 +55,12 @@ class ContractAccountServiceTest {
 
     @Mock
     private LoanContractRepository loanContractRepository;
+<<<<<<< HEAD
 
     @Mock
     private LinkedBankAccountRepository linkedBankAccountRepository;
+=======
+>>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
 
     @Mock
     private LinkedBankAccountService linkedBankAccountService;
@@ -509,7 +519,12 @@ class ContractAccountServiceTest {
 
     private LoanContract createContract(ContractStatus status) {
         return LoanContract.builder()
+<<<<<<< HEAD
                 .creditorId(CREDITOR_ID)
+=======
+                .contractId(CONTRACT_ID)
+                .creditor(User.builder().userId(CREDITOR_ID).build())
+>>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
                 .status(status)
                 .build();
     }

@@ -15,7 +15,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRejectRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
@@ -73,7 +73,7 @@ public class ContractChangeController {
     @ResponseBody
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/contracts/{contractId}/change-requests")   // ← consumes 삭제, JSON으로
-    public LoanContractChangeDTO requestChange(
+    public LoanContractChangeRequestEntity requestChange(
             @PathVariable Long contractId,
             @Valid @RequestBody ContractChangeRequest request,     // ← @RequestBody로 원복
             @AuthenticationPrincipal(expression = "userId") Long userId
@@ -95,7 +95,7 @@ public class ContractChangeController {
     })
     @ResponseBody
     @PatchMapping("/api/contracts/{contractId}/change-requests/{changeRequestId}/reject")
-    public LoanContractChangeDTO rejectChange(
+    public LoanContractChangeRequestEntity rejectChange(
             @PathVariable Long contractId,
             @PathVariable Long changeRequestId,
             @Valid @RequestBody ContractChangeRejectRequest request,
@@ -118,7 +118,7 @@ public class ContractChangeController {
     @ResponseBody
     @PatchMapping(value = "/api/contracts/{contractId}/change-requests/{changeRequestId}/signature",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public LoanContractChangeDTO submitRequesterSignature(
+    public LoanContractChangeRequestEntity submitRequesterSignature(
             @PathVariable Long contractId,
             @PathVariable Long changeRequestId,
             @RequestParam("signature") MultipartFile signature,
