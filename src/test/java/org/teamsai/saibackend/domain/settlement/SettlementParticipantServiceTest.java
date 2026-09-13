@@ -9,21 +9,23 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
+import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementParticipantService;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantRole;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
+import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SettlementParticipantService 단위 테스트")
@@ -202,5 +204,94 @@ class SettlementParticipantServiceTest {
                 .save(
                         any(SettlementParticipant.class)
                 );
+    }
+
+    @Test
+    @DisplayName(
+            "존재하지 않는 정산이면 SETTLEMENT_NOT_FOUND 예외가 발생한다"
+    )
+    void createParticipantFailsWhenSettlementNotFound() {
+
+        when(
+                settlementRepository.findById(
+                        SETTLEMENT_ID
+                )
+        ).thenReturn(
+                Optional.empty()
+        );
+
+
+        assertThatThrownBy(
+                () ->
+                        participantService.createParticipant(
+                                SETTLEMENT_ID,
+                                USER_ID
+                        )
+        ).isInstanceOfSatisfying(
+                DomainException.class,
+                exception ->
+                        assertThat(
+                                exception.getErrorCode()
+                        ).isEqualTo(
+                                SettlementErrorCode.SETTLEMENT_NOT_FOUND
+                        )
+        );
+
+
+        verify(userRepository, never())
+                .findById(any());
+
+        verify(participantRepository, never())
+                .save(any());
+    }
+
+
+    @Test
+    @DisplayName(
+            "존재하지 않는 사용자이면 USER_NOT_FOUND 예외가 발생한다"
+    )
+    void createParticipantFailsWhenUserNotFound() {
+
+        Settlement settlement =
+                Settlement.builder()
+                        .settlementId(SETTLEMENT_ID)
+                        .build();
+
+        when(
+                settlementRepository.findById(
+                        SETTLEMENT_ID
+                )
+        ).thenReturn(
+                Optional.of(settlement)
+        );
+
+        when(
+                userRepository.findById(
+                        USER_ID
+                )
+        ).thenReturn(
+                Optional.empty()
+        );
+
+
+        assertThatThrownBy(
+                () ->
+                        participantService.createParticipant(
+                                SETTLEMENT_ID,
+                                USER_ID
+                        )
+        ).isInstanceOfSatisfying(
+                DomainException.class,
+                exception ->
+                        assertThat(
+                                exception.getErrorCode()
+                        ).isEqualTo(
+                                UserErrorCode.USER_NOT_FOUND
+                        )
+        );
+
+
+        verify(participantRepository, never())
+                .save(any());
     }
 }
