@@ -8,16 +8,10 @@ import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-<<<<<<< HEAD
 import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractAccountRepository;
-import org.teamsai.saibackend.domain.contract.repository.LinkedBankAccountRepository;
-=======
-import org.teamsai.saibackend.domain.contract.entity.LoanContract;
-import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
->>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 
 import java.util.Objects;
@@ -27,14 +21,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ContractAccountService {
 
-<<<<<<< HEAD
     private final ContractAccountRepository contractAccountRepository;
     private final LoanContractRepository loanContractRepository;
-    private final LinkedBankAccountRepository linkedBankAccountRepository;
-=======
-    
-    private final LoanContractRepository loanContractRepository;
->>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
     private final LinkedBankAccountService linkedBankAccountService;
 
     @Transactional(readOnly = true)
@@ -72,7 +60,8 @@ public class ContractAccountService {
     public void createContractAccount(Long contractId, Long userId, Long linkedAccountId) {
         if (linkedAccountId == null) return;
 
-        loanContractRepository.findWithLockByContractId(contractId);
+        loanContractRepository.findWithLockByContractId(contractId)
+                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
 
         validateSelectable(userId, linkedAccountId);
 
@@ -86,7 +75,8 @@ public class ContractAccountService {
 
     @Transactional
     public void changeContractAccount(Long contractId, Long userId, Long newLinkedAccountId) {
-        loanContractRepository.findWithLockByContractId(contractId);
+        loanContractRepository.findWithLockByContractId(contractId)
+                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
 
         validateContractOwner(contractId, userId);
         validateSelectable(userId, newLinkedAccountId);
@@ -97,7 +87,8 @@ public class ContractAccountService {
 
     @Transactional
     public void deactivateContractAccount(Long contractId, Long userId) {
-        loanContractRepository.findWithLockByContractId(contractId);
+        loanContractRepository.findWithLockByContractId(contractId)
+                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
 
         validateContractOwner(contractId, userId);
         retireActiveAccount(contractId, ContractAccountStatus.DISABLED);
@@ -122,11 +113,7 @@ public class ContractAccountService {
 
     private LoanContract findContract(Long contractId) {
         return loanContractRepository.findById(contractId)
-<<<<<<< HEAD
                 .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
-=======
-                
->>>>>>> 1b9d44a27046795a8574dd1a74412371f83b0043
     }
 
     private void validateCreditor(
@@ -149,7 +136,7 @@ public class ContractAccountService {
 
     private void insertActiveAccount(Long contractId, Long linkedAccountId) {
         ContractAccount contractAccount = ContractAccount.builder()
-                .linkedAccount(linkedBankAccountRepository.getReferenceById(linkedAccountId))
+                .linkedAccount(linkedBankAccountService.getReferenceById(linkedAccountId))
                 .loanContract(loanContractRepository.getReferenceById(contractId))
                 .accountStatus(ContractAccountStatus.ACTIVE)
                 .build();
