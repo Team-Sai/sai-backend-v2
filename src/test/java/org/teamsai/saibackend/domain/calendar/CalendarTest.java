@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
 import org.teamsai.saibackend.domain.contract.service.DashboardService;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
@@ -28,6 +28,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,7 +53,7 @@ public class CalendarTest {
     @Test
     void 채권자인_대여_스케줄은_수취예정으로_표시된다() {
         LoanContractResponse contract = buildContract(10L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
@@ -72,7 +74,7 @@ public class CalendarTest {
     @Test
     void 채무자인_대여_스케줄은_납부예정으로_표시된다() {
         LoanContractResponse contract = buildContract(11L, 2L, USER_ID, "차량구입 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 350_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 350_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
@@ -88,7 +90,7 @@ public class CalendarTest {
     @Test
     void 다른_날짜의_스케줄은_결과에서_제외된다() {
         LoanContractResponse contract = buildContract(12L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(
                 TARGET_DATE.plusDays(1), RepaymentScheduleStatus.PENDING, 600_000
         );
 
@@ -105,7 +107,7 @@ public class CalendarTest {
     @Test
     void 이미_납부완료된_스케줄은_결과에서_제외된다() {
         LoanContractResponse contract = buildContract(13L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PAID, 600_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PAID, 600_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
@@ -166,7 +168,7 @@ public class CalendarTest {
     @Test
     void 대여와_정산_항목이_함께_반환된다() {
         LoanContractResponse contract = buildContract(14L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
 
@@ -196,7 +198,7 @@ public class CalendarTest {
     @Test
     void 결과는_제목_가나다순으로_정렬된다() {
         LoanContractResponse contract = buildContract(15L, USER_ID, 2L, "차용증 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 100_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 100_000);
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
 
@@ -217,7 +219,7 @@ public class CalendarTest {
     @Test
     void 상환예정일이_없는_스케줄은_예외없이_결과에서_제외된다() {
         LoanContractResponse contract = buildContract(16L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(null, RepaymentScheduleStatus.PENDING, 600_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(null, RepaymentScheduleStatus.PENDING, 600_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
@@ -255,26 +257,25 @@ public class CalendarTest {
                 .build();
     }
 
-    private RepaymentScheduleDTO buildSchedule(
+    private RepaymentScheduleWithRemainingProjection buildSchedule(
             LocalDate dueDate, RepaymentScheduleStatus status, long amount
     ) {
         return buildSchedule(dueDate, status, amount, 1);
     }
 
-    private RepaymentScheduleDTO buildSchedule(
+    private RepaymentScheduleWithRemainingProjection buildSchedule(
             LocalDate dueDate, RepaymentScheduleStatus status, long amount, int sequence
     ) {
-        return RepaymentScheduleDTO.builder()
-                .sequence(sequence)
-                .dueDate(dueDate)
-                .status(status)
-                .totalPaymentDue(BigDecimal.valueOf(amount))
-                .remainingPrincipal(BigDecimal.valueOf(amount))
-                .build();
+        RepaymentScheduleWithRemainingProjection schedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(schedule.getSequence()).thenReturn(sequence);
+        lenient().when(schedule.getDueDate()).thenReturn(dueDate);
+        lenient().when(schedule.getStatus()).thenReturn(status);
+        lenient().when(schedule.getTotalPaymentDue()).thenReturn(BigDecimal.valueOf(amount));
+        return schedule;
     }
 
     private DashboardService.IntegrationDashboardData loanData(
-            LoanContractResponse contract, List<RepaymentScheduleDTO> schedules
+            LoanContractResponse contract, List<RepaymentScheduleWithRemainingProjection> schedules
     ) {
 
         DashboardResponse dashboard = DashboardResponse.builder()
@@ -326,7 +327,7 @@ public class CalendarTest {
     }
 
     private DashboardService.IntegrationDashboardData loanData(
-            LoanContractResponse contract, RepaymentScheduleDTO schedule
+            LoanContractResponse contract, RepaymentScheduleWithRemainingProjection schedule
     ) {
         DashboardResponse dashboard = DashboardResponse.builder()
                 .summary(DashboardSummaryResponse.builder()
@@ -346,7 +347,7 @@ public class CalendarTest {
     @Test
     void 대여_항목에는_상대방_이름과_만기일_원금_이자율이_채워진다() {
         LoanContractResponse contract = buildContract(20L, USER_ID, 2L, "생활비 대출", "김채권", "이채무");
-        RepaymentScheduleDTO schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
@@ -366,7 +367,7 @@ public class CalendarTest {
     @Test
     void 채무자_입장에서는_상대방이_채권자이다() {
         LoanContractResponse contract = buildContract(21L, 2L, USER_ID, "차량구입 대출", "김채권", "이채무");
-        RepaymentScheduleDTO schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 350_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 350_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
@@ -382,9 +383,9 @@ public class CalendarTest {
     @Test
     void 대여_항목의_회차_정보는_계약의_전체_스케줄_개수_기준으로_계산된다() {
         LoanContractResponse contract = buildContract(22L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule1 = buildSchedule(TARGET_DATE.minusMonths(1), RepaymentScheduleStatus.PAID, 600_000, 1);
-        RepaymentScheduleDTO schedule2 = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000, 2);
-        RepaymentScheduleDTO schedule3 = buildSchedule(TARGET_DATE.plusMonths(1), RepaymentScheduleStatus.PENDING, 600_000, 3);
+        RepaymentScheduleWithRemainingProjection schedule1 = buildSchedule(TARGET_DATE.minusMonths(1), RepaymentScheduleStatus.PAID, 600_000, 1);
+        RepaymentScheduleWithRemainingProjection schedule2 = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000, 2);
+        RepaymentScheduleWithRemainingProjection schedule3 = buildSchedule(TARGET_DATE.plusMonths(1), RepaymentScheduleStatus.PENDING, 600_000, 3);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, List.of(schedule1, schedule2, schedule3)));
@@ -401,7 +402,7 @@ public class CalendarTest {
     void 조회_날짜가_오늘보다_과거면_연체로_표시된다() {
         LocalDate pastDate = LocalDate.now().minusDays(5);
         LoanContractResponse contract = buildContract(23L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(pastDate, RepaymentScheduleStatus.PENDING, 600_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(pastDate, RepaymentScheduleStatus.PENDING, 600_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
@@ -418,7 +419,7 @@ public class CalendarTest {
     void 조회_날짜가_오늘이거나_미래면_연체가_아니다() {
         LocalDate futureDate = LocalDate.now().plusDays(5);
         LoanContractResponse contract = buildContract(24L, USER_ID, 2L, "생활비 대출");
-        RepaymentScheduleDTO schedule = buildSchedule(futureDate, RepaymentScheduleStatus.PENDING, 600_000);
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(futureDate, RepaymentScheduleStatus.PENDING, 600_000);
 
         when(contractDashboardService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
