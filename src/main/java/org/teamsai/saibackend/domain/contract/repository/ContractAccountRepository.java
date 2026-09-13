@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.contract.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.contract.dto.ContractAccountStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
 
 import java.util.Optional;

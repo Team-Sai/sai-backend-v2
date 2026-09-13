@@ -5,7 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractRelationType;
+import org.teamsai.saibackend.domain.contract.type.ContractRelationType;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -30,8 +30,7 @@ public class LoanContract {
     private LoanContract previousContract;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "relation_type", length = 20, nullable = false)
-    @ColumnDefault("ACQUAINTANCE")
+    @Column(name = "relation_type", length = 50)
     private ContractRelationType relationType;
 
     @Column(name="principal_amount", nullable = false, precision=15, scale=2)
