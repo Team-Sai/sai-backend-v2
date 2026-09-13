@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.notification;
 
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -7,18 +8,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.notification.dto.NotificationDTO;
 import org.teamsai.saibackend.domain.notification.dto.response.NotificationResponse;
-import org.teamsai.saibackend.domain.notification.mapper.NotificationMapper;
+import org.teamsai.saibackend.domain.notification.entity.Notification;
+import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,7 +30,13 @@ import static org.mockito.Mockito.when;
 class NotificationServiceTest {
 
     @Mock
-    private NotificationMapper notificationMapper;
+    private NotificationRepository notificationRepository;
+
+    @Mock
+    private EntityManager entityManager;
+
+    @Mock
+    private User user;
 
     @InjectMocks
     private NotificationService notificationService;
@@ -37,6 +47,8 @@ class NotificationServiceTest {
         Long userId = 2L;
         Long settlementId = 10L;
 
+        when(entityManager.getReference(User.class, userId)).thenReturn(user);
+
         notificationService.create(
                 userId,
                 NotificationType.SETTLEMENT_PARTICIPANT_ADDED,
@@ -45,17 +57,16 @@ class NotificationServiceTest {
                 settlementId
         );
 
-        ArgumentCaptor<NotificationDTO> captor = ArgumentCaptor.forClass(NotificationDTO.class);
-        verify(notificationMapper).insert(captor.capture());
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
 
-        NotificationDTO notification = captor.getValue();
+        Notification notification = captor.getValue();
 
-        assertThat(notification.getUserId()).isEqualTo(userId);
+        assertThat(notification.getUser()).isEqualTo(user);
         assertThat(notification.getNotificationType()).isEqualTo(NotificationType.SETTLEMENT_PARTICIPANT_ADDED);
         assertThat(notification.getTitle()).isEqualTo("새로운 정산에 참여자로 등록되었습니다.");
         assertThat(notification.getContent()).isEqualTo("정산 금액 30000원이 등록되었습니다.");
         assertThat(notification.getReferenceId()).isEqualTo(settlementId);
-        assertThat(notification.getCreatedAt()).isNotNull();
 
         // 5개짜리 오버로드를 쓰면 secondaryReferenceId는 항상 null이어야 한다
         assertThat(notification.getSecondaryReferenceId()).isNull();
@@ -68,6 +79,8 @@ class NotificationServiceTest {
         Long contractId = 100L;
         Long changeRequestId = 7L;
 
+        when(entityManager.getReference(User.class, debtorId)).thenReturn(user);
+
         notificationService.create(
                 debtorId,
                 NotificationType.CONTRACT_CHANGE,
@@ -77,10 +90,10 @@ class NotificationServiceTest {
                 changeRequestId
         );
 
-        ArgumentCaptor<NotificationDTO> captor = ArgumentCaptor.forClass(NotificationDTO.class);
-        verify(notificationMapper).insert(captor.capture());
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
 
-        NotificationDTO notification = captor.getValue();
+        Notification notification = captor.getValue();
 
         assertThat(notification.getReferenceId()).isEqualTo(contractId);
         assertThat(notification.getSecondaryReferenceId()).isEqualTo(changeRequestId);
@@ -92,41 +105,40 @@ class NotificationServiceTest {
         Long userId = 2L;
         LocalDateTime createdAt = LocalDateTime.now();
 
-        List<NotificationResponse> expected =
-                List.of(
-                        new NotificationResponse(
-                                1L,
-                                NotificationType
-                                        .SETTLEMENT_PARTICIPANT_ADDED,
-                                "새로운 정산에 참여자로 등록되었습니다.",
-                                "정산 금액 30000원이 등록되었습니다.",
-                                10L,
-                                null,          // ← 이 줄 추가 (secondaryReferenceId)
-                                null,
-                                null,
-                                null,
-                                null,
-                                false,
-                                createdAt
-                        )
-                );
+        NotificationResponse expected = new NotificationResponse(
+                1L,
+                NotificationType.SETTLEMENT_PARTICIPANT_ADDED,
+                "새로운 정산에 참여자로 등록되었습니다.",
+                "정산 금액 30000원이 등록되었습니다.",
+                10L,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                createdAt
+        );
 
-        when(notificationMapper.findAllByUserId(userId)).thenReturn(expected);
+        when(notificationRepository.findBankTransactionNotificationsByUserId(userId)).thenReturn(List.of());
+        when(notificationRepository.findSettlementNotificationsByUserId(userId)).thenReturn(List.of(expected));
+        when(notificationRepository.findContractNotificationsByUserId(userId)).thenReturn(List.of());
+        when(notificationRepository.findRepaymentNotificationsByUserId(userId)).thenReturn(List.of());
 
         List<NotificationResponse> result = notificationService.getNotifications(userId);
 
-        assertThat(result).isEqualTo(expected);
-        verify(notificationMapper).findAllByUserId(userId);
+        assertThat(result).containsExactly(expected);
     }
 
     @Test
     @DisplayName("같은 은행 거래의 매칭 검토 알림이 없으면 생성한다")
     void createsMatchingReviewNotificationWhenItDoesNotExist() {
-        when(notificationMapper.existsByUserIdAndTypeAndReferenceId(
+        when(notificationRepository.existsByUser_UserIdAndNotificationTypeAndReferenceId(
                 2L,
                 NotificationType.BANK_TRANSACTION_MATCHING_REVIEW,
                 100L
         )).thenReturn(false);
+        when(entityManager.getReference(User.class, 2L)).thenReturn(user);
 
         notificationService.createIfAbsent(
                 2L,
@@ -137,12 +149,11 @@ class NotificationServiceTest {
                 10L
         );
 
-        verify(notificationMapper).insert(
-                org.mockito.ArgumentMatchers.argThat(notification ->
-                        notification.getUserId().equals(2L)
+        verify(notificationRepository).save(
+                argThat(notification ->
+                        notification.getUser().equals(user)
                                 && notification.getReferenceId().equals(100L)
-                                && notification.getSecondaryReferenceId()
-                                .equals(10L)
+                                && notification.getSecondaryReferenceId().equals(10L)
                 )
         );
     }
@@ -150,7 +161,7 @@ class NotificationServiceTest {
     @Test
     @DisplayName("같은 은행 거래의 매칭 검토 알림이 있으면 중복 생성하지 않는다")
     void doesNotCreateDuplicatedMatchingReviewNotification() {
-        when(notificationMapper.existsByUserIdAndTypeAndReferenceId(
+        when(notificationRepository.existsByUser_UserIdAndNotificationTypeAndReferenceId(
                 2L,
                 NotificationType.BANK_TRANSACTION_MATCHING_REVIEW,
                 100L
@@ -165,8 +176,6 @@ class NotificationServiceTest {
                 10L
         );
 
-        verify(notificationMapper, never()).insert(
-                org.mockito.ArgumentMatchers.any()
-        );
+        verify(notificationRepository, never()).save(any());
     }
 }
