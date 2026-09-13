@@ -12,8 +12,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.teamsai.saibackend.domain.archive.dto.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.dto.FileDTO;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.entity.File;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
@@ -55,11 +55,11 @@ public class ArchiveController {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
 
-        List<FileDTO> savedFiles = archiveService.findFilesByReference(ArchiveStatus.CONTRACT.name(), contractId);
+        List<File> savedFiles = archiveService.findFilesByReference(ArchiveStatus.CONTRACT, contractId);
 
         byte[] pdfBytes;
         if (!savedFiles.isEmpty()) {
-            FileDTO latestFile = savedFiles.get(0);
+            File latestFile = savedFiles.get(0);
             Resource resource = archiveService.loadFileAsResource(latestFile.getSavedFilename());
             try (InputStream is = resource.getInputStream()) {
                 pdfBytes = StreamUtils.copyToByteArray(is);

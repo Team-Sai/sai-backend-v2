@@ -13,9 +13,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.archive.dto.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.dto.FileDTO;
-import org.teamsai.saibackend.domain.archive.mapper.ArchiveMapper;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.entity.File;
+import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 import org.teamsai.saibackend.domain.archive.service.HtmlToPdfRenderer;
 import org.teamsai.saibackend.domain.archive.service.SettlementArchiveService;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
@@ -63,7 +63,7 @@ class SettlementArchiveServiceTest {
     private TemplateEngine templateEngine;
 
     @Mock
-    private ArchiveMapper archiveMapper;
+    private ArchiveRepository archiveRepository;
 
     @Mock
     private SettlementQueryService settlementQueryService;
@@ -110,7 +110,7 @@ class SettlementArchiveServiceTest {
             stubRenderingDependencies();
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
-            given(archiveMapper.findFilesByReference(ArchiveStatus.SETTLEMENT.name(), SETTLEMENT_ID))
+            given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.SETTLEMENT, SETTLEMENT_ID))
                     .willReturn(List.of());
 
             byte[] pdfBytes = settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID);
@@ -118,10 +118,10 @@ class SettlementArchiveServiceTest {
             assertThat(pdfBytes).isNotEmpty();
             assertThat(new String(pdfBytes, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
 
-            ArgumentCaptor<FileDTO> captor = ArgumentCaptor.forClass(FileDTO.class);
-            verify(archiveMapper).insertFile(captor.capture());
+            ArgumentCaptor<File> captor = ArgumentCaptor.forClass(File.class);
+            verify(archiveRepository).save(captor.capture());
 
-            FileDTO saved = captor.getValue();
+            File saved = captor.getValue();
             assertThat(saved.getDomainType()).isEqualTo(ArchiveStatus.SETTLEMENT);
             assertThat(saved.getReferenceId()).isEqualTo(SETTLEMENT_ID);
             assertThat(tempDir.resolve(saved.getSavedFilename())).exists();
@@ -137,10 +137,10 @@ class SettlementArchiveServiceTest {
             byte[] cachedBytes = "%PDF-cached-bytes".getBytes(StandardCharsets.UTF_8);
             Files.write(tempDir.resolve(savedFilename), cachedBytes);
 
-            FileDTO cachedFile = FileDTO.builder()
+            File cachedFile = File.builder()
                     .savedFilename(savedFilename)
                     .build();
-            given(archiveMapper.findFilesByReference(ArchiveStatus.SETTLEMENT.name(), SETTLEMENT_ID))
+            given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.SETTLEMENT, SETTLEMENT_ID))
                     .willReturn(List.of(cachedFile));
 
             byte[] result = settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID);
@@ -150,7 +150,7 @@ class SettlementArchiveServiceTest {
             verify(settlementPaymentStatusService, never()).getPaymentStatus(any(), any());
             verify(settlementPaymentHistoryService, never()).getPaymentHistory(any(), any());
             verify(templateEngine, never()).process(anyString(), any());
-            verify(archiveMapper, never()).insertFile(any());
+            verify(archiveRepository, never()).save(any());
         }
 
         @Test
@@ -164,8 +164,8 @@ class SettlementArchiveServiceTest {
 
             assertThat(pdfBytes).isNotEmpty();
 
-            verify(archiveMapper, never()).findFilesByReference(any(), any());
-            verify(archiveMapper, never()).insertFile(any());
+            verify(archiveRepository, never()).findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(any(), any());
+            verify(archiveRepository, never()).save(any());
             verify(settlementPaymentStatusService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
     }
@@ -237,7 +237,7 @@ class SettlementArchiveServiceTest {
         void rendersSettlementDataIntoPdfBody() throws IOException {
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
-            given(archiveMapper.findFilesByReference(ArchiveStatus.SETTLEMENT.name(), SETTLEMENT_ID))
+            given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.SETTLEMENT, SETTLEMENT_ID))
                     .willReturn(List.of());
             given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
                     .willReturn(paymentStatusWithObligation());

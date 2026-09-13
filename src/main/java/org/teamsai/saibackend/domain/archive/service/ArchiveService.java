@@ -10,9 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.teamsai.saibackend.domain.archive.dto.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.dto.FileDTO;
-import org.teamsai.saibackend.domain.archive.mapper.ArchiveMapper;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.entity.File;
+import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
@@ -26,10 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
@@ -41,7 +38,7 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class ArchiveService {
 
-    private final ArchiveMapper archiveMapper;
+    private final ArchiveRepository archiveRepository;
     private final TemplateEngine templateEngine;
     private final HtmlToPdfRenderer htmlToPdfRenderer;
 
@@ -49,16 +46,16 @@ public class ArchiveService {
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    public List<FileDTO> findFilesByReference(String domainType, Long referenceId) {
-        return archiveMapper.findFilesByReference(domainType, referenceId);
+    public List<File> findFilesByReference(ArchiveStatus domainType, Long referenceId) {
+        return archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(domainType, referenceId);
     }
 
-    public List<FileDTO> findAllFilesByUserId(Long userId) {
-        return archiveMapper.findAllFilesByUserId(userId);
+    public List<File> findAllFilesByUserId(Long userId) {
+        return archiveRepository.findAllByUserId(userId);
     }
 
     @Transactional
-    public FileDTO saveFile(String domainType, Long referenceId, MultipartFile file) {
+    public File saveFile(String domainType, Long referenceId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 존재하지 않습니다.");
         }
@@ -73,7 +70,7 @@ public class ArchiveService {
     }
 
     @Transactional
-    public FileDTO saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
+    public File saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
                              InputStream content, long fileSize) {
         try {
             Path dirPath = Paths.get(uploadDir);
@@ -91,22 +88,21 @@ public class ArchiveService {
             Path savePath = dirPath.resolve(savedFilename);
             Files.copy(content, savePath, StandardCopyOption.REPLACE_EXISTING);
 
-            FileDTO fileDTO = FileDTO.builder()
-                    .domainType(ArchiveStatus.valueOf(domainType))
-                    .referenceId(referenceId)
-                    .originalFilename(originalFilename)
-                    .savedFilename(savedFilename)
-                    .fileSize(fileSize)
-                    .fileType(contentType)
-                    .createdAt(LocalDateTime.now())
-                    .build();
+            File file = File.builder()
+                        .domainType(ArchiveStatus.valueOf(domainType))
+                        .referenceId(referenceId)
+                        .originalFilename(originalFilename)
+                        .savedFilename(savedFilename)
+                        .fileSize(fileSize)
+                        .fileType(contentType)
+                        .build();
 
-            archiveMapper.insertFile(fileDTO);
+            archiveRepository.save(file);
 
             log.info("[File Saved] Domain: {}, RefId: {}, Original: {} -> Saved: {}",
                     domainType, referenceId, originalFilename, savedFilename);
 
-            return fileDTO;
+            return file;
 
         } catch (IOException e) {
             log.error("파일 저장 중 오류 발생", e);
@@ -187,8 +183,8 @@ public class ArchiveService {
         return 255 - brightness;
     }
 
-    public FileDTO getFileById(Long fileId) {
-        return archiveMapper.findFileById(fileId)
+    public File getFileById(Long fileId) {
+        return archiveRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 파일입니다. fileId=" + fileId));
     }
 
