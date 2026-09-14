@@ -148,7 +148,7 @@ class RecurringSettlementGenerationServiceTest {
         );
 
         when(
-                settlementRepository.countByRecurringId(1L)
+                settlementRepository.countByRecurringSettlementRecurringSettlementId(1L)
         ).thenReturn(
                 1L
         );
@@ -227,7 +227,7 @@ class RecurringSettlementGenerationServiceTest {
         );
 
         when(
-                settlementRepository.countByRecurringId(1L)
+                settlementRepository.countByRecurringSettlementRecurringSettlementId(1L)
         ).thenReturn(
                 1L
         );
@@ -337,7 +337,7 @@ class RecurringSettlementGenerationServiceTest {
         );
 
         when(
-                settlementRepository.countByRecurringId(1L)
+                settlementRepository.countByRecurringSettlementRecurringSettlementId(1L)
         ).thenReturn(
                 1L
         );

@@ -25,13 +25,8 @@ public interface SettlementRepository extends JpaRepository<Settlement,Long> {
             @Param("settlementId") Long settlementId
     );
 
-    @Query("""
-        SELECT COUNT(s)
-        FROM Settlement s
-        WHERE s.recurringSettlement.recurringSettlementId = :recurringSettlementId
-        """)
-    long countByRecurringId(
-            @Param("recurringSettlementId") Long recurringSettlementId
+    long countByRecurringSettlementRecurringSettlementId(
+            Long recurringSettlementId
     );
 
     long countBySettlementStatus(

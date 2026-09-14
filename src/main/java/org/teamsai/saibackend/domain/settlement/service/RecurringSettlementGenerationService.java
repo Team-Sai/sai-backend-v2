@@ -68,7 +68,7 @@ public class RecurringSettlementGenerationService {
         }
 
         int cycleCount = Math.toIntExact(
-                settlementRepository.countByRecurringId(
+                settlementRepository.countByRecurringSettlementRecurringSettlementId(
                         recurring.getRecurringSettlementId()
                 )
         );        int generatedThisRun = 0;
