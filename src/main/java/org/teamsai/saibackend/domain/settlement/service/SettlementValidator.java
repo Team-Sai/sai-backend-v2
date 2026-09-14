@@ -6,8 +6,11 @@ import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 
 import java.util.HashSet;
 import java.util.List;
@@ -18,10 +21,10 @@ import java.util.Set;
 public class SettlementValidator {
 
     private final LinkedBankAccountService linkedBankAccountService;
-    private final SettlementParticipantMapper settlementParticipantMapper;
+    private final SettlementParticipantRepository settlementParticipantRepository;
 
-    public void validateOwner(SettlementDTO settlement, Long userId){
-        if(!settlement.getOwnerId().equals(userId)){
+    public void validateOwner(Settlement settlement, Long userId){
+        if(!settlement.getOwner().getUserId().equals(userId)){
             throw SettlementErrorCode.SETTLEMENT_ACCESS_DENIED.toException();
         }
     }
@@ -75,17 +78,18 @@ public class SettlementValidator {
     }
 
     public void validateAccessibleUser(
-            SettlementDTO settlement,
+            Settlement settlement,
             Long userId
     ) {
-        if (settlement.getOwnerId().equals(userId)) {
+        if (settlement.getOwner().getUserId().equals(userId)) {
             return;
         }
 
         boolean isParticipant =
-                settlementParticipantMapper.existsActiveParticipant(
+                settlementParticipantRepository.existsActiveParticipant(
                         settlement.getSettlementId(),
-                        userId
+                        userId,
+                        SettlementParticipantStatus.ACTIVE
                 );
 
         if (!isParticipant) {

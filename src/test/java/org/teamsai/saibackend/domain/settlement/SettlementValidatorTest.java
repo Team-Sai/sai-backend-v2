@@ -7,12 +7,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.util.Arrays;
@@ -38,7 +40,7 @@ class SettlementValidatorTest {
     private LinkedBankAccountService linkedBankAccountService;
 
     @Mock
-    private SettlementParticipantMapper settlementParticipantMapper;
+    private SettlementParticipantRepository settlementParticipantRepository;
 
     @InjectMocks
     private SettlementValidator settlementValidator;
@@ -48,7 +50,7 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자는 OWNER 검증을 통과한다")
     void validateOwnerSuccess() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         settlementValidator.validateOwner(
@@ -62,7 +64,7 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자가 아니면 OWNER 검증에 실패한다")
     void validateOwnerFailsWhenUserIsNotOwner() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         assertSettlementExceptionThrownBy(
@@ -127,7 +129,7 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자는 정산 조회 권한 검증을 통과한다")
     void validateAccessibleUserSuccessForOwner() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         settlementValidator.validateAccessibleUser(
@@ -136,11 +138,12 @@ class SettlementValidatorTest {
         );
 
         verify(
-                settlementParticipantMapper,
+                settlementParticipantRepository,
                 never()
         ).existsActiveParticipant(
                 SETTLEMENT_ID,
-                OWNER_ID
+                OWNER_ID,
+                SettlementParticipantStatus.ACTIVE
         );
     }
 
@@ -149,14 +152,15 @@ class SettlementValidatorTest {
     @DisplayName("ACTIVE 참여자는 정산 조회 권한 검증을 통과한다")
     void validateAccessibleUserSuccessForMember() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         given(
-                settlementParticipantMapper
+                settlementParticipantRepository
                         .existsActiveParticipant(
                                 SETTLEMENT_ID,
-                                MEMBER_ID
+                                MEMBER_ID,
+                                SettlementParticipantStatus.ACTIVE
                         )
         ).willReturn(true);
 
@@ -165,10 +169,11 @@ class SettlementValidatorTest {
                 MEMBER_ID
         );
 
-        verify(settlementParticipantMapper)
+        verify(settlementParticipantRepository)
                 .existsActiveParticipant(
                         SETTLEMENT_ID,
-                        MEMBER_ID
+                        MEMBER_ID,
+                        SettlementParticipantStatus.ACTIVE
                 );
     }
 
@@ -177,14 +182,15 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자도 ACTIVE 참여자도 아니면 조회할 수 없다")
     void validateAccessibleUserFailsWhenUserHasNoAccess() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         given(
-                settlementParticipantMapper
+                settlementParticipantRepository
                         .existsActiveParticipant(
                                 SETTLEMENT_ID,
-                                OTHER_USER_ID
+                                OTHER_USER_ID,
+                                SettlementParticipantStatus.ACTIVE
                         )
         ).willReturn(false);
 
@@ -198,10 +204,11 @@ class SettlementValidatorTest {
                 SettlementErrorCode.SETTLEMENT_ACCESS_DENIED
         );
 
-        verify(settlementParticipantMapper)
+        verify(settlementParticipantRepository)
                 .existsActiveParticipant(
                         SETTLEMENT_ID,
-                        OTHER_USER_ID
+                        OTHER_USER_ID,
+                        SettlementParticipantStatus.ACTIVE
                 );
     }
 
@@ -312,11 +319,13 @@ class SettlementValidatorTest {
     }
 
 
-    private SettlementDTO settlement() {
+    private Settlement settlement() {
 
-        return SettlementDTO.builder()
+        return Settlement.builder()
                 .settlementId(SETTLEMENT_ID)
-                .ownerId(OWNER_ID)
+                .owner(
+                        User.builder().userId(OWNER_ID).build()
+                )
                 .build();
     }
 

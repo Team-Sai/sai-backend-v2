@@ -15,17 +15,21 @@ import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.request.SelectSettlementAccountRequest;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementAccountMapper;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementAccountStatus;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,7 +53,7 @@ class SettlementAccountServiceTest {
     private static final Long SECOND_SETTLEMENT_ACCOUNT_ID = 2L;
 
     @Mock
-    private SettlementMapper settlementMapper;
+    private SettlementRepository settlementRepository;
 
     @Mock
     private SettlementAccountMapper settlementAccountMapper;
@@ -72,7 +76,7 @@ class SettlementAccountServiceTest {
         @DisplayName("수취 계좌가 없으면 선택한 연동 계좌를 ACTIVE 상태로 등록한다")
         void selectAccountSuccessWhenCurrentAccountDoesNotExist() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SelectSettlementAccountRequest request =
@@ -81,7 +85,7 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
             when(
@@ -189,7 +193,7 @@ class SettlementAccountServiceTest {
         @DisplayName("현재 수취 계좌와 같은 계좌를 다시 선택하면 새 행을 생성하지 않는다")
         void selectSameAccountDoesNotInsertAgain() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SettlementAccountDTO currentAccount =
@@ -204,7 +208,7 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
             when(
@@ -270,7 +274,7 @@ class SettlementAccountServiceTest {
         @DisplayName("다른 계좌로 변경하면 기존 계좌를 REPLACED로 변경하고 새 ACTIVE 계좌를 등록한다")
         void replaceSettlementAccountSuccess() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SettlementAccountDTO currentAccount =
@@ -289,7 +293,7 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -410,7 +414,7 @@ class SettlementAccountServiceTest {
         @DisplayName("정산 생성자가 아니면 수취 계좌를 설정할 수 없다")
         void selectAccountFailsWhenUserIsNotOwner() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SelectSettlementAccountRequest request =
@@ -418,7 +422,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -471,7 +475,7 @@ class SettlementAccountServiceTest {
         @DisplayName("본인에게 연동되지 않은 계좌는 정산 수취 계좌로 설정할 수 없다")
         void selectAccountFailsWhenLinkedAccountDoesNotBelongToUser() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SelectSettlementAccountRequest request =
@@ -479,7 +483,7 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -535,7 +539,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.empty()
                     );
@@ -565,7 +569,7 @@ class SettlementAccountServiceTest {
         @DisplayName("기존 수취 계좌 상태 변경에 실패하면 새 계좌를 등록하지 않는다")
         void replaceAccountFailsWhenCurrentAccountUpdateFails() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SettlementAccountDTO currentAccount =
@@ -579,7 +583,7 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -636,7 +640,7 @@ class SettlementAccountServiceTest {
         @DisplayName("새 수취 계좌 저장에 실패하면 예외가 발생한다")
         void selectAccountFailsWhenInsertFails() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SelectSettlementAccountRequest request =
@@ -644,7 +648,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -701,7 +705,7 @@ class SettlementAccountServiceTest {
         @DisplayName("현재 ACTIVE 상태의 수취 계좌를 조회한다")
         void findCurrentAccountSuccess() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
             SettlementAccountDTO account =
@@ -713,7 +717,7 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(SECOND_LINKED_ACCOUNT_ID);
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -773,13 +777,13 @@ class SettlementAccountServiceTest {
         @Test
         @DisplayName("참여자는 정산 소유자의 현재 수취 계좌를 조회한다")
         void participantFindsOwnersCurrentAccount() {
-            SettlementDTO settlement = createSettlement(OWNER_ID);
+            Settlement settlement = createSettlement(OWNER_ID);
             SettlementAccountDTO account = createActiveSettlementAccount(
                     SECOND_SETTLEMENT_ACCOUNT_ID,
                     SECOND_LINKED_ACCOUNT_ID
             );
             LinkedBankAccountResponse linkedAccount = linkedAccount(SECOND_LINKED_ACCOUNT_ID);
-            when(settlementMapper.findById(SETTLEMENT_ID)).thenReturn(Optional.of(settlement));
+            when(settlementRepository.findById(SETTLEMENT_ID)).thenReturn(Optional.of(settlement));
             when(settlementAccountMapper.findActiveBySettlementId(SETTLEMENT_ID))
                     .thenReturn(Optional.of(account));
             when(linkedBankAccountService.getLinkedAccounts(OWNER_ID))
@@ -800,10 +804,10 @@ class SettlementAccountServiceTest {
         @DisplayName("현재 설정된 수취 계좌가 없으면 예외가 발생한다")
         void findCurrentAccountFailsWhenAccountDoesNotExist() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -842,10 +846,10 @@ class SettlementAccountServiceTest {
         @DisplayName("정산 생성자가 아니면 현재 수취 계좌를 조회할 수 없다")
         void findCurrentAccountFailsWhenUserIsNotOwner() {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            when(settlementMapper.findById(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -889,13 +893,17 @@ class SettlementAccountServiceTest {
     }
 
 
-    private SettlementDTO createSettlement(
+    private Settlement createSettlement(
             Long ownerId
     ) {
 
-        return SettlementDTO.builder()
+        return Settlement.builder()
                 .settlementId(SETTLEMENT_ID)
-                .ownerId(ownerId)
+                .owner(
+                        User.builder()
+                                .userId(ownerId)
+                                .build()
+                )
                 .build();
     }
 
