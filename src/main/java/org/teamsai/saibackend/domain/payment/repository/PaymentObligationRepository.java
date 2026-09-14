@@ -132,4 +132,23 @@ public interface PaymentObligationRepository
             @Param("obligationIds")
             List<Long> obligationIds
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT paymentObligation
+        FROM PaymentObligationEntity paymentObligation
+        WHERE paymentObligation.paymentObligationId IN :obligationIds
+          AND paymentObligation.obligationStatus = :obligationStatus
+          AND paymentObligation.paymentStatus IN :paymentStatuses
+        """)
+    List<PaymentObligationEntity> findWriteOffTargetsForUpdate(
+            @Param("obligationIds")
+            List<Long> obligationIds,
+
+            @Param("obligationStatus")
+            ObligationStatus obligationStatus,
+
+            @Param("paymentStatuses")
+            List<PaymentStatus> paymentStatuses
+    );
 }

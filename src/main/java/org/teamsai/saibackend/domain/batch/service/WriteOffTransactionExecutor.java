@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,9 +27,17 @@ public class WriteOffTransactionExecutor {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int writeOffOneBatch(List<Long> obligationIds) {
         int total = 0;
+
         for (List<Long> chunk : partition(obligationIds, CHUNK_SIZE)) {
             List<PaymentObligationEntity> obligations =
-                    paymentObligationRepository.findAllById(chunk);
+                    paymentObligationRepository.findWriteOffTargetsForUpdate(
+                            chunk,
+                            ObligationStatus.ACTIVE,
+                            List.of(
+                                    PaymentStatus.UNPAID,
+                                    PaymentStatus.PARTIALLY_PAID
+                            )
+                    );
 
             for (PaymentObligationEntity obligation : obligations) {
                 obligation.writeOff();
@@ -35,6 +45,7 @@ public class WriteOffTransactionExecutor {
 
             total += obligations.size();
         }
+
         return total;
     }
 
