@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.dto.PaymentObligationDTO;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 class SettlementPaymentServiceTest {
 
     @Mock
-    private PaymentObligationMapper paymentObligationMapper;
+    private PaymentObligationRepository paymentObligationRepository;
 
     @Mock
     private PaymentRecordService paymentRecordService;
@@ -36,29 +36,24 @@ class SettlementPaymentServiceTest {
     void limitsExcessAmountToCurrentRemainingAmount() {
         SettlementPaymentService settlementPaymentService =
                 new SettlementPaymentService(
-                        paymentObligationMapper,
+                        paymentObligationRepository,
                         paymentRecordService
                 );
-        PaymentObligationDTO obligation = PaymentObligationDTO.builder()
-                .paymentObligationId(10L)
-                .expectedAmount(new BigDecimal("100000"))
-                .paymentStatus(PaymentStatus.PARTIALLY_PAID)
-                .obligationStatus(ObligationStatus.ACTIVE)
-                .build();
+        PaymentObligationEntity obligation =
+                new PaymentObligationEntity(
+                        20L,
+                        new BigDecimal("100000")
+                );
+        obligation.changePaymentStatus(PaymentStatus.PARTIALLY_PAID);
 
         given(paymentRecordService.existsByBankTransactionId(101L))
                 .willReturn(false);
-        given(paymentObligationMapper.findByIdForUpdate(10L))
+        given(paymentObligationRepository.findByIdForUpdate(10L))
                 .willReturn(Optional.of(obligation));
         given(paymentRecordService.sumConfirmedAmountByTarget(
                 PaymentTargetType.SETTLEMENT,
                 10L
         )).willReturn(new BigDecimal("70000"));
-        given(paymentObligationMapper.updatePaymentStatus(
-                10L,
-                PaymentStatus.PAID
-        )).willReturn(1);
-
         settlementPaymentService.applyManuallyMatchedPayment(
                 10L,
                 101L,
@@ -72,10 +67,8 @@ class SettlementPaymentServiceTest {
                 new BigDecimal("30000"),
                 SourceType.MANUAL
         );
-        verify(paymentObligationMapper).updatePaymentStatus(
-                10L,
-                PaymentStatus.PAID
-        );
+        assertThat(obligation.getPaymentStatus())
+                .isEqualTo(PaymentStatus.PAID);
     }
 
     @Test
@@ -83,19 +76,19 @@ class SettlementPaymentServiceTest {
     void rejectsManuallyMatchedPaymentForPaidObligation() {
         SettlementPaymentService settlementPaymentService =
                 new SettlementPaymentService(
-                        paymentObligationMapper,
+                        paymentObligationRepository,
                         paymentRecordService
                 );
-        PaymentObligationDTO obligation = PaymentObligationDTO.builder()
-                .paymentObligationId(10L)
-                .expectedAmount(new BigDecimal("100000"))
-                .paymentStatus(PaymentStatus.PAID)
-                .obligationStatus(ObligationStatus.ACTIVE)
-                .build();
+        PaymentObligationEntity obligation =
+                new PaymentObligationEntity(
+                        20L,
+                        new BigDecimal("100000")
+                );
+        obligation.changePaymentStatus(PaymentStatus.PAID);
 
         given(paymentRecordService.existsByBankTransactionId(101L))
                 .willReturn(false);
-        given(paymentObligationMapper.findByIdForUpdate(10L))
+        given(paymentObligationRepository.findByIdForUpdate(10L))
                 .willReturn(Optional.of(obligation));
 
         assertThatThrownBy(() ->

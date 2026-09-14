@@ -4,10 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
 
 
 import java.time.LocalDate;
@@ -23,8 +21,6 @@ public class SettlementDueReminderService {
 
     private final OverdueCriteria overdueCriteria;
     private final SettlementMapper settlementMapper;
-    private final SettlementParticipantMapper participantMapper;
-    private final PaymentObligationMapper paymentObligationMapper;
     private final SettlementReminderSender reminderSender;
 
     public SettlementReminderResult sendDueReminders(LocalDate baseDate) {

@@ -5,7 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
 
 import java.time.LocalDate;
@@ -19,7 +21,7 @@ public class WriteOffBatchService {
 
     private static final int WRITE_OFF_DAYS_AFTER_OVERDUE = 30;
 
-    private final PaymentObligationMapper paymentObligationMapper;
+    private final PaymentObligationRepository paymentObligationRepository;
     private final RepaymentScheduleMapper repaymentScheduleMapper;
     private final SettlementCloseService settlementCloseService;
     private final WriteOffTransactionExecutor writeOffTransactionExecutor;  // 추가
@@ -27,7 +29,14 @@ public class WriteOffBatchService {
     @Transactional
     public WriteOffResult writeOffSettlementObligations(LocalDate baseDate) {
         LocalDateTime cutoff = baseDate.minusDays(WRITE_OFF_DAYS_AFTER_OVERDUE).atStartOfDay();
-        List<Long> candidateIds = paymentObligationMapper.findWriteOffCandidateIds(cutoff);
+        List<Long> candidateIds = paymentObligationRepository.findWriteOffCandidateIds(
+                ObligationStatus.ACTIVE,
+                List.of(
+                        PaymentStatus.UNPAID,
+                        PaymentStatus.PARTIALLY_PAID
+                ),
+                cutoff
+                );
         if (candidateIds.isEmpty()) {
             return new WriteOffResult(0, 0);
         }
@@ -39,7 +48,7 @@ public class WriteOffBatchService {
             return new WriteOffResult(0, 0);
         }
 
-        List<Long> affectedSettlementIds = paymentObligationMapper.findSettlementIdsByObligationIds(candidateIds);
+        List<Long> affectedSettlementIds = paymentObligationRepository.findSettlementIdsByObligationIds(candidateIds);
         int closedCount = 0;
         for (Long settlementId : affectedSettlementIds) {
             try {

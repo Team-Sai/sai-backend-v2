@@ -7,8 +7,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.dto.PaymentObligationDTO;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
@@ -23,7 +24,7 @@ import java.util.stream.Collectors;
 public class SettlementReminderSender {
 
     private final SettlementParticipantMapper participantMapper;
-    private final PaymentObligationMapper paymentObligationMapper;
+    private final PaymentObligationRepository paymentObligationRepository;
     private final NotificationService notificationService;
 
     public int sendForSettlement(SettlementDTO settlement, ReminderStage stage) {
@@ -44,13 +45,16 @@ public class SettlementReminderSender {
                 .map(SettlementParticipantDTO::getParticipantId)
                 .toList();
 
-        List<PaymentObligationDTO> unresolvedObligations =
-                paymentObligationMapper.findByParticipantIds(participantIds).stream()
+        List<PaymentObligationEntity> unresolvedObligations =
+                paymentObligationRepository.findLatestByParticipantIds(
+                            participantIds,
+                            ObligationStatus.ACTIVE
+                        ).stream()
                         .filter(o -> o.getPaymentStatus().isUnresolved())
                         .toList();
 
         int sent = 0;
-        for (PaymentObligationDTO obligation : unresolvedObligations) {
+        for (PaymentObligationEntity obligation : unresolvedObligations) {
             Long userId = userIdByParticipantId.get(obligation.getParticipantId());
             if (userId == null) {
                 log.warn("참여자-사용자 매핑 실패 participantId={}", obligation.getParticipantId());
@@ -67,7 +71,7 @@ public class SettlementReminderSender {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void sendOneReminder(Long userId, PaymentObligationDTO obligation, SettlementDTO settlement, ReminderStage stage) {
+    public void sendOneReminder(Long userId, PaymentObligationEntity obligation, SettlementDTO settlement, ReminderStage stage) {
         notificationService.createIfAbsent(
                 userId,
                 stage.type(),
