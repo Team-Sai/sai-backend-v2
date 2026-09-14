@@ -53,7 +53,7 @@ public class LoanContract {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
-    @ColumnDefault("DRAFT")
+    @ColumnDefault("'DRAFT'")
     private ContractStatus status;
 
     @Column(name="creditor_address",nullable = false)
