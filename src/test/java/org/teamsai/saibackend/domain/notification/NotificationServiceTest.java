@@ -21,6 +21,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -105,20 +106,9 @@ class NotificationServiceTest {
         Long userId = 2L;
         LocalDateTime createdAt = LocalDateTime.now();
 
-        NotificationResponse expected = new NotificationResponse(
-                1L,
-                NotificationType.SETTLEMENT_PARTICIPANT_ADDED,
-                "새로운 정산에 참여자로 등록되었습니다.",
-                "정산 금액 30000원이 등록되었습니다.",
-                10L,
-                null,
-                null,
-                null,
-                null,
-                null,
-                false,
-                createdAt
-        );
+        NotificationResponse expected = mock(NotificationResponse.class);
+        when(expected.getNotificationId()).thenReturn(1L);
+        when(expected.getCreatedAt()).thenReturn(createdAt);
 
         when(notificationRepository.findBankTransactionNotificationsByUserId(userId)).thenReturn(List.of());
         when(notificationRepository.findSettlementNotificationsByUserId(userId)).thenReturn(List.of(expected));

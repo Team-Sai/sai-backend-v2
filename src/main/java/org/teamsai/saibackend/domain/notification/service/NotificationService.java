@@ -75,8 +75,8 @@ public class NotificationService {
         notifications.addAll(notificationRepository.findRepaymentNotificationsByUserId(userId));
 
         notifications.sort(
-                Comparator.comparing(NotificationResponse::createdAt)
-                        .thenComparing(NotificationResponse::notificationId)
+                Comparator.comparing(NotificationResponse::getCreatedAt)
+                        .thenComparing(NotificationResponse::getNotificationId)
                         .reversed()
         );
 
