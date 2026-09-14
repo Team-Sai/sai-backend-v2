@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.matching.mapper.BankTransactionMatchCandidateMapper;
+import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.type.RetryPolicy;
 import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
@@ -19,7 +19,7 @@ import java.util.List;
 public class BankTransactionRetryService {
 
     private final BankTransactionMapper bankTransactionMapper;
-    private final BankTransactionMatchCandidateMapper candidateMapper;
+    private final BankTransactionMatchCandidateService candidateService;
     private final BankMatchingService bankMatchingService;
     private final SlackNotifier slackNotifier;
 
@@ -32,7 +32,7 @@ public class BankTransactionRetryService {
         }
 
         for (BankTransactionDTO tx : candidates) {
-            candidateMapper.deleteAllByBankTransactionId(tx.getBankTransactionId());
+            candidateService.deleteAllByBankTransactionId(tx.getBankTransactionId());
             bankTransactionMapper.resetToPendingForRetry(
                     tx.getBankTransactionId(), tx.getProcessingStatus());
         }
