@@ -3,9 +3,16 @@ package org.teamsai.saibackend.domain.matching.repository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
+import jakarta.persistence.Tuple;
 import org.springframework.stereotype.Repository;
 import org.teamsai.saibackend.domain.matching.dto.request.MatchingReviewSearchCondition;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.matching.dto.BankTransactionReviewQueryDTO;
+import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
+import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 import java.util.List;
 
@@ -148,25 +155,45 @@ public class BankTransactionMatchingReviewQueryRepository {
             """.formatted(CANDIDATE_VALIDITY);
 
     @SuppressWarnings("unchecked")
-    public List<BankTransactionEntity> search(Long userId, MatchingReviewSearchCondition condition) {
+    public List<BankTransactionReviewQueryDTO> search(Long userId, MatchingReviewSearchCondition condition) {
         String sql = """
                 SELECT bt.bank_transaction_id, bt.linked_account_id,
-                       bt.external_transaction_id, bt.amount,
+                       bt.amount,
                        bt.transaction_type, bt.processing_status,
-                       bt.transaction_at, bt.counterparty_name, bt.memo, bt.synced_at,
-                       bt.retry_count
+                       bt.transaction_at, bt.counterparty_name, bt.memo, bt.synced_at
                 """ + searchCondition(condition) + """
                 ORDER BY bt.transaction_at DESC, bt.bank_transaction_id DESC
                 LIMIT :size OFFSET :offset
                 """;
         Query query = bindParameters(
-                entityManager.createNativeQuery(sql, BankTransactionEntity.class), userId, condition
+                entityManager.createNativeQuery(sql, Tuple.class), userId, condition
         );
-        // 기존 long 기반 LIMIT/OFFSET 바인딩을 유지한다.
         query.setParameter("size", condition.size());
         query.setParameter("offset", condition.offset());
-        // Entity의 모든 매핑 컬럼을 조회하므로 JPA가 직접 객체를 구성한다.
-        return query.getResultList();
+        List<Tuple> rows = query.getResultList();
+        return rows.stream().map(this::toDto).toList();
+    }
+
+    private BankTransactionReviewQueryDTO toDto(Tuple row) {
+        return new BankTransactionReviewQueryDTO(
+                row.get("bank_transaction_id", Number.class).longValue(),
+                row.get("linked_account_id", Number.class).longValue(),
+                row.get("amount", BigDecimal.class),
+                BankTransactionType.valueOf(row.get("transaction_type", String.class)),
+                BankTransactionProcessingStatus.valueOf(row.get("processing_status", String.class)),
+                toLocalDateTime(row.get("transaction_at")),
+                row.get("counterparty_name", String.class),
+                row.get("memo", String.class),
+                toLocalDateTime(row.get("synced_at"))
+        );
+    }
+
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return value instanceof LocalDateTime dateTime
+                ? dateTime : ((Timestamp) value).toLocalDateTime();
     }
 
     public long count(Long userId, MatchingReviewSearchCondition condition) {

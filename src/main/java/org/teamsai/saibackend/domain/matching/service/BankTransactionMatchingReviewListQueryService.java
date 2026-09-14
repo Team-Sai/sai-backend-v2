@@ -9,7 +9,7 @@ import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchC
 import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchingReviewResponse;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchingReviewQueryRepository;
 import org.teamsai.saibackend.domain.matching.type.MatchingReviewChannel;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.matching.dto.BankTransactionReviewQueryDTO;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
 
@@ -29,7 +29,7 @@ public class BankTransactionMatchingReviewListQueryService {
             Long userId,
             MatchingReviewSearchCondition condition
     ) {
-        List<BankTransactionEntity> transactions =
+        List<BankTransactionReviewQueryDTO> transactions =
                 reviewQueryRepository.search(userId, condition);
         long totalCount = reviewQueryRepository.count(userId, condition);
 
@@ -43,7 +43,7 @@ public class BankTransactionMatchingReviewListQueryService {
         }
 
         List<Long> transactionIds = transactions.stream()
-                .map(BankTransactionEntity::getBankTransactionId)
+                .map(BankTransactionReviewQueryDTO::bankTransactionId)
                 .toList();
 
         Map<Long, List<BankTransactionMatchCandidateQueryDTO>> candidatesByTransaction =
@@ -60,7 +60,7 @@ public class BankTransactionMatchingReviewListQueryService {
                 .map(transaction -> toResponse(
                         transaction,
                         candidatesByTransaction.getOrDefault(
-                                transaction.getBankTransactionId(),
+                                transaction.bankTransactionId(),
                                 List.of()
                         )
                 ))
@@ -75,11 +75,21 @@ public class BankTransactionMatchingReviewListQueryService {
     }
 
     private BankTransactionMatchingReviewResponse toResponse(
-            BankTransactionEntity transaction,
+            BankTransactionReviewQueryDTO transaction,
             List<BankTransactionMatchCandidateQueryDTO> candidates
     ) {
         return new BankTransactionMatchingReviewResponse(
-                BankTransactionDetailResponse.from(transaction),
+                new BankTransactionDetailResponse(
+                        transaction.bankTransactionId(),
+                        transaction.linkedAccountId(),
+                        transaction.amount(),
+                        transaction.transactionType(),
+                        transaction.processingStatus(),
+                        transaction.transactionAt(),
+                        transaction.counterpartyName(),
+                        transaction.memo(),
+                        transaction.syncedAt()
+                ),
                 determineReviewChannel(candidates),
                 candidates.stream()
                         .map(BankTransactionMatchCandidateResponse::from)
