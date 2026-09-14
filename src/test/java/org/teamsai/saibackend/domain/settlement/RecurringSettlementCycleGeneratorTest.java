@@ -9,9 +9,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.payment.dto.PaymentObligationDTO;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
@@ -45,7 +46,7 @@ class RecurringSettlementCycleGeneratorTest {
     private SettlementParticipantRepository participantRepository;
 
     @Mock
-    private PaymentObligationMapper paymentObligationMapper;
+    private PaymentObligationRepository paymentObligationRepository;
 
     @Mock
     private SettlementPaymentService settlementPaymentService;
@@ -128,16 +129,23 @@ class RecurringSettlementCycleGeneratorTest {
                 .build();
     }
 
-    private PaymentObligationDTO obligation(
-            Long obligationId,
+    private PaymentObligationEntity obligation(
             Long participantId,
             BigDecimal expectedAmount
     ) {
-        return PaymentObligationDTO.builder()
-                .paymentObligationId(obligationId)
-                .participantId(participantId)
-                .expectedAmount(expectedAmount)
-                .build();
+        return new PaymentObligationEntity(
+                participantId,
+                expectedAmount
+        );
+    }
+
+    private List<ObligationStatus> allObligationStatuses() {
+        return List.of(
+                ObligationStatus.ACTIVE,
+                ObligationStatus.EXCLUDED,
+                ObligationStatus.CANCELLED,
+                ObligationStatus.WRITTEN_OFF
+        );
     }
 
     private void givenNoPreviousAccount() {
@@ -442,9 +450,9 @@ class RecurringSettlementCycleGeneratorTest {
                     );
 
             verify(
-                    paymentObligationMapper,
+                    paymentObligationRepository,
                     never()
-            ).findLatestByParticipantIdsIncludingWrittenOff(any());
+            ).findLatestByParticipantIdsAndObligationStatuses(any(), any());
         }
 
 
@@ -565,14 +573,14 @@ class RecurringSettlementCycleGeneratorTest {
             );
 
             when(
-                    paymentObligationMapper
-                            .findLatestByParticipantIdsIncludingWrittenOff(
-                                    List.of(1L)
+                    paymentObligationRepository
+                            .findLatestByParticipantIdsAndObligationStatuses(
+                                    List.of(1L),
+                                    allObligationStatuses()
                             )
             ).thenReturn(
                     List.of(
                             obligation(
-                                    500L,
                                     1L,
                                     BigDecimal.valueOf(150000)
                             )
@@ -604,9 +612,9 @@ class RecurringSettlementCycleGeneratorTest {
             );
 
             verify(
-                    paymentObligationMapper,
+                    paymentObligationRepository,
                     times(1)
-            ).findLatestByParticipantIdsIncludingWrittenOff(any());
+            ).findLatestByParticipantIdsAndObligationStatuses(any(), any());
         }
 
 
@@ -648,9 +656,10 @@ class RecurringSettlementCycleGeneratorTest {
             );
 
             when(
-                    paymentObligationMapper
-                            .findLatestByParticipantIdsIncludingWrittenOff(
-                                    List.of(1L)
+                    paymentObligationRepository
+                            .findLatestByParticipantIdsAndObligationStatuses(
+                                    List.of(1L),
+                                    allObligationStatuses()
                             )
             ).thenReturn(
                     List.of()
@@ -798,24 +807,22 @@ class RecurringSettlementCycleGeneratorTest {
             );
 
             when(
-                    paymentObligationMapper
-                            .findLatestByParticipantIdsIncludingWrittenOff(
-                                    List.of(1L, 2L, 3L)
+                    paymentObligationRepository
+                            .findLatestByParticipantIdsAndObligationStatuses(
+                                    List.of(1L, 2L, 3L),
+                                    allObligationStatuses()
                             )
             ).thenReturn(
                     List.of(
                             obligation(
-                                    500L,
                                     1L,
                                     BigDecimal.valueOf(100000)
                             ),
                             obligation(
-                                    501L,
                                     2L,
                                     BigDecimal.valueOf(120000)
                             ),
                             obligation(
-                                    502L,
                                     3L,
                                     BigDecimal.valueOf(80000)
                             )
@@ -838,9 +845,9 @@ class RecurringSettlementCycleGeneratorTest {
             ).save(any(SettlementParticipant.class));
 
             verify(
-                    paymentObligationMapper,
+                    paymentObligationRepository,
                     times(1)
-            ).findLatestByParticipantIdsIncludingWrittenOff(any());
+            ).findLatestByParticipantIdsAndObligationStatuses(any(), any());
 
             verify(settlementPaymentService)
                     .createObligation(

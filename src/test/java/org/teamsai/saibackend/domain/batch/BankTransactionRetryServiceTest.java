@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.matching.mapper.BankTransactionMatchCandidateMapper;
+import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionRetryService;
@@ -30,7 +30,7 @@ class BankTransactionRetryServiceTest {
     @Mock
     private BankTransactionMapper bankTransactionMapper;
     @Mock
-    private BankTransactionMatchCandidateMapper candidateMapper;
+    private BankTransactionMatchCandidateService candidateService;
     @Mock
     private BankMatchingService bankMatchingService;
     @Mock
@@ -61,7 +61,7 @@ class BankTransactionRetryServiceTest {
 
             service.retryForAccount(userId, linkedAccountId);
 
-            verifyNoInteractions(candidateMapper, bankMatchingService, slackNotifier);
+            verifyNoInteractions(candidateService, bankMatchingService, slackNotifier);
             verify(bankTransactionMapper, never()).resetToPendingForRetry(any(), any());
         }
     }
@@ -89,8 +89,8 @@ class BankTransactionRetryServiceTest {
 
             service.retryForAccount(userId, linkedAccountId);
 
-            verify(candidateMapper).deleteAllByBankTransactionId(100L);
-            verify(candidateMapper).deleteAllByBankTransactionId(200L);
+            verify(candidateService).deleteAllByBankTransactionId(100L);
+            verify(candidateService).deleteAllByBankTransactionId(200L);
             verify(bankTransactionMapper).resetToPendingForRetry(100L, BankTransactionProcessingStatus.UNMATCHED);
             verify(bankTransactionMapper).resetToPendingForRetry(200L, BankTransactionProcessingStatus.UNMATCHED);
             verify(bankMatchingService).execute(userId, linkedAccountId, true);

@@ -7,7 +7,7 @@ import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQ
 import org.teamsai.saibackend.domain.matching.dto.request.MatchingReviewSearchCondition;
 import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchCandidateResponse;
 import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchingReviewResponse;
-import org.teamsai.saibackend.domain.matching.mapper.BankTransactionMatchingReviewQueryMapper;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchingReviewQueryRepository;
 import org.teamsai.saibackend.domain.matching.type.MatchingReviewChannel;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class BankTransactionMatchingReviewListQueryService {
 
-    private final BankTransactionMatchingReviewQueryMapper reviewQueryMapper;
+    private final BankTransactionMatchingReviewQueryRepository reviewQueryRepository;
     private final BankTransactionMatchCandidateService candidateService;
 
     public PageResponse<BankTransactionMatchingReviewResponse> getReviews(
@@ -31,8 +31,8 @@ public class BankTransactionMatchingReviewListQueryService {
             MatchingReviewSearchCondition condition
     ) {
         List<BankTransactionDTO> transactions =
-                reviewQueryMapper.search(userId, condition);
-        long totalCount = reviewQueryMapper.count(userId, condition);
+                reviewQueryRepository.search(userId, condition);
+        long totalCount = reviewQueryRepository.count(userId, condition);
 
         if (transactions.isEmpty()) {
             return PageResponse.of(

@@ -7,10 +7,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.payment.dto.PaymentObligationDTO;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
@@ -36,7 +37,7 @@ public class RecurringSettlementCycleGenerator {
 
     private final SettlementRepository settlementRepository;
     private final SettlementParticipantRepository settlementParticipantRepository;
-    private final PaymentObligationMapper paymentObligationMapper;
+    private final PaymentObligationRepository paymentObligationRepository;
     private final SettlementPaymentService settlementPaymentService;
     private final SettlementAmountCalculator settlementAmountCalculator;
     private final SettlementAccountMapper settlementAccountMapper;
@@ -148,10 +149,17 @@ public class RecurringSettlementCycleGenerator {
                 .map(SettlementParticipant::getParticipantId)
                 .toList();
 
-        Map<Long, BigDecimal> latestObligationByParticipant = paymentObligationMapper
-                .findLatestByParticipantIdsIncludingWrittenOff(participantIds)
+        Map<Long, BigDecimal> latestObligationByParticipant = paymentObligationRepository
+                .findLatestByParticipantIdsAndObligationStatuses(
+                        participantIds,
+                        List.of(
+                                ObligationStatus.ACTIVE,
+                                ObligationStatus.EXCLUDED,
+                                ObligationStatus.CANCELLED,
+                                ObligationStatus.WRITTEN_OFF
+                        ))
                 .stream()
-                .collect(Collectors.toMap(PaymentObligationDTO::getParticipantId, PaymentObligationDTO::getExpectedAmount));
+                .collect(Collectors.toMap(PaymentObligationEntity::getParticipantId, PaymentObligationEntity::getExpectedAmount));
 
         for (SettlementParticipant oldParticipant : activeParticipants) {
             BigDecimal expectedAmount = latestObligationByParticipant.get(oldParticipant.getParticipantId());

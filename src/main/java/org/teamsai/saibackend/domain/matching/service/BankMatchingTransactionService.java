@@ -3,17 +3,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateDTO;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingTransactionResult;
-import org.teamsai.saibackend.domain.matching.service.MatchingCandidate;
-import org.teamsai.saibackend.domain.matching.service.MatchingTransaction;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateRepository;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
 import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
@@ -23,7 +20,9 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class BankMatchingTransactionService {
-    private final PaymentObligationMapper paymentObligationMapper;
+
+    private final MatchingCandidateRepository matchingCandidateRepository;
+    private final PaymentObligationRepository paymentObligationRepository;
     private final AutoMatchingService autoMatchingService;
     private final BankTransactionService bankTransactionService;
     private final BankTransactionMatchCandidateService candidateService;
@@ -97,7 +96,7 @@ public class BankMatchingTransactionService {
                 != AutoMatchingProcessStatus.NEEDS_CHECK) {
             return;
         }
-        List<BankTransactionMatchCandidateDTO> candidates =
+        List<BankTransactionMatchCandidateEntity> candidates =
                 candidateService.findAllByBankTransactionId(
                         bankTransaction.getBankTransactionId()
                 );
@@ -123,11 +122,11 @@ public class BankMatchingTransactionService {
         if (isBatch) {
             List<Long> settlementObligationIds = candidates.stream()
                     .filter(c -> c.getTargetType() == MatchingTargetType.SETTLEMENT)
-                    .map(BankTransactionMatchCandidateDTO::getTargetId)
+                    .map(BankTransactionMatchCandidateEntity::getTargetId)
                     .toList();
             if (!settlementObligationIds.isEmpty()) {
                 List<Long> settlementIds =
-                        paymentObligationMapper.findSettlementIdsByObligationIds(settlementObligationIds);
+                        paymentObligationRepository.findSettlementIdsByObligationIds(settlementObligationIds);
                 boolean hasUnresolvedSettlement = settlementIds.stream()
                         .anyMatch(settlementId ->
                                 !settlementPaymentStatusService.areAllObligationsResolved(settlementId));
@@ -212,12 +211,12 @@ public class BankMatchingTransactionService {
             Long aggregateId
     ) {
         if (targetType == null) {
-            return paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+            return matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                     linkedAccountId,
                     transaction.transactionAt()
             );
         }
-        return paymentObligationMapper.findMatchCandidatesByLinkedAccountIdAndTarget(
+        return matchingCandidateRepository.findMatchCandidatesByLinkedAccountIdAndTarget(
                 linkedAccountId,
                 transaction.transactionAt(),
                 targetType,

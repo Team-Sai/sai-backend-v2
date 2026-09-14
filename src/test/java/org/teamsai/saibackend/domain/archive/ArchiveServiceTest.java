@@ -16,9 +16,9 @@ import org.springframework.core.io.Resource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.teamsai.saibackend.domain.archive.dto.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.dto.FileDTO;
-import org.teamsai.saibackend.domain.archive.mapper.ArchiveMapper;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.entity.File;
+import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
 import org.teamsai.saibackend.domain.archive.service.HtmlToPdfRenderer;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
@@ -38,7 +38,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,7 +59,7 @@ class ArchiveServiceTest {
     private static final Long FILE_ID = 1L;
 
     @Mock
-    private ArchiveMapper archiveMapper;
+    private ArchiveRepository archiveRepository;
 
     @InjectMocks
     private ArchiveService archiveService;
@@ -93,7 +93,7 @@ class ArchiveServiceTest {
                     "file", "contract.pdf", "application/pdf", "file-bytes".getBytes()
             );
 
-            FileDTO result = archiveService.saveFile(DOMAIN_TYPE, REFERENCE_ID, file);
+            File result = archiveService.saveFile(DOMAIN_TYPE, REFERENCE_ID, file);
             savedPath = Path.of(archiveService.getUploadDir()).resolve(result.getSavedFilename());
 
             assertThat(savedPath).exists();
@@ -103,7 +103,7 @@ class ArchiveServiceTest {
             assertThat(result.getOriginalFilename()).isEqualTo("contract.pdf");
             assertThat(result.getDomainType()).isEqualTo(ArchiveStatus.CONTRACT);
 
-            verify(archiveMapper).insertFile(result);
+            verify(archiveRepository).save(result);
         }
 
         @Test
@@ -114,7 +114,7 @@ class ArchiveServiceTest {
             assertThatThrownBy(() -> archiveService.saveFile(DOMAIN_TYPE, REFERENCE_ID, emptyFile))
                     .isInstanceOf(IllegalArgumentException.class);
 
-            verify(archiveMapper, org.mockito.Mockito.never()).insertFile(any());
+            verify(archiveRepository, never()).save(any());
         }
 
         @Test
@@ -128,7 +128,7 @@ class ArchiveServiceTest {
             assertThatThrownBy(() -> archiveService.saveFile(DOMAIN_TYPE, REFERENCE_ID, file))
                     .isInstanceOf(RuntimeException.class);
 
-            verify(archiveMapper, org.mockito.Mockito.never()).insertFile(any());
+            verify(archiveRepository, never()).save(any());
         }
     }
 
@@ -139,10 +139,11 @@ class ArchiveServiceTest {
         @Test
         @DisplayName("도메인 타입과 참조 ID로 파일 목록을 조회한다")
         void findFilesByReferenceSuccess() {
-            List<FileDTO> files = List.of(createFile());
-            given(archiveMapper.findFilesByReference(DOMAIN_TYPE, REFERENCE_ID)).willReturn(files);
+            List<File> files = List.of(createFile());
+            given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.CONTRACT, REFERENCE_ID))
+                    .willReturn(files);
 
-            List<FileDTO> result = archiveService.findFilesByReference(DOMAIN_TYPE, REFERENCE_ID);
+            List<File> result = archiveService.findFilesByReference(ArchiveStatus.CONTRACT, REFERENCE_ID);
 
             assertThat(result).isEqualTo(files);
         }
@@ -150,21 +151,21 @@ class ArchiveServiceTest {
         @Test
         @DisplayName("사용자 ID로 파일 목록을 조회한다")
         void findAllFilesByUserIdSuccess() {
-            List<FileDTO> files = List.of(createFile());
-            given(archiveMapper.findAllFilesByUserId(REFERENCE_ID)).willReturn(files);
+            List<File> files = List.of(createFile());
+            given(archiveRepository.findAllByUserId(REFERENCE_ID)).willReturn(files);
 
-            List<FileDTO> result = archiveService.findAllFilesByUserId(REFERENCE_ID);
+            List<File> result = archiveService.findAllFilesByUserId(REFERENCE_ID);
 
             assertThat(result).isEqualTo(files);
         }
 
         @Test
-        @DisplayName("파일 ID로 조회해 파일 DTO를 반환한다")
+        @DisplayName("파일 ID로 조회해 파일 엔티티를 반환한다")
         void getFileByIdSuccess() {
-            FileDTO file = createFile();
-            given(archiveMapper.findFileById(FILE_ID)).willReturn(Optional.of(file));
+            File file = createFile();
+            given(archiveRepository.findById(FILE_ID)).willReturn(Optional.of(file));
 
-            FileDTO result = archiveService.getFileById(FILE_ID);
+            File result = archiveService.getFileById(FILE_ID);
 
             assertThat(result).isEqualTo(file);
         }
@@ -172,7 +173,7 @@ class ArchiveServiceTest {
         @Test
         @DisplayName("파일을 찾을 수 없으면 예외가 발생한다")
         void getFileByIdFailsWhenNotFound() {
-            given(archiveMapper.findFileById(FILE_ID)).willReturn(Optional.empty());
+            given(archiveRepository.findById(FILE_ID)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> archiveService.getFileById(FILE_ID))
                     .isInstanceOf(IllegalArgumentException.class);
@@ -344,16 +345,14 @@ class ArchiveServiceTest {
         }
     }
 
-    private FileDTO createFile() {
-        return FileDTO.builder()
-                .fileId(FILE_ID)
+    private File createFile() {
+        return File.builder()
                 .domainType(ArchiveStatus.CONTRACT)
                 .referenceId(REFERENCE_ID)
                 .originalFilename("contract.pdf")
                 .savedFilename("uuid_contract.pdf")
                 .fileSize(1024L)
                 .fileType("application/pdf")
-                .createdAt(LocalDateTime.now())
                 .build();
     }
 }

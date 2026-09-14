@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateDTO;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingTransactionResult;
 import org.teamsai.saibackend.domain.matching.service.MatchingCandidate;
@@ -19,7 +19,8 @@ import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateRepository;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
@@ -45,7 +46,9 @@ class BankMatchingTransactionServiceTest {
     private static final Long USER_ID = 10L;
     private static final Long LINKED_ACCOUNT_ID = 1L;
     @Mock
-    private PaymentObligationMapper paymentObligationMapper;
+    private MatchingCandidateRepository matchingCandidateRepository;
+    @Mock
+    private PaymentObligationRepository paymentObligationRepository;
     @Mock
     private AutoMatchingService autoMatchingService;
     @Mock
@@ -72,7 +75,7 @@ class BankMatchingTransactionServiceTest {
                 );
         assertThat(result.processStatus())
                 .isEqualTo(AutoMatchingProcessStatus.UNMATCHED);
-        verify(paymentObligationMapper, never())
+        verify(matchingCandidateRepository, never())
                 .findMatchCandidatesByLinkedAccountId(any(), any());
         verify(autoMatchingService, never()).execute(any(), any());
         verify(bankTransactionService).updateStatus(
@@ -86,7 +89,7 @@ class BankMatchingTransactionServiceTest {
     void keepsOutOfScopeTransactionPending() {
         BankTransactionDTO transaction = bankTransaction(101L, "Hong Gil Dong");
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountIdAndTarget(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountIdAndTarget(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt(),
                 MatchingTargetType.SETTLEMENT,
@@ -121,7 +124,7 @@ class BankMatchingTransactionServiceTest {
                 101L,
                 AutoMatchingProcessStatus.APPLIED
         );
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 lockedTransaction.getTransactionAt()
         )).willReturn(List.of(candidate));
@@ -164,7 +167,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -188,7 +191,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -220,7 +223,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -255,7 +258,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -283,7 +286,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -316,7 +319,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -331,7 +334,7 @@ class BankMatchingTransactionServiceTest {
                         MatchingTargetType.SETTLEMENT
                 )));
         // candidateDto(1L, SETTLEMENT)의 targetId는 10L(obligationId) → settlementId 20L로 변환된다고 가정
-        given(paymentObligationMapper.findSettlementIdsByObligationIds(List.of(10L)))
+        given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
         given(settlementPaymentStatusService.areAllObligationsResolved(20L))
                 .willReturn(false);
@@ -358,7 +361,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -372,7 +375,7 @@ class BankMatchingTransactionServiceTest {
                         1L,
                         MatchingTargetType.SETTLEMENT
                 )));
-        given(paymentObligationMapper.findSettlementIdsByObligationIds(List.of(10L)))
+        given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
         given(settlementPaymentStatusService.areAllObligationsResolved(20L))
                 .willReturn(true);
@@ -394,7 +397,7 @@ class BankMatchingTransactionServiceTest {
                 "Hong Gil Dong"
         );
         givenLockedTransaction(transaction);
-        given(paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                 LINKED_ACCOUNT_ID,
                 transaction.getTransactionAt()
         )).willReturn(List.of(candidate()));
@@ -442,7 +445,7 @@ class BankMatchingTransactionServiceTest {
         );
         assertThat(result.processStatus())
                 .isEqualTo(AutoMatchingProcessStatus.DUPLICATE);
-        verify(paymentObligationMapper, never())
+        verify(matchingCandidateRepository, never())
                 .findMatchCandidatesByLinkedAccountId(any(), any());
         verify(autoMatchingService, never()).execute(any(), any());
         verify(candidateService, never())
@@ -496,11 +499,11 @@ class BankMatchingTransactionServiceTest {
                 new BigDecimal("10000.00")
         );
     }
-    private BankTransactionMatchCandidateDTO candidateDto(
+    private BankTransactionMatchCandidateEntity candidateDto(
             Long matchCandidateId,
             MatchingTargetType targetType
     ) {
-        return BankTransactionMatchCandidateDTO.builder()
+        return BankTransactionMatchCandidateEntity.builder()
                 .matchCandidateId(matchCandidateId)
                 .bankTransactionId(101L)
                 .targetType(targetType)
