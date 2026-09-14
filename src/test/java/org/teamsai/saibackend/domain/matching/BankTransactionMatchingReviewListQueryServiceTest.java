@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
 import org.teamsai.saibackend.domain.matching.dto.request.MatchingReviewSearchCondition;
-import org.teamsai.saibackend.domain.matching.mapper.BankTransactionMatchingReviewQueryMapper;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchingReviewQueryRepository;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchingReviewListQueryService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
 class BankTransactionMatchingReviewListQueryServiceTest {
 
     @Mock
-    private BankTransactionMatchingReviewQueryMapper reviewQueryMapper;
+    private BankTransactionMatchingReviewQueryRepository reviewQueryRepository;
     @Mock
     private BankTransactionMatchCandidateService candidateService;
 
@@ -40,7 +40,7 @@ class BankTransactionMatchingReviewListQueryServiceTest {
     @BeforeEach
     void setUp() {
         service = new BankTransactionMatchingReviewListQueryService(
-                reviewQueryMapper,
+                reviewQueryRepository,
                 candidateService
         );
     }
@@ -58,9 +58,9 @@ class BankTransactionMatchingReviewListQueryServiceTest {
         BankTransactionDTO transaction = transaction(10L);
         BankTransactionMatchCandidateQueryDTO candidate = candidate(10L);
 
-        given(reviewQueryMapper.search(1L, condition))
+        given(reviewQueryRepository.search(1L, condition))
                 .willReturn(List.of(transaction));
-        given(reviewQueryMapper.count(1L, condition)).willReturn(1L);
+        given(reviewQueryRepository.count(1L, condition)).willReturn(1L);
         given(candidateService.findAllForReviewByBankTransactionIds(
                 List.of(10L),
                 MatchingTargetType.SETTLEMENT,
@@ -90,8 +90,8 @@ class BankTransactionMatchingReviewListQueryServiceTest {
                         1,
                         20
                 );
-        given(reviewQueryMapper.search(1L, condition)).willReturn(List.of());
-        given(reviewQueryMapper.count(1L, condition)).willReturn(25L);
+        given(reviewQueryRepository.search(1L, condition)).willReturn(List.of());
+        given(reviewQueryRepository.count(1L, condition)).willReturn(25L);
 
         PageResponse<org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchingReviewResponse> result =
                 service.getReviews(1L, condition);
@@ -118,9 +118,9 @@ class BankTransactionMatchingReviewListQueryServiceTest {
                         20
                 );
         BankTransactionDTO transaction = transaction(11L);
-        given(reviewQueryMapper.search(1L, condition))
+        given(reviewQueryRepository.search(1L, condition))
                 .willReturn(List.of(transaction));
-        given(reviewQueryMapper.count(1L, condition)).willReturn(1L);
+        given(reviewQueryRepository.count(1L, condition)).willReturn(1L);
         given(candidateService.findAllForReviewByBankTransactionIds(
                 List.of(11L), null, null
         )).willReturn(List.of(

@@ -7,7 +7,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
@@ -32,8 +31,6 @@ class SettlementDueReminderServiceTest {
     private SettlementMapper settlementMapper;
     @Mock
     private SettlementParticipantMapper participantMapper;
-    @Mock
-    private PaymentObligationMapper paymentObligationMapper;
     @Mock
     private SettlementReminderSender reminderSender;
 
