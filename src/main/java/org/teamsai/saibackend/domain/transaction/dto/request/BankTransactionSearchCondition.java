@@ -22,6 +22,9 @@ public record BankTransactionSearchCondition(
         if (size <= 0 || size > 100) {
             size = 20;
         }
+        if (page > Integer.MAX_VALUE / size) {
+            throw BankTransactionErrorCode.INVALID_PAGINATION.toException();
+        }
         if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
             throw BankTransactionErrorCode.INVALID_DATE_RANGE.toException();
         }

@@ -9,8 +9,7 @@ import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchC
 import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchingReviewResponse;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchingReviewQueryRepository;
 import org.teamsai.saibackend.domain.matching.type.MatchingReviewChannel;
-import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
 
@@ -30,7 +29,7 @@ public class BankTransactionMatchingReviewListQueryService {
             Long userId,
             MatchingReviewSearchCondition condition
     ) {
-        List<BankTransactionDTO> transactions =
+        List<BankTransactionEntity> transactions =
                 reviewQueryRepository.search(userId, condition);
         long totalCount = reviewQueryRepository.count(userId, condition);
 
@@ -44,7 +43,7 @@ public class BankTransactionMatchingReviewListQueryService {
         }
 
         List<Long> transactionIds = transactions.stream()
-                .map(BankTransactionDTO::getBankTransactionId)
+                .map(BankTransactionEntity::getBankTransactionId)
                 .toList();
 
         Map<Long, List<BankTransactionMatchCandidateQueryDTO>> candidatesByTransaction =
@@ -76,7 +75,7 @@ public class BankTransactionMatchingReviewListQueryService {
     }
 
     private BankTransactionMatchingReviewResponse toResponse(
-            BankTransactionDTO transaction,
+            BankTransactionEntity transaction,
             List<BankTransactionMatchCandidateQueryDTO> candidates
     ) {
         return new BankTransactionMatchingReviewResponse(

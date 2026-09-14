@@ -9,8 +9,8 @@ import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
-import org.teamsai.saibackend.domain.transaction.mapper.BankTransactionMapper;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
 import java.util.List;
 import java.util.Map;
@@ -22,7 +22,7 @@ public class SettlementPaymentHistoryService {
 
     private final SettlementPaymentStatusService settlementPaymentStatusService;
     private final PaymentRecordService paymentRecordService;
-    private final BankTransactionMapper bankTransactionMapper;
+    private final BankTransactionService bankTransactionService;
 
     @Transactional(readOnly = true)
     public List<SettlementPaymentHistoryResponse> getPaymentHistory(Long settlementId, Long userId) {
@@ -49,7 +49,7 @@ public class SettlementPaymentHistoryService {
             PaymentRecordEntity record,
             Map<Long, String> payerNameByObligationId
     ) {
-        BankTransactionDTO transaction = bankTransactionMapper
+        BankTransactionEntity transaction = bankTransactionService
                 .findById(record.getBankTransactionId())
                 .orElse(null);
 

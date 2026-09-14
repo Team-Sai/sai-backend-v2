@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.transaction.dto.response;
 
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
@@ -18,7 +18,7 @@ public record BankTransactionDetailResponse(
         String memo,
         LocalDateTime syncedAt
 ) {
-    public static BankTransactionDetailResponse from(BankTransactionDTO dto) {
+    public static BankTransactionDetailResponse from(BankTransactionEntity dto) {
         return new BankTransactionDetailResponse(
                 dto.getBankTransactionId(),
                 dto.getLinkedAccountId(),

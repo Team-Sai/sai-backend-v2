@@ -5,17 +5,20 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.dto.request.BankTransactionSearchCondition;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
-import org.teamsai.saibackend.domain.transaction.mapper.BankTransactionMapper;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionQueryService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -40,7 +43,7 @@ import static org.mockito.Mockito.verify;
 class BankTransactionQueryServiceTest {
 
     @Mock
-    private BankTransactionMapper bankTransactionMapper;
+    private BankTransactionRepository bankTransactionRepository;
 
     @Mock
     private LinkedBankAccountMapper linkedBankAccountMapper;
@@ -61,19 +64,14 @@ class BankTransactionQueryServiceTest {
                 .build();
     }
 
-    private BankTransactionDTO createTransaction(Long bankTransactionId) {
-        return BankTransactionDTO.builder()
-                .bankTransactionId(bankTransactionId)
-                .linkedAccountId(LINKED_ACCOUNT_ID)
-                .externalTransactionId("TX-" + bankTransactionId)
-                .amount(BigDecimal.valueOf(30_000))
-                .transactionType(BankTransactionType.DEPOSIT)
-                .processingStatus(BankTransactionProcessingStatus.PENDING)
-                .transactionAt(LocalDateTime.now())
-                .counterpartyName("홍길동")
-                .memo("테스트 입금")
-                .syncedAt(LocalDateTime.now())
-                .build();
+    private BankTransactionEntity createTransaction(Long bankTransactionId) {
+        BankTransactionEntity transaction = new BankTransactionEntity(
+                LINKED_ACCOUNT_ID, "TX-" + bankTransactionId, BigDecimal.valueOf(30_000),
+                BankTransactionType.DEPOSIT, LocalDateTime.now(),
+                "홍길동", "테스트 입금", LocalDateTime.now()
+        );
+        ReflectionTestUtils.setField(transaction, "bankTransactionId", bankTransactionId);
+        return transaction;
     }
 
     private BankTransactionSearchCondition defaultCondition() {
@@ -91,13 +89,14 @@ class BankTransactionQueryServiceTest {
         void returnsPageResponseForOwnedAccount() {
             LinkedBankAccountDTO linkedAccount = createLinkedAccount();
             BankTransactionSearchCondition condition = defaultCondition();
-            List<BankTransactionDTO> transactions = List.of(
+            List<BankTransactionEntity> transactions = List.of(
                     createTransaction(1L), createTransaction(2L)
             );
 
             given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionMapper.search(LINKED_ACCOUNT_ID, condition)).willReturn(transactions);
-            given(bankTransactionMapper.countBySearch(LINKED_ACCOUNT_ID, condition)).willReturn(2L);
+            given(bankTransactionRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
+                    condition.keyword(), null, null,
+                    PageRequest.of(Math.toIntExact(condition.page()), Math.toIntExact(condition.size())))).willReturn(new PageImpl<>(transactions));
 
             PageResponse<?> result = bankTransactionQueryService.getTransactions(USER_ID, LINKED_ACCOUNT_ID, condition);
 
@@ -114,8 +113,9 @@ class BankTransactionQueryServiceTest {
             BankTransactionSearchCondition condition = defaultCondition();
 
             given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionMapper.search(LINKED_ACCOUNT_ID, condition)).willReturn(List.of());
-            given(bankTransactionMapper.countBySearch(LINKED_ACCOUNT_ID, condition)).willReturn(0L);
+            given(bankTransactionRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
+                    condition.keyword(), null, null,
+                    PageRequest.of(Math.toIntExact(condition.page()), Math.toIntExact(condition.size())))).willReturn(new PageImpl<>(List.of()));
 
             PageResponse<?> result = bankTransactionQueryService.getTransactions(USER_ID, LINKED_ACCOUNT_ID, condition);
 
@@ -137,8 +137,7 @@ class BankTransactionQueryServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND);
 
-            verify(bankTransactionMapper, never()).search(any(), any());
-            verify(bankTransactionMapper, never()).countBySearch(any(), any());
+            verify(bankTransactionRepository, never()).search(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -156,13 +155,12 @@ class BankTransactionQueryServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.ACCOUNT_ACCESS_DENIED);
 
-            verify(bankTransactionMapper, never()).search(any(), any());
-            verify(bankTransactionMapper, never()).countBySearch(any(), any());
+            verify(bankTransactionRepository, never()).search(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
-        @DisplayName("검색 조건을 그대로 mapper에 전달한다")
-        void passesSearchConditionToMapperAsIs() {
+        @DisplayName("검색 조건과 페이지 정보를 repository에 전달한다")
+        void passesSearchConditionToRepository() {
             LinkedBankAccountDTO linkedAccount = createLinkedAccount();
             BankTransactionSearchCondition condition = new BankTransactionSearchCondition(
                     BankTransactionProcessingStatus.APPLIED,
@@ -175,13 +173,17 @@ class BankTransactionQueryServiceTest {
             );
 
             given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionMapper.search(LINKED_ACCOUNT_ID, condition)).willReturn(List.of());
-            given(bankTransactionMapper.countBySearch(LINKED_ACCOUNT_ID, condition)).willReturn(0L);
+            given(bankTransactionRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
+                    condition.keyword(), null, null,
+                    PageRequest.of(Math.toIntExact(condition.page()), Math.toIntExact(condition.size())))).willReturn(new PageImpl<>(List.of()));
 
             bankTransactionQueryService.getTransactions(USER_ID, LINKED_ACCOUNT_ID, condition);
 
-            verify(bankTransactionMapper).search(eq(LINKED_ACCOUNT_ID), eq(condition));
-            verify(bankTransactionMapper).countBySearch(eq(LINKED_ACCOUNT_ID), eq(condition));
+            verify(bankTransactionRepository).search(
+                    eq(LINKED_ACCOUNT_ID), eq(BankTransactionProcessingStatus.APPLIED),
+                    eq(BankTransactionType.DEPOSIT), eq("홍길동"), eq(null), eq(null),
+                    eq(PageRequest.of(1, 10))
+            );
         }
     }
 
@@ -193,10 +195,10 @@ class BankTransactionQueryServiceTest {
         @DisplayName("본인 소유 계좌의 거래면 상세 정보를 반환한다")
         void returnsDetailForOwnedAccount() {
             LinkedBankAccountDTO linkedAccount = createLinkedAccount();
-            BankTransactionDTO transaction = createTransaction(BANK_TRANSACTION_ID);
+            BankTransactionEntity transaction = createTransaction(BANK_TRANSACTION_ID);
 
             given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionMapper.findByIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID))
+            given(bankTransactionRepository.findByBankTransactionIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID))
                     .willReturn(Optional.of(transaction));
 
             BankTransactionDetailResponse response = bankTransactionQueryService.getTransactionDetail(
@@ -214,7 +216,7 @@ class BankTransactionQueryServiceTest {
             LinkedBankAccountDTO linkedAccount = createLinkedAccount();
 
             given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionMapper.findByIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID))
+            given(bankTransactionRepository.findByBankTransactionIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID))
                     .willReturn(Optional.empty());
 
             assertThatThrownBy(() ->
@@ -237,7 +239,7 @@ class BankTransactionQueryServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND);
 
-            verify(bankTransactionMapper, never()).findByIdAndLinkedAccountId(any(), any());
+            verify(bankTransactionRepository, never()).findByBankTransactionIdAndLinkedAccountId(any(), any());
         }
 
         @Test
@@ -256,17 +258,17 @@ class BankTransactionQueryServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.ACCOUNT_ACCESS_DENIED);
 
-            verify(bankTransactionMapper, never()).findByIdAndLinkedAccountId(any(), any());
+            verify(bankTransactionRepository, never()).findByBankTransactionIdAndLinkedAccountId(any(), any());
         }
 
         @Test
-        @DisplayName("다른 연동계좌 소속의 거래 ID를 넣어도 findByIdAndLinkedAccountId가 함께 걸러낸다")
+        @DisplayName("다른 연동계좌 소속의 거래 ID를 넣어도 findByBankTransactionIdAndLinkedAccountId가 함께 걸러낸다")
         void doesNotLeakTransactionFromAnotherLinkedAccount() {
             LinkedBankAccountDTO linkedAccount = createLinkedAccount();
 
             given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
             // bankTransactionId는 존재하지만 다른 linkedAccountId 소속이라 매퍼 조회 결과가 비어있는 상황을 재현
-            given(bankTransactionMapper.findByIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID))
+            given(bankTransactionRepository.findByBankTransactionIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID))
                     .willReturn(Optional.empty());
 
             assertThatThrownBy(() ->
@@ -276,7 +278,7 @@ class BankTransactionQueryServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(BankTransactionErrorCode.BANK_TRANSACTION_NOT_FOUND);
 
-            verify(bankTransactionMapper).findByIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID);
+            verify(bankTransactionRepository).findByBankTransactionIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID);
         }
     }
 }

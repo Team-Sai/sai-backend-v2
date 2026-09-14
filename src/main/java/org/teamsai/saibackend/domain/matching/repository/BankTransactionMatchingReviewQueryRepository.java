@@ -3,16 +3,10 @@ package org.teamsai.saibackend.domain.matching.repository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
-import jakarta.persistence.Tuple;
 import org.springframework.stereotype.Repository;
 import org.teamsai.saibackend.domain.matching.dto.request.MatchingReviewSearchCondition;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
-import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
-import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 
-import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -154,24 +148,25 @@ public class BankTransactionMatchingReviewQueryRepository {
             """.formatted(CANDIDATE_VALIDITY);
 
     @SuppressWarnings("unchecked")
-    public List<BankTransactionDTO> search(Long userId, MatchingReviewSearchCondition condition) {
+    public List<BankTransactionEntity> search(Long userId, MatchingReviewSearchCondition condition) {
         String sql = """
                 SELECT bt.bank_transaction_id, bt.linked_account_id,
                        bt.external_transaction_id, bt.amount,
                        bt.transaction_type, bt.processing_status,
-                       bt.transaction_at, bt.counterparty_name, bt.memo, bt.synced_at
+                       bt.transaction_at, bt.counterparty_name, bt.memo, bt.synced_at,
+                       bt.retry_count
                 """ + searchCondition(condition) + """
                 ORDER BY bt.transaction_at DESC, bt.bank_transaction_id DESC
                 LIMIT :size OFFSET :offset
                 """;
         Query query = bindParameters(
-                entityManager.createNativeQuery(sql, Tuple.class), userId, condition
+                entityManager.createNativeQuery(sql, BankTransactionEntity.class), userId, condition
         );
         // 기존 long 기반 LIMIT/OFFSET 바인딩을 유지한다.
         query.setParameter("size", condition.size());
         query.setParameter("offset", condition.offset());
-        List<Tuple> rows = query.getResultList();
-        return rows.stream().map(this::toDto).toList();
+        // Entity의 모든 매핑 컬럼을 조회하므로 JPA가 직접 객체를 구성한다.
+        return query.getResultList();
     }
 
     public long count(Long userId, MatchingReviewSearchCondition condition) {
@@ -205,26 +200,4 @@ public class BankTransactionMatchingReviewQueryRepository {
         return query;
     }
 
-    private BankTransactionDTO toDto(Tuple row) {
-        return BankTransactionDTO.builder()
-                .bankTransactionId(row.get("bank_transaction_id", Number.class).longValue())
-                .linkedAccountId(row.get("linked_account_id", Number.class).longValue())
-                .externalTransactionId(row.get("external_transaction_id", String.class))
-                .amount(row.get("amount", BigDecimal.class))
-                .transactionType(BankTransactionType.valueOf(row.get("transaction_type", String.class)))
-                .processingStatus(BankTransactionProcessingStatus.valueOf(row.get("processing_status", String.class)))
-                .transactionAt(toLocalDateTime(row.get("transaction_at")))
-                .counterpartyName(row.get("counterparty_name", String.class))
-                .memo(row.get("memo", String.class))
-                .syncedAt(toLocalDateTime(row.get("synced_at")))
-                .build();
-    }
-
-    private LocalDateTime toLocalDateTime(Object value) {
-        if (value == null) {
-            return null;
-        }
-        return value instanceof LocalDateTime dateTime
-                ? dateTime : ((Timestamp) value).toLocalDateTime();
-    }
 }
