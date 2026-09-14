@@ -9,6 +9,7 @@ import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
@@ -45,7 +46,10 @@ public class SettlementReminderSender {
                 .toList();
 
         List<PaymentObligationEntity> unresolvedObligations =
-                paymentObligationRepository.findByParticipantIdIn(participantIds).stream()
+                paymentObligationRepository.findLatestByParticipantIds(
+                            participantIds,
+                            ObligationStatus.ACTIVE
+                        ).stream()
                         .filter(o -> o.getPaymentStatus().isUnresolved())
                         .toList();
 

@@ -10,6 +10,7 @@ import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
@@ -89,7 +90,10 @@ class SettlementReminderSenderTest {
             PaymentObligationEntity resolvedOb = mock(PaymentObligationEntity.class);
             when(resolvedOb.getPaymentStatus()).thenReturn(PaymentStatus.PAID);
 
-            when(paymentObligationRepository.findByParticipantIdIn(List.of(10L)))
+            when(paymentObligationRepository.findLatestByParticipantIds(
+                    List.of(10L),
+                    ObligationStatus.ACTIVE
+            ))
                     .thenReturn(List.of(unresolvedOb, resolvedOb));
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
@@ -115,7 +119,10 @@ class SettlementReminderSenderTest {
             when(orphanOb.getParticipantId()).thenReturn(20L);
             when(orphanOb.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            when(paymentObligationRepository.findByParticipantIdIn(List.of(10L)))
+            when(paymentObligationRepository.findLatestByParticipantIds(
+                    List.of(10L),
+                    ObligationStatus.ACTIVE
+            ))
                     .thenReturn(List.of(orphanOb));
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
@@ -145,7 +152,10 @@ class SettlementReminderSenderTest {
             when(ob2.getPaymentObligationId()).thenReturn(501L);
             when(ob2.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            when(paymentObligationRepository.findByParticipantIdIn(List.of(10L, 11L)))
+            when(paymentObligationRepository.findLatestByParticipantIds(
+                    List.of(10L, 11L),
+                    ObligationStatus.ACTIVE
+            ))
                     .thenReturn(List.of(ob1, ob2));
 
             doThrow(new RuntimeException("알림 발송 실패"))

@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractRelationType;
+import org.teamsai.saibackend.domain.contract.type.ContractRelationType;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 
