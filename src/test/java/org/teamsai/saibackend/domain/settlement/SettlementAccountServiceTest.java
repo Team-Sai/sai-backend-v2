@@ -11,14 +11,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.request.SelectSettlementAccountRequest;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementAccount;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementAccountMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementAccountRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
@@ -29,12 +27,10 @@ import org.teamsai.saibackend.global.exception.DomainException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,7 +52,7 @@ class SettlementAccountServiceTest {
     private SettlementRepository settlementRepository;
 
     @Mock
-    private SettlementAccountMapper settlementAccountMapper;
+    private SettlementAccountRepository settlementAccountRepository;
 
     @Mock
     private LinkedBankAccountService linkedBankAccountService;
@@ -85,23 +81,24 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
             when(
-                    settlementAccountMapper
-                            .findActiveBySettlementIdForUpdate(
-                                    SETTLEMENT_ID
+                    settlementAccountRepository
+                            .findBySettlementIdAndStatusForUpdate(
+                                    SETTLEMENT_ID,
+                                    SettlementAccountStatus.ACTIVE
                             )
             ).thenReturn(Optional.empty());
 
             when(
-                    settlementAccountMapper.insert(
-                            any(SettlementAccountDTO.class)
+                    settlementAccountRepository.save(
+                            any(SettlementAccount.class)
                     )
             ).thenAnswer(invocation -> {
 
-                SettlementAccountDTO account =
+                SettlementAccount account =
                         invocation.getArgument(0);
 
                 ReflectionTestUtils.setField(
@@ -110,7 +107,7 @@ class SettlementAccountServiceTest {
                         FIRST_SETTLEMENT_ACCOUNT_ID
                 );
 
-                return 1;
+                return account;
             });
 
             when(
@@ -129,18 +126,18 @@ class SettlementAccountServiceTest {
                     );
 
 
-            ArgumentCaptor<SettlementAccountDTO> captor =
+            ArgumentCaptor<SettlementAccount> captor =
                     ArgumentCaptor.forClass(
-                            SettlementAccountDTO.class
+                            SettlementAccount.class
                     );
 
-            verify(settlementAccountMapper)
-                    .insert(captor.capture());
+            verify(settlementAccountRepository)
+                    .save(captor.capture());
 
-            SettlementAccountDTO savedAccount =
+            SettlementAccount savedAccount =
                     captor.getValue();
 
-            assertThat(savedAccount.getSettlementId())
+            assertThat(savedAccount.getSettlement().getSettlementId())
                     .isEqualTo(SETTLEMENT_ID);
 
             assertThat(savedAccount.getLinkedAccountId())
@@ -196,7 +193,7 @@ class SettlementAccountServiceTest {
             Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            SettlementAccountDTO currentAccount =
+            SettlementAccount currentAccount =
                     createActiveSettlementAccount(
                             FIRST_SETTLEMENT_ACCOUNT_ID,
                             FIRST_LINKED_ACCOUNT_ID
@@ -208,13 +205,14 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
             when(
-                    settlementAccountMapper
-                            .findActiveBySettlementIdForUpdate(
-                                    SETTLEMENT_ID
+                    settlementAccountRepository
+                            .findBySettlementIdAndStatusForUpdate(
+                                    SETTLEMENT_ID,
+                                    SettlementAccountStatus.ACTIVE
                             )
             ).thenReturn(
                     Optional.of(currentAccount)
@@ -246,6 +244,14 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
+            assertThat(currentAccount.getAccountStatus())
+                    .isEqualTo(
+                            SettlementAccountStatus.ACTIVE
+                    );
+
+            assertThat(currentAccount.getEndedAt())
+                    .isNull();
+
             verify(settlementValidator)
                     .validateOwner(
                             settlement,
@@ -258,15 +264,8 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            verify(settlementAccountMapper, never())
-                    .updateStatus(
-                            any(),
-                            any(),
-                            any()
-                    );
-
-            verify(settlementAccountMapper, never())
-                    .insert(any());
+            verify(settlementAccountRepository, never())
+                    .save(any());
         }
 
 
@@ -277,7 +276,7 @@ class SettlementAccountServiceTest {
             Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            SettlementAccountDTO currentAccount =
+            SettlementAccount currentAccount =
                     createActiveSettlementAccount(
                             FIRST_SETTLEMENT_ACCOUNT_ID,
                             FIRST_LINKED_ACCOUNT_ID
@@ -293,35 +292,28 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
 
             when(
-                    settlementAccountMapper
-                            .findActiveBySettlementIdForUpdate(
-                                    SETTLEMENT_ID
+                    settlementAccountRepository
+                            .findBySettlementIdAndStatusForUpdate(
+                                    SETTLEMENT_ID,
+                                    SettlementAccountStatus.ACTIVE
                             )
             ).thenReturn(
                     Optional.of(currentAccount)
             );
 
             when(
-                    settlementAccountMapper.updateStatus(
-                            eq(FIRST_SETTLEMENT_ACCOUNT_ID),
-                            eq(SettlementAccountStatus.REPLACED),
-                            any(LocalDateTime.class)
-                    )
-            ).thenReturn(1);
-
-            when(
-                    settlementAccountMapper.insert(
-                            any(SettlementAccountDTO.class)
+                    settlementAccountRepository.save(
+                            any(SettlementAccount.class)
                     )
             ).thenAnswer(invocation -> {
 
-                SettlementAccountDTO account =
+                SettlementAccount account =
                         invocation.getArgument(0);
 
                 ReflectionTestUtils.setField(
@@ -330,7 +322,7 @@ class SettlementAccountServiceTest {
                         SECOND_SETTLEMENT_ACCOUNT_ID
                 );
 
-                return 1;
+                return account;
             });
 
             when(
@@ -351,32 +343,25 @@ class SettlementAccountServiceTest {
                     );
 
 
-            ArgumentCaptor<LocalDateTime> endedAtCaptor =
-                    ArgumentCaptor.forClass(
-                            LocalDateTime.class
+            assertThat(currentAccount.getAccountStatus())
+                    .isEqualTo(
+                            SettlementAccountStatus.REPLACED
                     );
 
-            verify(settlementAccountMapper)
-                    .updateStatus(
-                            eq(FIRST_SETTLEMENT_ACCOUNT_ID),
-                            eq(SettlementAccountStatus.REPLACED),
-                            endedAtCaptor.capture()
-                    );
-
-            assertThat(endedAtCaptor.getValue())
+            assertThat(currentAccount.getEndedAt())
                     .isNotNull();
 
-            ArgumentCaptor<SettlementAccountDTO> accountCaptor =
+            ArgumentCaptor<SettlementAccount> accountCaptor =
                     ArgumentCaptor.forClass(
-                            SettlementAccountDTO.class
+                            SettlementAccount.class
                     );
 
-            verify(settlementAccountMapper)
-                    .insert(
+            verify(settlementAccountRepository)
+                    .save(
                             accountCaptor.capture()
                     );
 
-            SettlementAccountDTO newAccount =
+            SettlementAccount newAccount =
                     accountCaptor.getValue();
 
             assertThat(newAccount.getLinkedAccountId())
@@ -391,6 +376,9 @@ class SettlementAccountServiceTest {
 
             assertThat(newAccount.getEndedAt())
                     .isNull();
+
+            assertThat(newAccount.getSettlement())
+                    .isEqualTo(settlement);
 
             assertThat(response.getLinkedAccountId())
                     .isEqualTo(
@@ -422,7 +410,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -466,7 +454,7 @@ class SettlementAccountServiceTest {
             );
 
             verifyNoInteractions(
-                    settlementAccountMapper
+                    settlementAccountRepository
             );
         }
 
@@ -483,7 +471,7 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -525,7 +513,7 @@ class SettlementAccountServiceTest {
                     );
 
             verifyNoInteractions(
-                    settlementAccountMapper
+                    settlementAccountRepository
             );
         }
 
@@ -539,7 +527,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.empty()
                     );
@@ -560,79 +548,8 @@ class SettlementAccountServiceTest {
 
             verifyNoInteractions(
                     settlementValidator,
-                    settlementAccountMapper
+                    settlementAccountRepository
             );
-        }
-
-
-        @Test
-        @DisplayName("기존 수취 계좌 상태 변경에 실패하면 새 계좌를 등록하지 않는다")
-        void replaceAccountFailsWhenCurrentAccountUpdateFails() {
-
-            Settlement settlement =
-                    createSettlement(OWNER_ID);
-
-            SettlementAccountDTO currentAccount =
-                    createActiveSettlementAccount(
-                            FIRST_SETTLEMENT_ACCOUNT_ID,
-                            FIRST_LINKED_ACCOUNT_ID
-                    );
-
-            SelectSettlementAccountRequest request =
-                    createRequest(
-                            SECOND_LINKED_ACCOUNT_ID
-                    );
-
-            when(settlementRepository.findById(SETTLEMENT_ID))
-                    .thenReturn(
-                            Optional.of(settlement)
-                    );
-
-            when(
-                    settlementAccountMapper
-                            .findActiveBySettlementIdForUpdate(
-                                    SETTLEMENT_ID
-                            )
-            ).thenReturn(
-                    Optional.of(currentAccount)
-            );
-
-            when(
-                    settlementAccountMapper.updateStatus(
-                            eq(FIRST_SETTLEMENT_ACCOUNT_ID),
-                            eq(SettlementAccountStatus.REPLACED),
-                            any(LocalDateTime.class)
-                    )
-            ).thenReturn(0);
-
-
-            assertThatThrownBy(
-                    () ->
-                            settlementAccountService
-                                    .selectAccount(
-                                            OWNER_ID,
-                                            SETTLEMENT_ID,
-                                            request.getLinkedAccountId()
-                                    )
-            ).isInstanceOf(
-                    DomainException.class
-            );
-
-
-            verify(settlementValidator)
-                    .validateOwner(
-                            settlement,
-                            OWNER_ID
-                    );
-
-            verify(settlementValidator)
-                    .validateLinkedAccountOwner(
-                            OWNER_ID,
-                            SECOND_LINKED_ACCOUNT_ID
-                    );
-
-            verify(settlementAccountMapper, never())
-                    .insert(any());
         }
 
 
@@ -648,25 +565,28 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
 
             when(
-                    settlementAccountMapper
-                            .findActiveBySettlementIdForUpdate(
-                                    SETTLEMENT_ID
+                    settlementAccountRepository
+                            .findBySettlementIdAndStatusForUpdate(
+                                    SETTLEMENT_ID,
+                                    SettlementAccountStatus.ACTIVE
                             )
             ).thenReturn(
                     Optional.empty()
             );
 
             when(
-                    settlementAccountMapper.insert(
-                            any(SettlementAccountDTO.class)
+                    settlementAccountRepository.save(
+                            any(SettlementAccount.class)
                     )
-            ).thenReturn(0);
+            ).thenThrow(
+                    new RuntimeException("save failed")
+            );
 
 
             assertThatThrownBy(
@@ -678,7 +598,7 @@ class SettlementAccountServiceTest {
                                             request.getLinkedAccountId()
                                     )
             ).isInstanceOf(
-                    DomainException.class
+                    RuntimeException.class
             );
 
 
@@ -708,7 +628,7 @@ class SettlementAccountServiceTest {
             Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            SettlementAccountDTO account =
+            SettlementAccount account =
                     createActiveSettlementAccount(
                             SECOND_SETTLEMENT_ACCOUNT_ID,
                             SECOND_LINKED_ACCOUNT_ID
@@ -723,9 +643,10 @@ class SettlementAccountServiceTest {
                     );
 
             when(
-                    settlementAccountMapper
-                            .findActiveBySettlementId(
-                                    SETTLEMENT_ID
+                    settlementAccountRepository
+                            .findBySettlementIdAndStatus(
+                                    SETTLEMENT_ID,
+                                    SettlementAccountStatus.ACTIVE
                             )
             ).thenReturn(
                     Optional.of(account)
@@ -778,14 +699,18 @@ class SettlementAccountServiceTest {
         @DisplayName("참여자는 정산 소유자의 현재 수취 계좌를 조회한다")
         void participantFindsOwnersCurrentAccount() {
             Settlement settlement = createSettlement(OWNER_ID);
-            SettlementAccountDTO account = createActiveSettlementAccount(
+            SettlementAccount account = createActiveSettlementAccount(
                     SECOND_SETTLEMENT_ACCOUNT_ID,
                     SECOND_LINKED_ACCOUNT_ID
             );
             LinkedBankAccountResponse linkedAccount = linkedAccount(SECOND_LINKED_ACCOUNT_ID);
             when(settlementRepository.findById(SETTLEMENT_ID)).thenReturn(Optional.of(settlement));
-            when(settlementAccountMapper.findActiveBySettlementId(SETTLEMENT_ID))
-                    .thenReturn(Optional.of(account));
+            when(
+                    settlementAccountRepository.findBySettlementIdAndStatus(
+                            SETTLEMENT_ID,
+                            SettlementAccountStatus.ACTIVE
+                    )
+            ).thenReturn(Optional.of(account));
             when(linkedBankAccountService.getLinkedAccounts(OWNER_ID))
                     .thenReturn(List.of(linkedAccount));
 
@@ -813,9 +738,10 @@ class SettlementAccountServiceTest {
                     );
 
             when(
-                    settlementAccountMapper
-                            .findActiveBySettlementId(
-                                    SETTLEMENT_ID
+                    settlementAccountRepository
+                            .findBySettlementIdAndStatus(
+                                    SETTLEMENT_ID,
+                                    SettlementAccountStatus.ACTIVE
                             )
             ).thenReturn(
                     Optional.empty()
@@ -884,10 +810,11 @@ class SettlementAccountServiceTest {
                     );
 
             verify(
-                    settlementAccountMapper,
+                    settlementAccountRepository,
                     never()
-            ).findActiveBySettlementId(
-                    SETTLEMENT_ID
+            ).findBySettlementIdAndStatus(
+                    SETTLEMENT_ID,
+                    SettlementAccountStatus.ACTIVE
             );
         }
     }
@@ -918,30 +845,26 @@ class SettlementAccountServiceTest {
     }
 
 
-    private SettlementAccountDTO createActiveSettlementAccount(
+    private SettlementAccount createActiveSettlementAccount(
             Long settlementAccountId,
             Long linkedAccountId
     ) {
 
-        return SettlementAccountDTO.builder()
-                .settlementAccountId(
-                        settlementAccountId
-                )
-                .settlementId(
-                        SETTLEMENT_ID
-                )
-                .linkedAccountId(
-                        linkedAccountId
-                )
-                .accountStatus(
-                        SettlementAccountStatus.ACTIVE
-                )
-                .selectedAt(
+        SettlementAccount account =
+                SettlementAccount.create(
+                        createSettlement(OWNER_ID),
+                        linkedAccountId,
                         LocalDateTime.now()
                                 .minusHours(1)
-                )
-                .endedAt(null)
-                .build();
+                );
+
+        ReflectionTestUtils.setField(
+                account,
+                "settlementAccountId",
+                settlementAccountId
+        );
+
+        return account;
     }
 
 
