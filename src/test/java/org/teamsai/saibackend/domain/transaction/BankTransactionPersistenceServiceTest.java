@@ -10,11 +10,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
-import org.teamsai.saibackend.domain.transaction.mapper.BankTransactionMapper;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
-import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
@@ -39,7 +37,7 @@ import static org.mockito.Mockito.verify;
 class BankTransactionPersistenceServiceTest {
 
     @Mock
-    private BankTransactionMapper bankTransactionMapper;
+    private BankTransactionRepository bankTransactionRepository;
 
     @Mock
     private LinkedBankAccountMapper linkedBankAccountMapper;
@@ -82,7 +80,7 @@ class BankTransactionPersistenceServiceTest {
         int result = bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, List.of());
 
         assertThat(result).isZero();
-        verify(bankTransactionMapper, never()).insertOrGetId(any());
+        verify(bankTransactionRepository, never()).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
         verify(linkedBankAccountMapper, never()).updateLastSyncedTransactionId(any(), any());
     }
 
@@ -100,16 +98,16 @@ class BankTransactionPersistenceServiceTest {
 
         assertThat(result).isEqualTo(3);
 
-        ArgumentCaptor<BankTransactionDTO> dtoCaptor = ArgumentCaptor.forClass(BankTransactionDTO.class);
-        verify(bankTransactionMapper, times(3)).insertOrGetId(dtoCaptor.capture());
+        ArgumentCaptor<String> externalIdCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<LocalDateTime> syncedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(bankTransactionRepository, times(3)).insertIfAbsent(
+                eq(LINKED_ACCOUNT_ID), externalIdCaptor.capture(), eq(BigDecimal.valueOf(50_000)),
+                any(), any(), eq("홍길동"), eq("테스트 입금"), syncedAtCaptor.capture()
+        );
 
-        List<BankTransactionDTO> savedDtos = dtoCaptor.getAllValues();
-        assertThat(savedDtos)
-                .extracting(BankTransactionDTO::getExternalTransactionId)
+        assertThat(externalIdCaptor.getAllValues())
                 .containsExactlyInAnyOrder("MOCK-TX-A", "MOCK-TX-B", "MOCK-TX-C");
-        assertThat(savedDtos)
-                .allMatch(dto -> dto.getLinkedAccountId().equals(LINKED_ACCOUNT_ID))
-                .allMatch(dto -> dto.getSyncedAt() != null);
+        assertThat(syncedAtCaptor.getAllValues()).doesNotContainNull();
 
         // 마지막 원소(12)가 아니라 실제 최댓값(13)으로 갱신되어야 한다.
         verify(linkedBankAccountMapper).updateLastSyncedTransactionId(eq(LINKED_ACCOUNT_ID), eq(13L));
@@ -179,16 +177,17 @@ class BankTransactionPersistenceServiceTest {
 
         bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions);
 
-        ArgumentCaptor<BankTransactionDTO> dtoCaptor = ArgumentCaptor.forClass(BankTransactionDTO.class);
-        verify(bankTransactionMapper, times(2)).insertOrGetId(dtoCaptor.capture());
+        ArgumentCaptor<String> typeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(bankTransactionRepository, times(2)).insertIfAbsent(
+                eq(LINKED_ACCOUNT_ID), any(), any(), typeCaptor.capture(),
+                any(), any(), any(), any()
+        );
 
-        List<BankTransactionDTO> savedDtos = dtoCaptor.getAllValues();
-        assertThat(savedDtos.get(0).getTransactionType()).isEqualTo(BankTransactionType.DEPOSIT);
-        assertThat(savedDtos.get(1).getTransactionType()).isEqualTo(BankTransactionType.WITHDRAWAL);
+        assertThat(typeCaptor.getAllValues()).containsExactly("DEPOSIT", "WITHDRAWAL");
     }
 
     @Test
-    @DisplayName("거래 저장(insertOrGetId) 중 DB 예외가 발생하면 그대로 전파하고 커서는 갱신하지 않는다")
+    @DisplayName("거래 저장(insertIfAbsent) 중 DB 예외가 발생하면 그대로 전파하고 커서는 갱신하지 않는다")
     void propagatesExceptionWhenInsertFails() {
         List<BankTransactionResponse> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT"),
@@ -197,7 +196,7 @@ class BankTransactionPersistenceServiceTest {
         DataIntegrityViolationException insertFailure =
                 new DataIntegrityViolationException("제약 위반");
 
-        willThrow(insertFailure).given(bankTransactionMapper).insertOrGetId(any());
+        willThrow(insertFailure).given(bankTransactionRepository).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
 
         assertThatThrownBy(() ->
                 bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions)
@@ -227,6 +226,6 @@ class BankTransactionPersistenceServiceTest {
                 .isSameAs(cursorUpdateFailure);
 
         // 거래 저장 자체는 커서 갱신 이전에 이미 시도되었어야 한다.
-        verify(bankTransactionMapper).insertOrGetId(any());
+        verify(bankTransactionRepository).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

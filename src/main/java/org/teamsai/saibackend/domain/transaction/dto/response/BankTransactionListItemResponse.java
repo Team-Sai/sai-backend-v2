@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.transaction.dto.response;
 
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
@@ -16,15 +16,17 @@ public record BankTransactionListItemResponse(
         String counterpartyName,
         String memo
 ) {
-    public static BankTransactionListItemResponse from(BankTransactionDTO dto) {
+    public static BankTransactionListItemResponse from(
+            BankTransactionEntity entity
+    ) {
         return new BankTransactionListItemResponse(
-                dto.getBankTransactionId(),
-                dto.getAmount(),
-                dto.getTransactionType(),
-                dto.getProcessingStatus(),
-                dto.getTransactionAt(),
-                dto.getCounterpartyName(),
-                dto.getMemo()
+                entity.getBankTransactionId(),
+                entity.getAmount(),
+                entity.getTransactionType(),
+                entity.getProcessingStatus(),
+                entity.getTransactionAt(),
+                entity.getCounterpartyName(),
+                entity.getMemo()
         );
     }
 }

@@ -13,7 +13,7 @@ import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchingRev
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
 import org.teamsai.saibackend.domain.matching.type.MatchingReviewChannel;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.matching.dto.BankTransactionReviewQueryDTO;
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -55,7 +55,7 @@ class BankTransactionMatchingReviewListQueryServiceTest {
                         0,
                         20
                 );
-        BankTransactionDTO transaction = transaction(10L);
+        BankTransactionReviewQueryDTO transaction = transaction(10L);
         BankTransactionMatchCandidateQueryDTO candidate = candidate(10L);
 
         given(reviewQueryRepository.search(1L, condition))
@@ -71,6 +71,14 @@ class BankTransactionMatchingReviewListQueryServiceTest {
                 service.getReviews(1L, condition);
 
         assertThat(result.totalCount()).isEqualTo(1);
+        assertThat(result.content().get(0).transaction()).isEqualTo(
+                new org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse(
+                        10L, 2L, new BigDecimal("5000"),
+                        BankTransactionType.DEPOSIT, BankTransactionProcessingStatus.NEEDS_CHECK,
+                        LocalDateTime.of(2026, 8, 17, 10, 0), "sender", null,
+                        LocalDateTime.of(2026, 8, 17, 10, 1)
+                )
+        );
         assertThat(result.content()).hasSize(1);
         assertThat(result.content().get(0).reviewChannel())
                 .isEqualTo(MatchingReviewChannel.TRANSACTION_HISTORY);
@@ -117,7 +125,7 @@ class BankTransactionMatchingReviewListQueryServiceTest {
                         0,
                         20
                 );
-        BankTransactionDTO transaction = transaction(11L);
+        BankTransactionReviewQueryDTO transaction = transaction(11L);
         given(reviewQueryRepository.search(1L, condition))
                 .willReturn(List.of(transaction));
         given(reviewQueryRepository.count(1L, condition)).willReturn(1L);
@@ -136,17 +144,18 @@ class BankTransactionMatchingReviewListQueryServiceTest {
         assertThat(result.content().get(0).candidates()).hasSize(2);
     }
 
-    private BankTransactionDTO transaction(Long id) {
-        return BankTransactionDTO.builder()
-                .bankTransactionId(id)
-                .linkedAccountId(2L)
-                .amount(new BigDecimal("5000"))
-                .transactionType(BankTransactionType.DEPOSIT)
-                .processingStatus(BankTransactionProcessingStatus.NEEDS_CHECK)
-                .transactionAt(LocalDateTime.of(2026, 8, 17, 10, 0))
-                .counterpartyName("sender")
-                .syncedAt(LocalDateTime.of(2026, 8, 17, 10, 1))
-                .build();
+    private BankTransactionReviewQueryDTO transaction(Long id) {
+        return new BankTransactionReviewQueryDTO(
+                id,
+                2L,
+                new BigDecimal("5000"),
+                BankTransactionType.DEPOSIT,
+                BankTransactionProcessingStatus.NEEDS_CHECK,
+                LocalDateTime.of(2026, 8, 17, 10, 0),
+                "sender",
+                null,
+                LocalDateTime.of(2026, 8, 17, 10, 1)
+        );
     }
 
     private BankTransactionMatchCandidateQueryDTO candidate(Long transactionId) {

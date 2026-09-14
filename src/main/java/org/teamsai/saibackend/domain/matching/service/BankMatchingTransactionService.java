@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -32,7 +32,7 @@ public class BankMatchingTransactionService {
     public AutoMatchingTransactionResult process(
             Long userId,
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransactionEntity bankTransaction,
             boolean isBatch
     ) {
         return process(userId, linkedAccountId, bankTransaction, null, null, isBatch);
@@ -41,12 +41,12 @@ public class BankMatchingTransactionService {
     public AutoMatchingTransactionResult process(
             Long userId,
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransactionEntity bankTransaction,
             MatchingTargetType targetType,
             Long aggregateId,
             boolean isBatch
     ) {
-        BankTransactionDTO lockedTransaction =
+        BankTransactionEntity lockedTransaction =
                 bankTransactionService
                         .findByIdAndLinkedAccountIdForUpdate(
                                 bankTransaction.getBankTransactionId(),
@@ -88,7 +88,7 @@ public class BankMatchingTransactionService {
     private void createMatchingReviewNotificationIfRequired(
             Long userId,
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransactionEntity bankTransaction,
             AutoMatchingTransactionResult result,
             boolean isBatch
     ) {
@@ -142,7 +142,7 @@ public class BankMatchingTransactionService {
         }
     }
     private String createBothFoundContent(
-            BankTransactionDTO bankTransaction
+            BankTransactionEntity bankTransaction
     ) {
         String counterpartyName = resolveCounterpartyName(bankTransaction);
         return counterpartyName
@@ -151,7 +151,7 @@ public class BankMatchingTransactionService {
                 + "원 입금에 정산과 차용증 후보가 모두 발견되었습니다.";
     }
     private String createUnresolvedSettlementContent(
-            BankTransactionDTO bankTransaction
+            BankTransactionEntity bankTransaction
     ) {
         String counterpartyName = resolveCounterpartyName(bankTransaction);
         return counterpartyName
@@ -160,7 +160,7 @@ public class BankMatchingTransactionService {
                 + "원 입금이 정산 금액과 일치하지 않아 확인이 필요합니다.";
     }
     private String resolveCounterpartyName(
-            BankTransactionDTO bankTransaction
+            BankTransactionEntity bankTransaction
     ) {
         String counterpartyName = bankTransaction.getCounterpartyName();
         if (counterpartyName == null || counterpartyName.isBlank()) {
@@ -170,7 +170,7 @@ public class BankMatchingTransactionService {
     }
     private AutoMatchingTransactionResult processMatching(
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransactionEntity bankTransaction,
             MatchingTargetType targetType,
             Long aggregateId
     ) {
@@ -224,13 +224,13 @@ public class BankMatchingTransactionService {
         );
     }
     private boolean hasMatchableCounterpartyName(
-            BankTransactionDTO bankTransaction
+            BankTransactionEntity bankTransaction
     ) {
         String counterpartyName = bankTransaction.getCounterpartyName();
         return counterpartyName != null && !counterpartyName.isBlank();
     }
     private MatchingTransaction toMatchingTransaction(
-            BankTransactionDTO bankTransaction
+            BankTransactionEntity bankTransaction
     ) {
         return new MatchingTransaction(
                 bankTransaction.getBankTransactionId(),

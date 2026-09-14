@@ -1,5 +1,7 @@
 package org.teamsai.saibackend.domain.settlement;
 
+import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,8 +18,8 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentOb
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
-import org.teamsai.saibackend.domain.transaction.mapper.BankTransactionMapper;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,7 +46,7 @@ class SettlementPaymentHistoryServiceTest {
     private PaymentRecordService paymentRecordService;
 
     @Mock
-    private BankTransactionMapper bankTransactionMapper;
+    private BankTransactionService bankTransactionService;
 
     @InjectMocks
     private SettlementPaymentHistoryService settlementPaymentHistoryService;
@@ -75,7 +77,7 @@ class SettlementPaymentHistoryServiceTest {
         );
 
         given(
-                bankTransactionMapper.findById(200L)
+                bankTransactionService.findById(200L)
         ).willReturn(
                 Optional.of(
                         bankTransaction(200L, "카카오뱅크 홍길동", "TX-EXTERNAL-1")
@@ -128,7 +130,7 @@ class SettlementPaymentHistoryServiceTest {
         );
 
         given(
-                bankTransactionMapper.findById(999L)
+                bankTransactionService.findById(999L)
         ).willReturn(
                 Optional.empty()
         );
@@ -227,15 +229,22 @@ class SettlementPaymentHistoryServiceTest {
         );
     }
 
-    private BankTransactionDTO bankTransaction(
+    private BankTransactionEntity bankTransaction(
             Long bankTransactionId,
             String counterpartyName,
             String externalTransactionId
     ) {
-        return BankTransactionDTO.builder()
-                .bankTransactionId(bankTransactionId)
-                .counterpartyName(counterpartyName)
-                .externalTransactionId(externalTransactionId)
-                .build();
+        BankTransactionEntity transaction = new BankTransactionEntity(
+                1L,
+                externalTransactionId,
+                BigDecimal.ONE,
+                BankTransactionType.DEPOSIT,
+                LocalDateTime.of(2026, 8, 5, 10, 0),
+                counterpartyName,
+                null,
+                LocalDateTime.of(2026, 8, 5, 10, 1)
+        );
+        ReflectionTestUtils.setField(transaction, "bankTransactionId", bankTransactionId);
+        return transaction;
     }
 }

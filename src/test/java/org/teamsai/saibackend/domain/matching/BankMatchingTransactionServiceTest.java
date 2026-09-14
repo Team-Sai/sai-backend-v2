@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.matching;
 import org.junit.jupiter.api.DisplayName;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -24,7 +25,7 @@ import org.teamsai.saibackend.domain.payment.repository.PaymentObligationReposit
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
@@ -64,7 +65,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("상대방명이 없으면 후보를 조회하지 않고 미매칭으로 변경한다")
     void classifiesBlankCounterpartyNameAsUnmatched() {
-        BankTransactionDTO transaction = bankTransaction(101L, " ");
+        BankTransactionEntity transaction = bankTransaction(101L, " ");
         givenLockedTransaction(transaction);
         AutoMatchingTransactionResult result =
                 transactionService.process(
@@ -87,7 +88,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("특정 대상 동기화 범위 밖 거래는 PENDING으로 유지한다")
     void keepsOutOfScopeTransactionPending() {
-        BankTransactionDTO transaction = bankTransaction(101L, "Hong Gil Dong");
+        BankTransactionEntity transaction = bankTransaction(101L, "Hong Gil Dong");
         givenLockedTransaction(transaction);
         given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountIdAndTarget(
                 LINKED_ACCOUNT_ID,
@@ -110,11 +111,11 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("후보를 조회해 자동매칭하고 은행 거래 상태를 변경한다")
     void executesAutoMatchingAndUpdatesStatus() {
-        BankTransactionDTO staleTransaction = bankTransaction(
+        BankTransactionEntity staleTransaction = bankTransaction(
                 101L,
                 "Old Name"
         );
-        BankTransactionDTO lockedTransaction = bankTransaction(
+        BankTransactionEntity lockedTransaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -162,7 +163,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("중복 납부 결과는 이미 반영된 거래로 저장한다")
     void updatesDuplicatedResultAsApplied() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -186,7 +187,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("자동매칭 결과가 거래 한 건이 아니면 예외가 발생한다")
     void throwsExceptionWhenMatchingResultCountIsInvalid() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -218,7 +219,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("상태 변경 실패를 그대로 전파한다")
     void propagatesStatusUpdateFailure() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -253,7 +254,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("수동 동기화(isBatch=false)는 정산+차용증 후보가 모두 있어도 매칭 검토 알림을 생성하지 않는다 (동기화 결과 화면에서 바로 선택 가능하므로)")
     void doesNotCreateNotificationForCrossDomainCandidatesWhenNotBatch() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -281,7 +282,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("수동 동기화(isBatch=false)는 한 도메인의 후보만 있어도 매칭 검토 알림을 생성하지 않는다")
     void doesNotCreateNotificationForSingleDomainCandidatesWhenNotBatch() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -314,7 +315,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("배치로 실행되고 정산 후보가 완납되지 않았으면 매칭 검토 알림을 생성한다")
     void createsNotificationForUnresolvedSettlementWhenTriggeredByBatch() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -356,7 +357,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("배치로 실행되어도 정산이 이미 완납이면 알림을 생성하지 않는다")
     void doesNotCreateNotificationWhenSettlementAlreadyResolvedEvenIfBatch() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -392,7 +393,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("배치이고 정산이 미완납이어도 차용증 후보가 함께 있으면 동시 후보 알림이 우선한다")
     void crossDomainNotificationTakesPriorityOverBatchUnresolvedSettlement() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -431,7 +432,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("잠금 조회한 거래가 이미 처리됐으면 자동매칭을 다시 실행하지 않는다")
     void skipsTransactionAlreadyProcessedByConcurrentRequest() {
-        BankTransactionDTO transaction = bankTransaction(
+        BankTransactionEntity transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong",
                 BankTransactionProcessingStatus.APPLIED
@@ -457,7 +458,7 @@ class BankMatchingTransactionServiceTest {
                 any(), any(), any()
         );
     }
-    private BankTransactionDTO bankTransaction(
+    private BankTransactionEntity bankTransaction(
             Long bankTransactionId,
             String counterpartyName
     ) {
@@ -467,24 +468,26 @@ class BankMatchingTransactionServiceTest {
                 BankTransactionProcessingStatus.PENDING
         );
     }
-    private BankTransactionDTO bankTransaction(
+    private BankTransactionEntity bankTransaction(
             Long bankTransactionId,
             String counterpartyName,
             BankTransactionProcessingStatus processingStatus
     ) {
-        return BankTransactionDTO.builder()
-                .bankTransactionId(bankTransactionId)
-                .linkedAccountId(LINKED_ACCOUNT_ID)
-                .externalTransactionId("external-" + bankTransactionId)
-                .amount(new BigDecimal("10000.00"))
-                .transactionType(BankTransactionType.DEPOSIT)
-                .processingStatus(processingStatus)
-                .transactionAt(LocalDateTime.of(2026, 8, 5, 10, 0))
-                .counterpartyName(counterpartyName)
-                .syncedAt(LocalDateTime.of(2026, 8, 5, 10, 5))
-                .build();
+        BankTransactionEntity transaction = new BankTransactionEntity(
+                LINKED_ACCOUNT_ID,
+                "external-" + bankTransactionId,
+                new BigDecimal("10000.00"),
+                BankTransactionType.DEPOSIT,
+                LocalDateTime.of(2026, 8, 5, 10, 0),
+                counterpartyName,
+                null,
+                LocalDateTime.of(2026, 8, 5, 10, 5)
+        );
+        ReflectionTestUtils.setField(transaction, "bankTransactionId", bankTransactionId);
+        transaction.changeProcessingStatus(processingStatus);
+        return transaction;
     }
-    private void givenLockedTransaction(BankTransactionDTO transaction) {
+    private void givenLockedTransaction(BankTransactionEntity transaction) {
         given(bankTransactionService.findByIdAndLinkedAccountIdForUpdate(
                 transaction.getBankTransactionId(),
                 LINKED_ACCOUNT_ID

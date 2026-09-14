@@ -7,8 +7,8 @@ import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.type.RetryPolicy;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
-import org.teamsai.saibackend.domain.transaction.mapper.BankTransactionMapper;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 
 import java.util.List;
@@ -18,22 +18,22 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BankTransactionRetryService {
 
-    private final BankTransactionMapper bankTransactionMapper;
+    private final BankTransactionService bankTransactionService;
     private final BankTransactionMatchCandidateService candidateService;
     private final BankMatchingService bankMatchingService;
     private final SlackNotifier slackNotifier;
 
     public void retryForAccount(Long userId, Long linkedAccountId) {
-        List<BankTransactionDTO> candidates =
-                bankTransactionMapper.findRetryCandidates(linkedAccountId);
+        List<BankTransactionEntity> candidates =
+                bankTransactionService.findRetryCandidates(linkedAccountId);
 
         if (candidates.isEmpty()) {
             return;
         }
 
-        for (BankTransactionDTO tx : candidates) {
+        for (BankTransactionEntity tx : candidates) {
             candidateService.deleteAllByBankTransactionId(tx.getBankTransactionId());
-            bankTransactionMapper.resetToPendingForRetry(
+            bankTransactionService.resetToPendingForRetry(
                     tx.getBankTransactionId(), tx.getProcessingStatus());
         }
 
@@ -46,9 +46,9 @@ public class BankTransactionRetryService {
         checkAndNotifyExhausted(candidates);
     }
 
-    private void checkAndNotifyExhausted(List<BankTransactionDTO> retriedTransactions) {
-        for (BankTransactionDTO original : retriedTransactions) {
-            BankTransactionDTO current = bankTransactionMapper.findById(
+    private void checkAndNotifyExhausted(List<BankTransactionEntity> retriedTransactions) {
+        for (BankTransactionEntity original : retriedTransactions) {
+            BankTransactionEntity current = bankTransactionService.findById(
                     original.getBankTransactionId()
             ).orElse(null);
 
