@@ -2,6 +2,7 @@ package org.teamsai.saibackend.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,14 +12,13 @@ import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.settlement.dto.RecurringSettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
-import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
+import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementAccountMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.type.*;
 
 import java.math.BigDecimal;
@@ -35,8 +35,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RecurringSettlementCycleGenerator {
 
-    private final SettlementMapper settlementMapper;
-    private final SettlementParticipantMapper participantMapper;
+    private final SettlementRepository settlementRepository;
+    private final SettlementParticipantRepository settlementParticipantRepository;
     private final PaymentObligationRepository paymentObligationRepository;
     private final SettlementPaymentService settlementPaymentService;
     private final SettlementAmountCalculator settlementAmountCalculator;
@@ -44,27 +44,34 @@ public class RecurringSettlementCycleGenerator {
     private final SlackNotifier slackNotifier;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public CycleGenerationOutcome generateOneCycle(RecurringSettlementDTO recurring, SettlementDTO previousSettlement, LocalDate cycleDate) {
-        SettlementDTO lockedLatest =
-                settlementMapper.findLatestByRecurringIdForUpdate(recurring.getRecurringSettlementId());
-
+    public CycleGenerationOutcome generateOneCycle(RecurringSettlement recurring, Settlement previousSettlement, LocalDate cycleDate) {
+        Settlement lockedLatest =
+                settlementRepository.findLatestByRecurringIdForUpdate(
+                                recurring.getRecurringSettlementId(),
+                                PageRequest.of(0, 1)
+                        )
+                        .stream()
+                        .findFirst()
+                        .orElse(null);
         if (lockedLatest == null || !lockedLatest.getSettlementId().equals(previousSettlement.getSettlementId())) {
             log.warn("동시 생성 감지, 스킵 recurringId={}", recurring.getRecurringSettlementId());
             return CycleGenerationOutcome.concurrentlySkipped();
         }
 
-        List<SettlementParticipantDTO> activeParticipants =
-                participantMapper.findActiveBySettlementId(previousSettlement.getSettlementId());
-
+        List<SettlementParticipant> activeParticipants =
+                settlementParticipantRepository.findBySettlementIdAndStatus(
+                        previousSettlement.getSettlementId(),
+                        SettlementParticipantStatus.ACTIVE
+                );
         if (activeParticipants.isEmpty()) {
             log.warn("ACTIVE 참여자 없음, 생성 스킵 recurringId={}, cycleDate={}",
                     recurring.getRecurringSettlementId(), cycleDate);
             return CycleGenerationOutcome.noActiveParticipant();
         }
 
-        SettlementDTO newSettlement = SettlementDTO.builder()
-                .recurringSettlementId(recurring.getRecurringSettlementId())
-                .ownerId(recurring.getOwnerId())
+        Settlement newSettlement = Settlement.builder()
+                .recurringSettlement(recurring)
+                .owner(recurring.getOwner())
                 .settlementType(SettlementType.RECURRING)
                 .settlementStatus(SettlementStatus.IN_PROGRESS)
                 .settlementCategory(recurring.getSettlementCategory())
@@ -76,20 +83,18 @@ public class RecurringSettlementCycleGenerator {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        int inserted = settlementMapper.insertSettlement(newSettlement);
-        if (inserted != 1) {
-            throw SettlementErrorCode.SETTLEMENT_CREATE_FAILED.toException();
-        }
+        Settlement savedSettlement =
+                settlementRepository.save(newSettlement);
 
         if (recurring.getSplitType() == SplitType.EQUAL) {
-            copyParticipantsWithEqualSplit(activeParticipants, newSettlement, recurring.getTotalAmount());
+            copyParticipantsWithEqualSplit(activeParticipants, savedSettlement, recurring.getTotalAmount());
         } else {
-            copyParticipantsWithCustomAmounts(activeParticipants, newSettlement);
+            copyParticipantsWithCustomAmounts(activeParticipants, savedSettlement);
         }
 
-        copySettlementAccount(previousSettlement.getSettlementId(), newSettlement.getSettlementId());
+        copySettlementAccount(previousSettlement.getSettlementId(), savedSettlement.getSettlementId());
 
-        return CycleGenerationOutcome.created(newSettlement);
+        return CycleGenerationOutcome.created(savedSettlement);
     }
 
     private void copySettlementAccount(Long previousSettlementId, Long newSettlementId) {
@@ -120,7 +125,7 @@ public class RecurringSettlementCycleGenerator {
     }
 
     private void copyParticipantsWithEqualSplit(
-            List<SettlementParticipantDTO> activeParticipants, SettlementDTO newSettlement, BigDecimal totalAmount
+            List<SettlementParticipant> activeParticipants, Settlement newSettlement, BigDecimal totalAmount
     ) {
         BigDecimal perPersonAmount =
                 settlementAmountCalculator.calculateEqualAmount(
@@ -128,20 +133,20 @@ public class RecurringSettlementCycleGenerator {
                         activeParticipants.size()
                 );
 
-        for (SettlementParticipantDTO oldParticipant : activeParticipants) {
+        for (SettlementParticipant oldParticipant : activeParticipants) {
             copyParticipantWithObligation(
                     oldParticipant,
-                    newSettlement.getSettlementId(),
+                    newSettlement,
                     perPersonAmount
             );
         }
     }
 
     private void copyParticipantsWithCustomAmounts(
-            List<SettlementParticipantDTO> activeParticipants, SettlementDTO newSettlement
+            List<SettlementParticipant> activeParticipants, Settlement newSettlement
     ) {
         List<Long> participantIds = activeParticipants.stream()
-                .map(SettlementParticipantDTO::getParticipantId)
+                .map(SettlementParticipant::getParticipantId)
                 .toList();
 
         Map<Long, BigDecimal> latestObligationByParticipant = paymentObligationRepository
@@ -156,32 +161,30 @@ public class RecurringSettlementCycleGenerator {
                 .stream()
                 .collect(Collectors.toMap(PaymentObligationEntity::getParticipantId, PaymentObligationEntity::getExpectedAmount));
 
-        for (SettlementParticipantDTO oldParticipant : activeParticipants) {
+        for (SettlementParticipant oldParticipant : activeParticipants) {
             BigDecimal expectedAmount = latestObligationByParticipant.get(oldParticipant.getParticipantId());
             if (expectedAmount == null) {
                 throw PaymentErrorCode.PAYMENT_OBLIGATION_NOT_FOUND.toException();
             }
-            copyParticipantWithObligation(oldParticipant, newSettlement.getSettlementId(), expectedAmount);
+            copyParticipantWithObligation(oldParticipant, newSettlement, expectedAmount);
         }
     }
 
     private void copyParticipantWithObligation(
-            SettlementParticipantDTO oldParticipant, Long newSettlementId, BigDecimal expectedAmount
+            SettlementParticipant oldParticipant, Settlement newSettlement, BigDecimal expectedAmount
     ) {
-        SettlementParticipantDTO newParticipant = SettlementParticipantDTO.builder()
-                .userId(oldParticipant.getUserId())
-                .settlementId(newSettlementId)
+        SettlementParticipant newParticipant = SettlementParticipant.builder()
+                .user(oldParticipant.getUser())
+                .settlement(newSettlement)
                 .participantRole(oldParticipant.getParticipantRole())
                 .participantStatus(SettlementParticipantStatus.ACTIVE)
                 .joinedAt(LocalDateTime.now())
                 .build();
 
-        int inserted = participantMapper.insert(newParticipant);
-        if (inserted != 1) {
-            throw SettlementErrorCode.SETTLEMENT_PARTICIPANT_CREATE_FAILED.toException();
-        }
+        SettlementParticipant savedParticipant =
+                settlementParticipantRepository.save(newParticipant);
 
-        settlementPaymentService.createObligation(newParticipant.getParticipantId(), expectedAmount);
+        settlementPaymentService.createObligation(savedParticipant.getParticipantId(), expectedAmount);
     }
 
     public LocalDate calculateNthCycleDate(LocalDate startDate, CycleRule cycleRule, int n) {
