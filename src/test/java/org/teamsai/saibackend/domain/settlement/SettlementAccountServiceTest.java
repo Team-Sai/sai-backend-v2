@@ -81,6 +81,9 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
+            when(settlementRepository.findById(SETTLEMENT_ID))
+                    .thenReturn(Optional.of(settlement));
+
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
@@ -205,6 +208,9 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
+            when(settlementRepository.findById(SETTLEMENT_ID))
+                    .thenReturn(Optional.of(settlement));
+
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
@@ -290,6 +296,11 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse secondLinkedAccount =
                     linkedAccount(
                             SECOND_LINKED_ACCOUNT_ID
+                    );
+
+            when(settlementRepository.findById(SETTLEMENT_ID))
+                    .thenReturn(
+                            Optional.of(settlement)
                     );
 
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
@@ -398,6 +409,7 @@ class SettlementAccountServiceTest {
                     );
         }
 
+
         @Test
         @DisplayName("정산 생성자가 아니면 수취 계좌를 설정할 수 없다")
         void selectAccountFailsWhenUserIsNotOwner() {
@@ -410,7 +422,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -453,6 +465,13 @@ class SettlementAccountServiceTest {
                     any()
             );
 
+            verify(
+                    settlementRepository,
+                    never()
+            ).findByIdForUpdate(
+                    SETTLEMENT_ID
+            );
+
             verifyNoInteractions(
                     settlementAccountRepository
             );
@@ -471,7 +490,7 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -512,6 +531,13 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
+            verify(
+                    settlementRepository,
+                    never()
+            ).findByIdForUpdate(
+                    SETTLEMENT_ID
+            );
+
             verifyNoInteractions(
                     settlementAccountRepository
             );
@@ -527,7 +553,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
+            when(settlementRepository.findById(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.empty()
                     );
@@ -546,6 +572,13 @@ class SettlementAccountServiceTest {
             );
 
 
+            verify(
+                    settlementRepository,
+                    never()
+            ).findByIdForUpdate(
+                    SETTLEMENT_ID
+            );
+
             verifyNoInteractions(
                     settlementValidator,
                     settlementAccountRepository
@@ -563,6 +596,11 @@ class SettlementAccountServiceTest {
             SelectSettlementAccountRequest request =
                     createRequest(
                             FIRST_LINKED_ACCOUNT_ID
+                    );
+
+            when(settlementRepository.findById(SETTLEMENT_ID))
+                    .thenReturn(
+                            Optional.of(settlement)
                     );
 
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
@@ -694,6 +732,7 @@ class SettlementAccountServiceTest {
                             OWNER_ID
                     );
         }
+
 
         @Test
         @DisplayName("참여자는 정산 소유자의 현재 수취 계좌를 조회한다")

@@ -40,11 +40,7 @@ public class SettlementAccountService {
                 linkedAccountId
         );
 
-        Settlement settlement = settlementRepository
-                .findByIdForUpdate(settlementId)
-                .orElseThrow(
-                        SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException
-                );
+        Settlement settlement = findSettlement(settlementId);
 
         settlementValidator.validateOwner(
                 settlement,
@@ -55,6 +51,12 @@ public class SettlementAccountService {
                 userId,
                 linkedAccountId
         );
+
+        Settlement lockedSettlement = settlementRepository
+                .findByIdForUpdate(settlementId)
+                .orElseThrow(
+                        SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException
+                );
 
         Optional<SettlementAccount> currentAccount =
                 settlementAccountRepository
@@ -88,7 +90,7 @@ public class SettlementAccountService {
 
         SettlementAccount newAccount =
                 SettlementAccount.create(
-                        settlement,
+                        lockedSettlement,
                         linkedAccountId,
                         now
                 );

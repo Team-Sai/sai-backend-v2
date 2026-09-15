@@ -6,6 +6,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
@@ -40,6 +41,7 @@ public class RecurringSettlementCycleGenerator {
     private final SettlementPaymentService settlementPaymentService;
     private final SettlementAmountCalculator settlementAmountCalculator;
     private final SettlementAccountRepository settlementAccountRepository;
+    private final SlackNotifier slackNotifier;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public CycleGenerationOutcome generateOneCycle(RecurringSettlement recurring, Settlement previousSettlement, LocalDate cycleDate) {
@@ -97,7 +99,10 @@ public class RecurringSettlementCycleGenerator {
 
     private void copySettlementAccount(Settlement previousSettlement, Settlement newSettlement) {
         Optional<SettlementAccount> previousAccount =
-                settlementAccountRepository.findBySettlementIdAndStatus(previousSettlement.getSettlementId(), SettlementAccountStatus.ACTIVE);
+                settlementAccountRepository.findBySettlementIdAndStatus(
+                        previousSettlement.getSettlementId(),
+                        SettlementAccountStatus.ACTIVE
+                );
 
         if (previousAccount.isEmpty()) {
             log.warn("직전 회차에 연결된 계좌 없음, 계좌 승계 스킵 previousSettlementId={}", previousSettlement.getSettlementId());
@@ -111,7 +116,26 @@ public class RecurringSettlementCycleGenerator {
                         LocalDateTime.now()
                 );
 
-        settlementAccountRepository.save(newAccount);
+        try {
+            settlementAccountRepository.saveAndFlush(newAccount);
+        } catch (RuntimeException e) {
+            log.error("정산 계좌 승계 실패 newSettlementId={}", newSettlement.getSettlementId(), e);
+
+            try {
+                slackNotifier.send(
+                        "[정기정산] 계좌 승계 실패 - settlementId=" + newSettlement.getSettlementId()
+                                + " (이 회차는 은행거래 자동매칭이 되지 않습니다. 수동 확인 필요)"
+                );
+            } catch (RuntimeException notificationException) {
+                log.error(
+                        "정산 계좌 승계 실패 알림 전송 실패 newSettlementId={}",
+                        newSettlement.getSettlementId(),
+                        notificationException
+                );
+            }
+
+            throw e;
+        }
     }
 
     private void copyParticipantsWithEqualSplit(

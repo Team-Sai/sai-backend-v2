@@ -1,16 +1,14 @@
 package org.teamsai.saibackend.domain.settlement.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.teamsai.saibackend.domain.settlement.type.SettlementAccountStatus;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Table(name = "settlement_account")
@@ -43,14 +41,12 @@ public class SettlementAccount {
             Long linkedAccountId,
             LocalDateTime selectedAt
     ) {
-        return new SettlementAccount(
-                null,
-                settlement,
-                linkedAccountId,
-                SettlementAccountStatus.ACTIVE,
-                selectedAt,
-                null
-        );
+        return SettlementAccount.builder()
+                .settlement(settlement)
+                .linkedAccountId(linkedAccountId)
+                .accountStatus(SettlementAccountStatus.ACTIVE)
+                .selectedAt(selectedAt)
+                .build();
     }
 
     public void replace(LocalDateTime endedAt) {
