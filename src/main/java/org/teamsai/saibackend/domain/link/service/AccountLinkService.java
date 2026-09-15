@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 
 import java.util.List;
 
@@ -15,13 +15,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AccountLinkService {
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
     private final LinkedBankAccountService linkedBankAccountService;
 
     @Transactional
     public void completeLink(Long userId, String userKey, List<Long> accountIds) {
-        String previousUserKey = userMapper.findUserKeyByUserId(userId);
-        int updated = userMapper.updateUserKeyByUserId(userId, userKey, previousUserKey);
+        String previousUserKey = userRepository.findUserKeyByUserId(userId);
+        int updated = userRepository.updateUserKeyByUserId(userId, userKey, previousUserKey);
         if (updated == 0) {
             log.warn(
                     "[AccountLinkService] userKey 갱신 실패(동시 요청 경합 가능) - userId: {}",

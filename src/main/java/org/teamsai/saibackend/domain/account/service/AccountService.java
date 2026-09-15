@@ -3,12 +3,13 @@ package org.teamsai.saibackend.domain.account.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
 import org.teamsai.saibackend.domain.link.mapper.LinkMapper;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.client.UserKeyRevoker;
 
@@ -19,13 +20,14 @@ public class AccountService {
 
     private static final String CALLER = "AccountService";
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
     private final LinkMapper linkMapper;
     private final MockBankClient mockBankClient;
     private final UserKeyRevoker userKeyRevoker;
 
+    @Transactional
     public UserKeyResponse issueOrGetUserKey(Long userId) {
-        UserDTO user = userMapper.findById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserErrorCode.USER_NOT_FOUND.toException());
 
         if (user.getUserKey() != null) {

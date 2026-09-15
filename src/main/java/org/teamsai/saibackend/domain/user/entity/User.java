@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_id")
     private Long userId;
 
     @Column(name="user_token", nullable = false, length = 36) //회원가입할 때 발급
@@ -54,5 +55,9 @@ public class User {
         this.password = password;
         this.name = name;
         this.birthDate = birthDate;
+    }
+
+    public void updateUserKey(String userKey) {
+        this.userKey = userKey;
     }
 }

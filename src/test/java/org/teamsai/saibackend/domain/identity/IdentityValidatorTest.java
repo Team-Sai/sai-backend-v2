@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDate;
@@ -117,7 +117,7 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("이름과 생년월일이 같으면 검증을 통과한다")
         void sameUser() {
-            UserDTO user = createUser(
+            User user = createUser(
                     " 김사이 ",
                     BIRTH_DATE
             );
@@ -140,7 +140,7 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("이름이 다르면 동일인 검증에 실패한다")
         void differentName() {
-            UserDTO user = createUser(
+            User user = createUser(
                     "김사이",
                     BIRTH_DATE
             );
@@ -165,7 +165,7 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("생년월일이 다르면 동일인 검증에 실패한다")
         void differentBirthDate() {
-            UserDTO user = createUser(
+            User user = createUser(
                     "김사이",
                     BIRTH_DATE
             );
@@ -173,7 +173,11 @@ class IdentityValidatorTest {
             PortOneIdentityResponse.VerifiedCustomer customer =
                     createCustomer(
                             "김사이",
-                            LocalDate.of(2001, 10, 22)
+                            LocalDate.of(
+                                    2001,
+                                    10,
+                                    22
+                            )
                     );
 
             assertIdentityError(
@@ -190,7 +194,7 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("회원의 이름 또는 생년월일이 없으면 예외가 발생한다")
         void missingUserInformation() {
-            UserDTO user = createUser(
+            User user = createUser(
                     null,
                     BIRTH_DATE
             );
@@ -215,7 +219,7 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("포트원 인증자 정보가 없으면 잘못된 응답으로 처리한다")
         void missingVerifiedCustomer() {
-            UserDTO user = createUser(
+            User user = createUser(
                     "김사이",
                     BIRTH_DATE
             );
@@ -232,12 +236,16 @@ class IdentityValidatorTest {
         }
     }
 
-    private UserDTO createUser(
+    private User createUser(
             String name,
             LocalDate birthDate
     ) {
-        return UserDTO.builder()
+        return User.builder()
                 .userId(2L)
+                .userToken("SAI-ABCDEFGH")
+                .userKey(null)
+                .email("user@example.com")
+                .password("encoded-password")
                 .name(name)
                 .birthDate(birthDate)
                 .build();
