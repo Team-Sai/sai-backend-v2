@@ -12,7 +12,6 @@ import org.teamsai.saibackend.domain.identity.dto.response.IdentityPrepareRespon
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
-import org.teamsai.saibackend.domain.identity.mapper.IdentityMapper;
 import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
