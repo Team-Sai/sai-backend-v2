@@ -24,7 +24,7 @@ public class ContractAccount {
     private LinkedBankAccount linkedAccount;
 
     @Enumerated(EnumType.STRING)
-    @ColumnDefault("ACTIVE")
+    @ColumnDefault("'ACTIVE'")
     private ContractAccountStatus accountStatus;
 
     @CreationTimestamp
