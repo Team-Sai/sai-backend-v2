@@ -3,7 +3,6 @@ package org.teamsai.saibackend.domain.user.dto.request;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.time.LocalDate;
 
