@@ -3,11 +3,8 @@ package org.teamsai.saibackend.domain.matching.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingTransactionResult;
-import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
 import java.util.List;
@@ -37,7 +34,7 @@ public class BankMatchingService {
         validateLinkedAccountId(linkedAccountId);
         validateMatchingScope(targetType, aggregateId);
 
-        List<BankTransactionDTO> bankTransactions =
+        List<BankTransactionEntity> bankTransactions =
                 bankTransactionService.findPendingDepositsByLinkedAccountId(
                         linkedAccountId
                 );
@@ -89,7 +86,7 @@ public class BankMatchingService {
     private List<AutoMatchingTransactionResult> processTransactions(
             Long userId,
             Long linkedAccountId,
-            List<BankTransactionDTO> bankTransactions,
+            List<BankTransactionEntity> bankTransactions,
             MatchingTargetType targetType,
             Long aggregateId,
             boolean isBatch
@@ -97,19 +94,19 @@ public class BankMatchingService {
         return bankTransactions.stream()
                 .map(bankTransaction -> targetType == null
                         ? transactionService.process(
-                                userId,
-                                linkedAccountId,
-                                bankTransaction,
-                                isBatch
-                        )
+                        userId,
+                        linkedAccountId,
+                        bankTransaction,
+                        isBatch
+                )
                         : transactionService.process(
-                                userId,
-                                linkedAccountId,
-                                bankTransaction,
-                                targetType,
-                                aggregateId,
-                                isBatch
-                        ))
+                        userId,
+                        linkedAccountId,
+                        bankTransaction,
+                        targetType,
+                        aggregateId,
+                        isBatch
+                ))
                 .filter(java.util.Objects::nonNull)
                 .toList();
     }

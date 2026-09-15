@@ -6,7 +6,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,22 +19,40 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WriteOffTransactionExecutor {
 
-    private final PaymentObligationMapper paymentObligationMapper;
+    private static final int CHUNK_SIZE = 500;
+
+    private final PaymentObligationRepository paymentObligationRepository;
     private final RepaymentScheduleMapper repaymentScheduleMapper;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int writeOffOneBatch(List<Long> obligationIds) {
         int total = 0;
-        for (List<Long> chunk : partition(obligationIds, 500)) {
-            total += paymentObligationMapper.writeOffBulk(chunk);
+
+        for (List<Long> chunk : partition(obligationIds, CHUNK_SIZE)) {
+            List<PaymentObligationEntity> obligations =
+                    paymentObligationRepository.findWriteOffTargetsForUpdate(
+                            chunk,
+                            ObligationStatus.ACTIVE,
+                            List.of(
+                                    PaymentStatus.UNPAID,
+                                    PaymentStatus.PARTIALLY_PAID
+                            )
+                    );
+
+            for (PaymentObligationEntity obligation : obligations) {
+                obligation.writeOff();
+            }
+
+            total += obligations.size();
         }
+
         return total;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int writeOffSchedulesInNewTransaction(List<Long> scheduleIds) {
         int total = 0;
-        for (List<Long> chunk : partition(scheduleIds, 500)) {
+        for (List<Long> chunk : partition(scheduleIds, CHUNK_SIZE)) {
             total += repaymentScheduleMapper.writeOffBulk(chunk);
         }
         log.info("상환 스케줄 상각 처리, {}건", total);

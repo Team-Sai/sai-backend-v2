@@ -5,18 +5,29 @@ import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingS
 
 import java.time.LocalDateTime;
 
-public record NotificationResponse(
-        Long notificationId,
-        NotificationType notificationType,
-        String title,
-        String content,
-        Long referenceId,
-        Long secondaryReferenceId,
-        String referenceTitle,
-        String referenceType,
-        String settlementType,
-        BankTransactionProcessingStatus relatedTransactionStatus,
-        boolean resolved,
-        LocalDateTime createdAt
-) {
+public interface NotificationResponse {
+
+    Long getNotificationId();
+
+    NotificationType getNotificationType();
+
+    String getTitle();
+
+    String getContent();
+
+    Long getReferenceId();
+
+    Long getSecondaryReferenceId();
+
+    String getReferenceTitle();
+
+    String getReferenceType();
+
+    String getSettlementType();
+
+    BankTransactionProcessingStatus getRelatedTransactionStatus();
+
+    boolean isResolved();
+
+    LocalDateTime getCreatedAt();
 }

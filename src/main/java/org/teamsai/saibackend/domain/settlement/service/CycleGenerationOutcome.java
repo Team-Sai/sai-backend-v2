@@ -1,10 +1,10 @@
 package org.teamsai.saibackend.domain.settlement.service;
 
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 
-public record CycleGenerationOutcome(CycleGenerationResult result, SettlementDTO settlement) {
+public record CycleGenerationOutcome(CycleGenerationResult result, Settlement settlement) {
 
-    public static CycleGenerationOutcome created(SettlementDTO settlement) {
+    public static CycleGenerationOutcome created(Settlement settlement) {
         return new CycleGenerationOutcome(CycleGenerationResult.CREATED, settlement);
     }
 

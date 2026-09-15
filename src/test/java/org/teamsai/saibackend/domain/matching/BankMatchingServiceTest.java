@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.matching;
 
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,7 +13,7 @@ import org.teamsai.saibackend.domain.matching.service.AutoMatchingTransactionRes
 import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingTransactionService;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -69,9 +70,9 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("각 거래를 조회 순서대로 처리하고 결과를 집계한다")
     void processesTransactionsInOrderAndAggregatesResults() {
-        BankTransactionDTO first = bankTransaction(101L);
-        BankTransactionDTO second = bankTransaction(102L);
-        BankTransactionDTO third = bankTransaction(103L);
+        BankTransactionEntity first = bankTransaction(101L);
+        BankTransactionEntity second = bankTransaction(102L);
+        BankTransactionEntity third = bankTransaction(103L);
 
         given(bankTransactionService
                 .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
@@ -105,7 +106,7 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("배치 실행 여부를 거래 처리 단계까지 그대로 전달한다")
     void passesBatchFlagDownToTransactionProcessing() {
-        BankTransactionDTO transaction = bankTransaction(101L);
+        BankTransactionEntity transaction = bankTransaction(101L);
 
         given(bankTransactionService
                 .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
@@ -121,7 +122,7 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("단건 처리 실패를 그대로 전파한다")
     void propagatesTransactionProcessingFailure() {
-        BankTransactionDTO transaction = bankTransaction(101L);
+        BankTransactionEntity transaction = bankTransaction(101L);
         DomainException exception = MatchingErrorCode
                 .INVALID_MATCHING_REQUEST
                 .toException();
@@ -151,18 +152,20 @@ class BankMatchingServiceTest {
                 );
     }
 
-    private BankTransactionDTO bankTransaction(Long bankTransactionId) {
-        return BankTransactionDTO.builder()
-                .bankTransactionId(bankTransactionId)
-                .linkedAccountId(LINKED_ACCOUNT_ID)
-                .externalTransactionId("external-" + bankTransactionId)
-                .amount(new BigDecimal("10000.00"))
-                .transactionType(BankTransactionType.DEPOSIT)
-                .processingStatus(BankTransactionProcessingStatus.PENDING)
-                .transactionAt(LocalDateTime.of(2026, 8, 5, 10, 0))
-                .counterpartyName("Hong Gil Dong")
-                .syncedAt(LocalDateTime.of(2026, 8, 5, 10, 5))
-                .build();
+    private BankTransactionEntity bankTransaction(Long bankTransactionId) {
+        BankTransactionEntity transaction = new BankTransactionEntity(
+                LINKED_ACCOUNT_ID,
+                "external-" + bankTransactionId,
+                new BigDecimal("10000.00"),
+                BankTransactionType.DEPOSIT,
+                LocalDateTime.of(2026, 8, 5, 10, 0),
+                "Hong Gil Dong",
+                null,
+                LocalDateTime.of(2026, 8, 5, 10, 5)
+        );
+        ReflectionTestUtils.setField(transaction, "bankTransactionId", bankTransactionId);
+        transaction.changeProcessingStatus(BankTransactionProcessingStatus.PENDING);
+        return transaction;
     }
 
     private AutoMatchingTransactionResult result(

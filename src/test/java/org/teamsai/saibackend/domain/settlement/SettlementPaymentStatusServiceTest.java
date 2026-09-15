@@ -1,4 +1,5 @@
 package org.teamsai.saibackend.domain.settlement;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -7,25 +8,27 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementObligationStatusResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
 import org.teamsai.saibackend.domain.settlement.mapper.SettlementPaymentStatusMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SettlementPaymentStatusService 단위 테스트")
 class SettlementPaymentStatusServiceTest {
@@ -34,7 +37,7 @@ class SettlementPaymentStatusServiceTest {
     private static final Long MEMBER_ID = 20L;
     private static final Long OTHER_USER_ID = 30L;
     @Mock
-    private SettlementMapper settlementMapper;
+    private SettlementRepository settlementRepository;
     @Mock
     private SettlementPaymentStatusMapper paymentStatusMapper;
     @Mock
@@ -45,10 +48,10 @@ class SettlementPaymentStatusServiceTest {
     @Test
     @DisplayName("납부의무별 금액을 합산하고 진행률을 계산한다")
     void getPaymentStatusCalculatesTotalsAndProgressRate() {
-        SettlementDTO settlement =
+        Settlement settlement =
                 createSettlement();
         given(
-                settlementMapper.findById(
+                settlementRepository.findById(
                         SETTLEMENT_ID
                 )
         ).willReturn(
@@ -102,10 +105,10 @@ class SettlementPaymentStatusServiceTest {
     @Test
     @DisplayName("납부의무 상태별 인원수를 집계한다")
     void getPaymentStatusCountsObligationsByPaymentStatus() {
-        SettlementDTO settlement =
+        Settlement settlement =
                 createSettlement();
         given(
-                settlementMapper.findById(
+                settlementRepository.findById(
                         SETTLEMENT_ID
                 )
         ).willReturn(
@@ -148,10 +151,10 @@ class SettlementPaymentStatusServiceTest {
     @Test
     @DisplayName("모든 납부의무가 PAID이면 마감 가능 상태가 된다")
     void getPaymentStatusIsClosableWhenAllObligationsArePaid() {
-        SettlementDTO settlement =
+        Settlement settlement =
                 createSettlement();
         given(
-                settlementMapper.findById(
+                settlementRepository.findById(
                         SETTLEMENT_ID
                 )
         ).willReturn(
@@ -188,10 +191,10 @@ class SettlementPaymentStatusServiceTest {
     @Test
     @DisplayName("초과 납부가 있어도 진행률은 100을 넘지 않고 마감할 수 없다")
     void getPaymentStatusIsNotClosableWhenPaymentExceedsExpectedAmount() {
-        SettlementDTO settlement =
+        Settlement settlement =
                 createSettlement();
         given(
-                settlementMapper.findById(
+                settlementRepository.findById(
                         SETTLEMENT_ID
                 )
         ).willReturn(
@@ -226,7 +229,7 @@ class SettlementPaymentStatusServiceTest {
     @DisplayName("정산이 없으면 현황 조회에 실패한다")
     void getPaymentStatusFailsWhenSettlementDoesNotExist() {
         given(
-                settlementMapper.findById(
+                settlementRepository.findById(
                         SETTLEMENT_ID
                 )
         ).willReturn(
@@ -260,10 +263,10 @@ class SettlementPaymentStatusServiceTest {
     @Test
     @DisplayName("ACTIVE 정산 참여자는 납부 현황을 조회할 수 있다")
     void getPaymentStatusSucceedsForMember() {
-        SettlementDTO settlement =
+        Settlement settlement =
                 createSettlement();
         given(
-                settlementMapper.findById(
+                settlementRepository.findById(
                         SETTLEMENT_ID
                 )
         ).willReturn(
@@ -304,10 +307,10 @@ class SettlementPaymentStatusServiceTest {
     @Test
     @DisplayName("정산과 관계없는 사용자는 납부 현황을 조회할 수 없다")
     void getPaymentStatusFailsWhenUserHasNoAccess() {
-        SettlementDTO settlement =
+        Settlement settlement =
                 createSettlement();
         given(
-                settlementMapper.findById(
+                settlementRepository.findById(
                         SETTLEMENT_ID
                 )
         ).willReturn(
@@ -440,10 +443,12 @@ class SettlementPaymentStatusServiceTest {
                 .isFalse();
     }
 
-    private SettlementDTO createSettlement() {
-        return SettlementDTO.builder()
+    private Settlement createSettlement() {
+        return Settlement.builder()
                 .settlementId(SETTLEMENT_ID)
-                .ownerId(OWNER_ID)
+                .owner(
+                        User.builder().userId(OWNER_ID).build()
+                )
                 .build();
     }
 
