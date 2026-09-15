@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.contract.dto.response;
 import lombok.Builder;
 import lombok.Getter;
 import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,17 +22,17 @@ public class RepaymentScheduleResponse {
     private RepaymentScheduleStatus status;
     private LocalDateTime paidAt;
 
-    public static RepaymentScheduleResponse from(RepaymentScheduleDTO dto) {
+    public static RepaymentScheduleResponse from(RepaymentScheduleEntity entity) {
         return RepaymentScheduleResponse.builder()
-                .scheduleId(dto.getScheduleId())
-                .sequence(dto.getSequence())
-                .dueDate(dto.getDueDate())
-                .principalDue(dto.getPrincipalDue())
-                .interestDue(dto.getInterestDue())
-                .totalPaymentDue(dto.getTotalPaymentDue())
-                .remainingPrincipal(dto.getRemainingPrincipal())
-                .status(dto.getStatus())
-                .paidAt(dto.getPaidAt())
+                .scheduleId(entity.getScheduleId())
+                .sequence(entity.getSequence())
+                .dueDate(entity.getDueDate())
+                .principalDue(entity.getPrincipalDue())
+                .interestDue(entity.getInterestDue())
+                .totalPaymentDue(entity.getTotalPaymentDue())
+                .remainingPrincipal(entity.getRemainingPrincipal())
+                .status(entity.getStatus())
+                .paidAt(entity.getPaidAt())
                 .build();
     }
 }
