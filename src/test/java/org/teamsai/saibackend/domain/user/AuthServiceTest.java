@@ -15,14 +15,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.UserLoginDTO;
 import org.teamsai.saibackend.domain.user.dto.request.UserLoginRequest;
 import org.teamsai.saibackend.domain.user.dto.request.UserSignUpRequest;
 import org.teamsai.saibackend.domain.user.dto.response.AccessTokenResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserSignUpResponse;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.domain.user.service.AuthService;
 import org.teamsai.saibackend.domain.user.service.AuthValidator;
 import org.teamsai.saibackend.domain.user.service.RefreshTokenService;
@@ -35,16 +35,21 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthService 단위 테스트")
 class AuthServiceTest {
 
-    private static final Long USER_ID =1L;
-    private static final String USER_TOKEN= "SAI-ABCDEFGH";
+    private static final Long USER_ID = 1L;
+    private static final String USER_TOKEN = "SAI-ABCDEFGH";
     private static final String USER_KEY = "mock-bank-user-key";
 
     private static final String RAW_PASSWORD = "Password1!";
@@ -55,7 +60,7 @@ class AuthServiceTest {
                     .getValidator();
 
     @Mock
-    private UserMapper userMapper;
+    private UserRepository userRepository;
 
     @Mock
     private AuthValidator authValidator;
@@ -79,185 +84,421 @@ class AuthServiceTest {
         @Test
         @DisplayName("이메일과 이름을 정리하고 비밀번호를 암호화해 회원을 저장한다")
         void signUpSuccess() {
-            UserSignUpRequest request = createSignUpRequest(
-                    "  USER@Example.COM  ",
-                    RAW_PASSWORD,
-                    "  김사이  ",
-                    LocalDate.of(2002, 10, 22)
+            UserSignUpRequest request =
+                    createSignUpRequest(
+                            "  USER@Example.COM  ",
+                            RAW_PASSWORD,
+                            "  김사이  ",
+                            LocalDate.of(
+                                    2002,
+                                    10,
+                                    22
+                            )
+                    );
+
+            given(
+                    userRepository.existsByUserToken(
+                            anyString()
+                    )
+            ).willReturn(false);
+
+            given(
+                    passwordEncoder.encode(
+                            RAW_PASSWORD
+                    )
+            ).willReturn(
+                    ENCODED_PASSWORD
             );
 
-            given(userMapper.existsByUserToken(anyString()))
-                    .willReturn(false);
-
-            given(passwordEncoder.encode(RAW_PASSWORD))
-                    .willReturn(ENCODED_PASSWORD);
-
-            given(userMapper.insert(any(UserDTO.class)))
-                    .willReturn(1);
+            /*
+             * save()가 전달받은 User를 그대로 반환하도록 설정한다.
+             */
+            given(
+                    userRepository.save(
+                            any(User.class)
+                    )
+            ).willAnswer(
+                    invocation ->
+                            invocation.getArgument(0)
+            );
 
             UserSignUpResponse response =
                     authService.signUp(request);
 
-            ArgumentCaptor<UserDTO> userCaptor =
-                    ArgumentCaptor.forClass(UserDTO.class);
+            ArgumentCaptor<User> userCaptor =
+                    ArgumentCaptor.forClass(
+                            User.class
+                    );
 
             verify(authValidator)
-                    .validateSignUp("user@example.com");
+                    .validateSignUp(
+                            "user@example.com"
+                    );
 
             verify(passwordEncoder)
                     .encode(RAW_PASSWORD);
 
-            verify(userMapper)
-                    .insert(userCaptor.capture());
+            verify(userRepository)
+                    .save(
+                            userCaptor.capture()
+                    );
 
-            UserDTO savedUser = userCaptor.getValue();
+            verify(userRepository)
+                    .flush();
 
-            assertThat(savedUser.getUserToken())
-                    .matches("^SAI-[A-HJ-NP-Z2-9]{8}$");
+            User savedUser =
+                    userCaptor.getValue();
 
-            assertThat(savedUser.getEmail())
-                    .isEqualTo("user@example.com");
+            assertThat(
+                    savedUser.getUserToken()
+            ).matches(
+                    "^SAI-[A-HJ-NP-Z2-9]{8}$"
+            );
 
-            assertThat(savedUser.getPassword())
-                    .isEqualTo(ENCODED_PASSWORD);
+            assertThat(
+                    savedUser.getUserKey()
+            ).isNull();
 
-            assertThat(savedUser.getName())
-                    .isEqualTo("김사이");
+            assertThat(
+                    savedUser.getEmail()
+            ).isEqualTo(
+                    "user@example.com"
+            );
 
-            assertThat(savedUser.getBirthDate())
-                    .isEqualTo(LocalDate.of(2002, 10, 22));
+            assertThat(
+                    savedUser.getPassword()
+            ).isEqualTo(
+                    ENCODED_PASSWORD
+            );
 
-            assertThat(response.getUserToken())
-                    .isEqualTo(savedUser.getUserToken());
+            assertThat(
+                    savedUser.getName()
+            ).isEqualTo(
+                    "김사이"
+            );
 
-            assertThat(response.getEmail())
-                    .isEqualTo("user@example.com");
+            assertThat(
+                    savedUser.getBirthDate()
+            ).isEqualTo(
+                    LocalDate.of(
+                            2002,
+                            10,
+                            22
+                    )
+            );
 
-            assertThat(response.getName())
-                    .isEqualTo("김사이");
+            assertThat(
+                    response.getUserToken()
+            ).isEqualTo(
+                    savedUser.getUserToken()
+            );
+
+            assertThat(
+                    response.getEmail()
+            ).isEqualTo(
+                    "user@example.com"
+            );
+
+            assertThat(
+                    response.getName()
+            ).isEqualTo(
+                    "김사이"
+            );
         }
 
         @Test
         @DisplayName("회원가입 검증에 실패하면 암호화와 저장을 수행하지 않는다")
         void signUpStopsWhenValidationFails() {
-            UserSignUpRequest request = createSignUpRequest(
-                    "duplicate@example.com",
-                    RAW_PASSWORD,
-                    "김사이",
-                    LocalDate.of(2002, 10, 22)
-            );
+            UserSignUpRequest request =
+                    createSignUpRequest(
+                            "duplicate@example.com",
+                            RAW_PASSWORD,
+                            "김사이",
+                            LocalDate.of(
+                                    2002,
+                                    10,
+                                    22
+                            )
+                    );
 
             DomainException expectedException =
-                    UserErrorCode.DUPLICATE_EMAIL.toException();
+                    UserErrorCode
+                            .DUPLICATE_EMAIL
+                            .toException();
 
             doThrow(expectedException)
                     .when(authValidator)
-                    .validateSignUp("duplicate@example.com");
+                    .validateSignUp(
+                            "duplicate@example.com"
+                    );
 
             assertThatThrownBy(
-                    () -> authService.signUp(request)
-            ).isSameAs(expectedException);
+                    () -> authService.signUp(
+                            request
+                    )
+            ).isSameAs(
+                    expectedException
+            );
 
-            verify(passwordEncoder, never())
-                    .encode(anyString());
+            verify(
+                    passwordEncoder,
+                    never()
+            ).encode(
+                    anyString()
+            );
 
-            verify(userMapper, never())
-                    .existsByUserToken(anyString());
+            verify(
+                    userRepository,
+                    never()
+            ).existsByUserToken(
+                    anyString()
+            );
 
-            verify(userMapper, never())
-                    .insert(any(UserDTO.class));
+            verify(
+                    userRepository,
+                    never()
+            ).save(
+                    any(User.class)
+            );
+
+            verify(
+                    userRepository,
+                    never()
+            ).flush();
         }
 
         @Test
-        @DisplayName("사용자 키를 10회 연속 생성하지 못하면 예외가 발생한다")
-        void signUpFailsWhenUserKeyGenerationFails() {
-            UserSignUpRequest request = createSignUpRequest(
-                    "user@example.com",
-                    RAW_PASSWORD,
-                    "김사이",
-                    LocalDate.of(2002, 10, 22)
-            );
+        @DisplayName("사용자 토큰을 10회 연속 생성하지 못하면 예외가 발생한다")
+        void signUpFailsWhenUserTokenGenerationFails() {
+            UserSignUpRequest request =
+                    createSignUpRequest(
+                            "user@example.com",
+                            RAW_PASSWORD,
+                            "김사이",
+                            LocalDate.of(
+                                    2002,
+                                    10,
+                                    22
+                            )
+                    );
 
-            given(userMapper.existsByUserToken(anyString()))
-                    .willReturn(true);
+            given(
+                    userRepository.existsByUserToken(
+                            anyString()
+                    )
+            ).willReturn(true);
 
             assertThatThrownBy(
-                    () -> authService.signUp(request)
+                    () -> authService.signUp(
+                            request
+                    )
             ).isInstanceOfSatisfying(
                     DomainException.class,
-                    exception -> assertThat(
-                            exception.getErrorCode()
-                    ).isEqualTo(
-                            UserErrorCode.USER_TOKEN_GENERATION_FAILED
-                    )
+                    exception ->
+                            assertThat(
+                                    exception.getErrorCode()
+                            ).isEqualTo(
+                                    UserErrorCode
+                                            .USER_TOKEN_GENERATION_FAILED
+                            )
             );
 
-            verify(userMapper, times(10))
-                    .existsByUserToken(anyString());
+            verify(
+                    userRepository,
+                    times(10)
+            ).existsByUserToken(
+                    anyString()
+            );
 
-            verify(passwordEncoder, never())
-                    .encode(anyString());
+            verify(
+                    passwordEncoder,
+                    never()
+            ).encode(
+                    anyString()
+            );
 
-            verify(userMapper, never())
-                    .insert(any(UserDTO.class));
+            verify(
+                    userRepository,
+                    never()
+            ).save(
+                    any(User.class)
+            );
+
+            verify(
+                    userRepository,
+                    never()
+            ).flush();
         }
 
         @Test
         @DisplayName("저장 시 이메일 유니크 제약을 위반하면 중복 이메일 예외가 발생한다")
-        void signUpDuplicateEmailAtInsert() {
-            UserSignUpRequest request = createSignUpRequest(
-                    "duplicate@example.com",
-                    RAW_PASSWORD,
-                    "김사이",
-                    LocalDate.of(2002, 10, 22)
-            );
-
-            given(userMapper.existsByUserToken(anyString()))
-                    .willReturn(false);
-
-            given(passwordEncoder.encode(RAW_PASSWORD))
-                    .willReturn(ENCODED_PASSWORD);
-
-            given(userMapper.insert(any(UserDTO.class)))
-                    .willThrow(
-                            new DataIntegrityViolationException(
-                                    "Duplicate entry for key 'uk_users_email'"
+        void signUpDuplicateEmailAtSave() {
+            UserSignUpRequest request =
+                    createSignUpRequest(
+                            "duplicate@example.com",
+                            RAW_PASSWORD,
+                            "김사이",
+                            LocalDate.of(
+                                    2002,
+                                    10,
+                                    22
                             )
                     );
 
+            given(
+                    userRepository.existsByUserToken(
+                            anyString()
+                    )
+            ).willReturn(false);
+
+            given(
+                    passwordEncoder.encode(
+                            RAW_PASSWORD
+                    )
+            ).willReturn(
+                    ENCODED_PASSWORD
+            );
+
+            given(
+                    userRepository.save(
+                            any(User.class)
+                    )
+            ).willThrow(
+                    new DataIntegrityViolationException(
+                            "Duplicate entry for key 'uk_users_email'"
+                    )
+            );
+
             assertThatThrownBy(
-                    () -> authService.signUp(request)
+                    () -> authService.signUp(
+                            request
+                    )
             ).isInstanceOfSatisfying(
                     DomainException.class,
                     exception -> {
-                        assertThat(exception.getHttpStatus())
-                                .isEqualTo(HttpStatus.CONFLICT);
+                        assertThat(
+                                exception.getHttpStatus()
+                        ).isEqualTo(
+                                HttpStatus.CONFLICT
+                        );
 
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(
-                                        UserErrorCode.DUPLICATE_EMAIL
-                                );
+                        assertThat(
+                                exception.getErrorCode()
+                        ).isEqualTo(
+                                UserErrorCode
+                                        .DUPLICATE_EMAIL
+                        );
 
-                        assertThat(exception.getMessage())
-                                .isEqualTo(
-                                        UserErrorCode
-                                                .DUPLICATE_EMAIL
-                                                .getMessage()
-                                );
+                        assertThat(
+                                exception.getMessage()
+                        ).isEqualTo(
+                                UserErrorCode
+                                        .DUPLICATE_EMAIL
+                                        .getMessage()
+                        );
                     }
             );
 
             verify(authValidator)
-                    .validateSignUp("duplicate@example.com");
+                    .validateSignUp(
+                            "duplicate@example.com"
+                    );
 
             verify(passwordEncoder)
-                    .encode(RAW_PASSWORD);
+                    .encode(
+                            RAW_PASSWORD
+                    );
 
-            verify(userMapper)
-                    .insert(any(UserDTO.class));
+            verify(userRepository)
+                    .save(
+                            any(User.class)
+                    );
 
-            verify(jwtTokenProvider, never())
-                    .createAccessToken(anyLong());
+            /*
+             * save()에서 이미 예외가 발생했으므로
+             * flush()까지 도달하지 않는다.
+             */
+            verify(
+                    userRepository,
+                    never()
+            ).flush();
+
+            verify(
+                    jwtTokenProvider,
+                    never()
+            ).createAccessToken(
+                    anyLong()
+            );
+        }
+
+        @Test
+        @DisplayName("flush 시 이메일 유니크 제약을 위반해도 중복 이메일 예외가 발생한다")
+        void signUpDuplicateEmailAtFlush() {
+            UserSignUpRequest request =
+                    createSignUpRequest(
+                            "duplicate@example.com",
+                            RAW_PASSWORD,
+                            "김사이",
+                            LocalDate.of(
+                                    2002,
+                                    10,
+                                    22
+                            )
+                    );
+
+            given(
+                    userRepository.existsByUserToken(
+                            anyString()
+                    )
+            ).willReturn(false);
+
+            given(
+                    passwordEncoder.encode(
+                            RAW_PASSWORD
+                    )
+            ).willReturn(
+                    ENCODED_PASSWORD
+            );
+
+            given(
+                    userRepository.save(
+                            any(User.class)
+                    )
+            ).willAnswer(
+                    invocation ->
+                            invocation.getArgument(0)
+            );
+
+            doThrow(
+                    new DataIntegrityViolationException(
+                            "Duplicate entry for key 'uk_users_email'"
+                    )
+            ).when(
+                    userRepository
+            ).flush();
+
+            assertThatThrownBy(
+                    () -> authService.signUp(
+                            request
+                    )
+            ).isInstanceOfSatisfying(
+                    DomainException.class,
+                    exception ->
+                            assertThat(
+                                    exception.getErrorCode()
+                            ).isEqualTo(
+                                    UserErrorCode
+                                            .DUPLICATE_EMAIL
+                            )
+            );
+
+            verify(userRepository)
+                    .save(
+                            any(User.class)
+                    );
+
+            verify(userRepository)
+                    .flush();
         }
     }
 
@@ -268,18 +509,25 @@ class AuthServiceTest {
         @Test
         @DisplayName("미래 날짜를 생년월일로 입력하면 검증에 실패한다")
         void futureBirthDateIsInvalid() {
-            UserSignUpRequest request = createSignUpRequest(
-                    "user@example.com",
-                    RAW_PASSWORD,
-                    "김사이",
-                    LocalDate.now().plusDays(1)
-            );
+            UserSignUpRequest request =
+                    createSignUpRequest(
+                            "user@example.com",
+                            RAW_PASSWORD,
+                            "김사이",
+                            LocalDate.now()
+                                    .plusDays(1)
+                    );
 
-            Set<ConstraintViolation<UserSignUpRequest>> violations =
-                    beanValidator.validate(request);
+            Set<ConstraintViolation<UserSignUpRequest>>
+                    violations =
+                    beanValidator.validate(
+                            request
+                    );
 
             assertThat(violations)
-                    .extracting(ConstraintViolation::getMessage)
+                    .extracting(
+                            ConstraintViolation::getMessage
+                    )
                     .contains(
                             "생년월일은 과거 날짜여야 합니다."
                     );
@@ -288,17 +536,26 @@ class AuthServiceTest {
         @Test
         @DisplayName("과거 날짜를 생년월일로 입력하면 검증을 통과한다")
         void pastBirthDateIsValid() {
-            UserSignUpRequest request = createSignUpRequest(
-                    "user@example.com",
-                    RAW_PASSWORD,
-                    "김사이",
-                    LocalDate.of(2002, 10, 22)
-            );
+            UserSignUpRequest request =
+                    createSignUpRequest(
+                            "user@example.com",
+                            RAW_PASSWORD,
+                            "김사이",
+                            LocalDate.of(
+                                    2002,
+                                    10,
+                                    22
+                            )
+                    );
 
-            Set<ConstraintViolation<UserSignUpRequest>> violations =
-                    beanValidator.validate(request);
+            Set<ConstraintViolation<UserSignUpRequest>>
+                    violations =
+                    beanValidator.validate(
+                            request
+                    );
 
-            assertThat(violations).isEmpty();
+            assertThat(violations)
+                    .isEmpty();
         }
     }
 
@@ -309,21 +566,45 @@ class AuthServiceTest {
         @Test
         @DisplayName("회원 조회와 비밀번호 검증에 성공하면 JWT를 발급한다")
         void loginSuccess() {
-            UserLoginRequest request = createLoginRequest(
-                    "  USER@Example.COM  ",
-                    RAW_PASSWORD
+            UserLoginRequest request =
+                    createLoginRequest(
+                            "  USER@Example.COM  ",
+                            RAW_PASSWORD
+                    );
+
+            User user =
+                    createUser();
+
+            given(
+                    userRepository.findByEmail(
+                            "user@example.com"
+                    )
+            ).willReturn(
+                    Optional.of(user)
             );
 
-            UserDTO user = createUser();
+            given(
+                    jwtTokenProvider
+                            .createAccessToken(
+                                    USER_ID
+                            )
+            ).willReturn(
+                    "access-token"
+            );
 
-            given(userMapper.findByEmail("user@example.com"))
-                    .willReturn(Optional.of(user));
-
-            given(jwtTokenProvider.createAccessToken(USER_ID))
-                    .willReturn("access-token");
+            given(
+                    jwtTokenProvider
+                            .createRefreshToken(
+                                    USER_ID
+                            )
+            ).willReturn(
+                    "refresh-token"
+            );
 
             UserLoginDTO response =
-                    authService.login(request);
+                    authService.login(
+                            request
+                    );
 
             verify(authValidator)
                     .validateLoginPassword(
@@ -332,67 +613,133 @@ class AuthServiceTest {
                     );
 
             verify(jwtTokenProvider)
-                    .createAccessToken(USER_ID);
+                    .createAccessToken(
+                            USER_ID
+                    );
 
-            assertThat(response.getAccessToken())
-                    .isEqualTo("access-token");
+            verify(jwtTokenProvider)
+                    .createRefreshToken(
+                            USER_ID
+                    );
 
-            assertThat(response.getUserToken())
-                    .isEqualTo(USER_TOKEN);
+            verify(refreshTokenService)
+                    .save(
+                            USER_ID,
+                            "refresh-token"
+                    );
 
-            assertThat(response.getName())
-                    .isEqualTo("김사이");
+            assertThat(
+                    response.getAccessToken()
+            ).isEqualTo(
+                    "access-token"
+            );
+
+            assertThat(
+                    response.getRefreshToken()
+            ).isEqualTo(
+                    "refresh-token"
+            );
+
+            assertThat(
+                    response.getUserToken()
+            ).isEqualTo(
+                    USER_TOKEN
+            );
+
+            assertThat(
+                    response.getName()
+            ).isEqualTo(
+                    "김사이"
+            );
         }
 
         @Test
         @DisplayName("이메일에 해당하는 회원이 없으면 로그인에 실패한다")
         void loginFailsWhenUserDoesNotExist() {
-            UserLoginRequest request = createLoginRequest(
-                    "missing@example.com",
-                    RAW_PASSWORD
-            );
-
-            given(userMapper.findByEmail("missing@example.com"))
-                    .willReturn(Optional.empty());
-
-            assertThatThrownBy(
-                    () -> authService.login(request)
-            ).isInstanceOfSatisfying(
-                    DomainException.class,
-                    exception -> assertThat(
-                            exception.getErrorCode()
-                    ).isEqualTo(
-                            UserErrorCode.INVALID_LOGIN_CREDENTIALS
-                    )
-            );
-
-            verify(authValidator, never())
-                    .validateLoginPassword(
-                            anyString(),
-                            anyString()
+            UserLoginRequest request =
+                    createLoginRequest(
+                            "missing@example.com",
+                            RAW_PASSWORD
                     );
 
-            verify(jwtTokenProvider, never())
-                    .createAccessToken(anyLong());
+            given(
+                    userRepository.findByEmail(
+                            "missing@example.com"
+                    )
+            ).willReturn(
+                    Optional.empty()
+            );
+
+            assertThatThrownBy(
+                    () -> authService.login(
+                            request
+                    )
+            ).isInstanceOfSatisfying(
+                    DomainException.class,
+                    exception ->
+                            assertThat(
+                                    exception.getErrorCode()
+                            ).isEqualTo(
+                                    UserErrorCode
+                                            .INVALID_LOGIN_CREDENTIALS
+                            )
+            );
+
+            verify(
+                    authValidator,
+                    never()
+            ).validateLoginPassword(
+                    anyString(),
+                    anyString()
+            );
+
+            verify(
+                    jwtTokenProvider,
+                    never()
+            ).createAccessToken(
+                    anyLong()
+            );
+
+            verify(
+                    jwtTokenProvider,
+                    never()
+            ).createRefreshToken(
+                    anyLong()
+            );
+
+            verify(
+                    refreshTokenService,
+                    never()
+            ).save(
+                    anyLong(),
+                    anyString()
+            );
         }
 
         @Test
         @DisplayName("비밀번호 검증에 실패하면 JWT를 발급하지 않는다")
         void loginFailsWhenPasswordDoesNotMatch() {
-            UserLoginRequest request = createLoginRequest(
-                    "user@example.com",
-                    "WrongPassword1!"
-            );
+            UserLoginRequest request =
+                    createLoginRequest(
+                            "user@example.com",
+                            "WrongPassword1!"
+                    );
 
-            UserDTO user = createUser();
+            User user =
+                    createUser();
 
             DomainException expectedException =
                     UserErrorCode
                             .INVALID_LOGIN_CREDENTIALS
                             .toException();
 
-            given(userMapper.findByEmail("user@example.com"))
-                    .willReturn(Optional.of(user));
+            given(
+                    userRepository.findByEmail(
+                            "user@example.com"
+                    )
+            ).willReturn(
+                    Optional.of(user)
+            );
 
             doThrow(expectedException)
                     .when(authValidator)
@@ -402,199 +749,233 @@ class AuthServiceTest {
                     );
 
             assertThatThrownBy(
-                    () -> authService.login(request)
-            ).isSameAs(expectedException);
+                    () -> authService.login(
+                            request
+                    )
+            ).isSameAs(
+                    expectedException
+            );
 
-            verify(jwtTokenProvider, never())
-                    .createAccessToken(anyLong());
+            verify(
+                    jwtTokenProvider,
+                    never()
+            ).createAccessToken(
+                    anyLong()
+            );
+
+            verify(
+                    jwtTokenProvider,
+                    never()
+            ).createRefreshToken(
+                    anyLong()
+            );
+
+            verify(
+                    refreshTokenService,
+                    never()
+            ).save(
+                    anyLong(),
+                    anyString()
+            );
         }
-        @Nested
-        @DisplayName("AccessToken 재발급")
-        class Reissue {
+    }
 
-            private static final String REFRESH_TOKEN = "refresh-token";
-            private static final String NEW_ACCESS_TOKEN = "new-access-token";
-            private static final Long USER_ID = 1L;
+    @Nested
+    @DisplayName("AccessToken 재발급")
+    class Reissue {
 
-            @Test
-            @DisplayName("유효한 RefreshToken이고 Redis 값과 일치하면 AccessToken을 재발급한다")
-            void reissueSuccess() {
-                given(
-                        jwtTokenProvider.getUserIdFromRefreshToken(
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(
-                        Optional.of(USER_ID)
-                );
+        private static final String REFRESH_TOKEN =
+                "refresh-token";
 
-                given(
-                        refreshTokenService.matches(
-                                USER_ID,
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(true);
+        private static final String NEW_ACCESS_TOKEN =
+                "new-access-token";
 
-                given(
-                        jwtTokenProvider.createAccessToken(
-                                USER_ID
-                        )
-                ).willReturn(
-                        NEW_ACCESS_TOKEN
-                );
+        @Test
+        @DisplayName("유효한 RefreshToken이고 Redis 값과 일치하면 AccessToken을 재발급한다")
+        void reissueSuccess() {
+            given(
+                    jwtTokenProvider
+                            .getUserIdFromRefreshToken(
+                                    REFRESH_TOKEN
+                            )
+            ).willReturn(
+                    Optional.of(USER_ID)
+            );
 
-                AccessTokenResponse response =
-                        authService.reissue(
-                                REFRESH_TOKEN
-                        );
+            given(
+                    refreshTokenService.matches(
+                            USER_ID,
+                            REFRESH_TOKEN
+                    )
+            ).willReturn(true);
 
-                assertThat(
-                        response.getAccessToken()
-                ).isEqualTo(
-                        NEW_ACCESS_TOKEN
-                );
+            given(
+                    jwtTokenProvider
+                            .createAccessToken(
+                                    USER_ID
+                            )
+            ).willReturn(
+                    NEW_ACCESS_TOKEN
+            );
 
-                verify(refreshTokenService)
-                        .matches(
-                                USER_ID,
-                                REFRESH_TOKEN
-                        );
+            AccessTokenResponse response =
+                    authService.reissue(
+                            REFRESH_TOKEN
+                    );
 
-                verify(jwtTokenProvider)
-                        .createAccessToken(
-                                USER_ID
-                        );
-            }
+            assertThat(
+                    response.getAccessToken()
+            ).isEqualTo(
+                    NEW_ACCESS_TOKEN
+            );
 
-            @Test
-            @DisplayName("만료되거나 조작된 RefreshToken이면 재발급에 실패한다")
-            void reissueFailsWhenRefreshTokenIsInvalid() {
-                given(
-                        jwtTokenProvider.getUserIdFromRefreshToken(
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(
-                        Optional.empty()
-                );
+            verify(refreshTokenService)
+                    .matches(
+                            USER_ID,
+                            REFRESH_TOKEN
+                    );
 
-                assertThatThrownBy(
-                        () -> authService.reissue(
-                                REFRESH_TOKEN
-                        )
-                ).isInstanceOf(
-                        DomainException.class
-                );
-
-                verify(
-                        refreshTokenService,
-                        never()
-                ).matches(
-                        anyLong(),
-                        anyString()
-                );
-
-                verify(
-                        jwtTokenProvider,
-                        never()
-                ).createAccessToken(
-                        anyLong()
-                );
-            }
-
-            @Test
-            @DisplayName("RefreshToken이 Redis에 저장된 값과 다르면 재발급에 실패한다")
-            void reissueFailsWhenRedisTokenDoesNotMatch() {
-                given(
-                        jwtTokenProvider.getUserIdFromRefreshToken(
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(
-                        Optional.of(USER_ID)
-                );
-
-                given(
-                        refreshTokenService.matches(
-                                USER_ID,
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(false);
-
-                assertThatThrownBy(
-                        () -> authService.reissue(
-                                REFRESH_TOKEN
-                        )
-                ).isInstanceOf(
-                        DomainException.class
-                );
-
-                verify(
-                        jwtTokenProvider,
-                        never()
-                ).createAccessToken(
-                        anyLong()
-                );
-            }
+            verify(jwtTokenProvider)
+                    .createAccessToken(
+                            USER_ID
+                    );
         }
 
-        @Nested
-        @DisplayName("로그아웃")
-        class Logout {
+        @Test
+        @DisplayName("만료되거나 조작된 RefreshToken이면 재발급에 실패한다")
+        void reissueFailsWhenRefreshTokenIsInvalid() {
+            given(
+                    jwtTokenProvider
+                            .getUserIdFromRefreshToken(
+                                    REFRESH_TOKEN
+                            )
+            ).willReturn(
+                    Optional.empty()
+            );
 
-            private static final String REFRESH_TOKEN = "refresh-token";
-            private static final Long USER_ID = 1L;
+            assertThatThrownBy(
+                    () -> authService.reissue(
+                            REFRESH_TOKEN
+                    )
+            ).isInstanceOf(
+                    DomainException.class
+            );
 
-            @Test
-            @DisplayName("유효한 RefreshToken이면 Redis에서 RefreshToken을 삭제한다")
-            void logoutDeletesRefreshToken() {
-                given(
-                        jwtTokenProvider.getUserIdFromRefreshToken(
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(
-                        Optional.of(USER_ID)
-                );
+            verify(
+                    refreshTokenService,
+                    never()
+            ).matches(
+                    anyLong(),
+                    anyString()
+            );
 
-                given(
-                        refreshTokenService.matches(
-                                USER_ID,
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(true);
+            verify(
+                    jwtTokenProvider,
+                    never()
+            ).createAccessToken(
+                    anyLong()
+            );
+        }
 
-                authService.logout(
-                        REFRESH_TOKEN
-                );
+        @Test
+        @DisplayName("RefreshToken이 Redis에 저장된 값과 다르면 재발급에 실패한다")
+        void reissueFailsWhenRedisTokenDoesNotMatch() {
+            given(
+                    jwtTokenProvider
+                            .getUserIdFromRefreshToken(
+                                    REFRESH_TOKEN
+                            )
+            ).willReturn(
+                    Optional.of(USER_ID)
+            );
 
-                verify(refreshTokenService)
-                        .delete(USER_ID);
-            }
+            given(
+                    refreshTokenService.matches(
+                            USER_ID,
+                            REFRESH_TOKEN
+                    )
+            ).willReturn(false);
 
-            @Test
-            @DisplayName("Redis의 RefreshToken과 일치하지 않으면 삭제하지 않는다")
-            void logoutDoesNotDeleteWhenTokenDoesNotMatch() {
-                given(
-                        jwtTokenProvider.getUserIdFromRefreshToken(
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(
-                        Optional.of(USER_ID)
-                );
+            assertThatThrownBy(
+                    () -> authService.reissue(
+                            REFRESH_TOKEN
+                    )
+            ).isInstanceOf(
+                    DomainException.class
+            );
 
-                given(
-                        refreshTokenService.matches(
-                                USER_ID,
-                                REFRESH_TOKEN
-                        )
-                ).willReturn(false);
+            verify(
+                    jwtTokenProvider,
+                    never()
+            ).createAccessToken(
+                    anyLong()
+            );
+        }
+    }
 
-                authService.logout(
-                        REFRESH_TOKEN
-                );
+    @Nested
+    @DisplayName("로그아웃")
+    class Logout {
 
-                verify(
-                        refreshTokenService,
-                        never()
-                ).delete(anyLong());
-            }
+        private static final String REFRESH_TOKEN =
+                "refresh-token";
+
+        @Test
+        @DisplayName("유효한 RefreshToken이면 Redis에서 RefreshToken을 삭제한다")
+        void logoutDeletesRefreshToken() {
+            given(
+                    jwtTokenProvider
+                            .getUserIdFromRefreshToken(
+                                    REFRESH_TOKEN
+                            )
+            ).willReturn(
+                    Optional.of(USER_ID)
+            );
+
+            given(
+                    refreshTokenService.matches(
+                            USER_ID,
+                            REFRESH_TOKEN
+                    )
+            ).willReturn(true);
+
+            authService.logout(
+                    REFRESH_TOKEN
+            );
+
+            verify(refreshTokenService)
+                    .delete(USER_ID);
+        }
+
+        @Test
+        @DisplayName("Redis의 RefreshToken과 일치하지 않으면 삭제하지 않는다")
+        void logoutDoesNotDeleteWhenTokenDoesNotMatch() {
+            given(
+                    jwtTokenProvider
+                            .getUserIdFromRefreshToken(
+                                    REFRESH_TOKEN
+                            )
+            ).willReturn(
+                    Optional.of(USER_ID)
+            );
+
+            given(
+                    refreshTokenService.matches(
+                            USER_ID,
+                            REFRESH_TOKEN
+                    )
+            ).willReturn(false);
+
+            authService.logout(
+                    REFRESH_TOKEN
+            );
+
+            verify(
+                    refreshTokenService,
+                    never()
+            ).delete(
+                    anyLong()
+            );
         }
     }
 
@@ -656,8 +1037,8 @@ class AuthServiceTest {
         return request;
     }
 
-    private UserDTO createUser() {
-        return UserDTO.builder()
+    private User createUser() {
+        return User.builder()
                 .userId(USER_ID)
                 .userToken(USER_TOKEN)
                 .userKey(USER_KEY)
@@ -665,7 +1046,11 @@ class AuthServiceTest {
                 .password(ENCODED_PASSWORD)
                 .name("김사이")
                 .birthDate(
-                        LocalDate.of(2002, 10, 22)
+                        LocalDate.of(
+                                2002,
+                                10,
+                                22
+                        )
                 )
                 .build();
     }

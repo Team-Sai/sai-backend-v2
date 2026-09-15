@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.user.dto;
 
 import lombok.*;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -20,5 +21,19 @@ public class UserDTO {
     private LocalDate birthDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public static UserDTO from(User user){
+        return UserDTO.builder()
+                .userId(user.getUserId())
+                .userToken(user.getUserToken())
+                .userKey(user.getUserKey())
+                .email(user.getEmail())
+                .password(user.getPassword())
+                .name(user.getName())
+                .birthDate(user.getBirthDate())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+    }
 
 }

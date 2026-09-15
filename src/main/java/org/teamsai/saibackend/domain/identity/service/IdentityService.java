@@ -13,9 +13,9 @@ import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.mapper.IdentityMapper;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDateTime;
@@ -40,7 +40,7 @@ public class IdentityService {
             255;
 
     private final IdentityMapper identityMapper;
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
 
     private final PortOneIdentityService portOneIdentityService;
     private final IdentityValidator identityValidator;
@@ -51,7 +51,7 @@ public class IdentityService {
 
     public IdentityService(
             IdentityMapper identityMapper,
-            UserMapper userMapper,
+            UserRepository userRepository,
             PortOneIdentityService portOneIdentityService,
             IdentityValidator identityValidator,
 
@@ -65,7 +65,7 @@ public class IdentityService {
             long validMinutes
     ) {
         this.identityMapper = identityMapper;
-        this.userMapper = userMapper;
+        this.userRepository = userRepository;
         this.portOneIdentityService = portOneIdentityService;
         this.identityValidator = identityValidator;
 
@@ -171,8 +171,8 @@ public class IdentityService {
                     .toException();
         }
 
-        UserDTO user =
-                userMapper.findById(userId)
+        User user =
+                userRepository.findById(userId)
                         .orElseThrow(
                                 UserErrorCode
                                         .USER_NOT_FOUND

@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.text.Normalizer;
 import java.util.Objects;
@@ -50,7 +50,7 @@ public class IdentityValidator {
     }
 
     public void validateSameUser(
-            UserDTO user,
+            User user,
             PortOneIdentityResponse.VerifiedCustomer verifiedCustomer
     ) {
         validateUserInformation(user);
@@ -76,7 +76,7 @@ public class IdentityValidator {
     }
 
     public void validateUserInformation(
-            UserDTO user
+            User user
     ) {
         if (user == null
                 || !StringUtils.hasText(user.getName())
