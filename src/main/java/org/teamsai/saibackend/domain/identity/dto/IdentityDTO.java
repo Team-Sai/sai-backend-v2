@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
 
@@ -28,4 +29,41 @@ public class IdentityDTO {
     private LocalDateTime usedAt;
 
     private String failureReason;
+
+    public static IdentityDTO from(
+            Identity identity
+    ) {
+        return IdentityDTO.builder()
+                .identityId(
+                        identity.getIdentityId()
+                )
+                .identityVerificationId(
+                        identity.getIdentityVerificationId()
+                )
+                .userId(
+                        identity.getUserId()
+                )
+                .purpose(
+                        identity.getPurpose()
+                )
+                .status(
+                        identity.getStatus()
+                )
+                .requestedAt(
+                        identity.getRequestedAt()
+                )
+                .verifiedAt(
+                        identity.getVerifiedAt()
+                )
+                .expiresAt(
+                        identity.getExpiresAt()
+                )
+                .usedAt(
+                        identity.getUsedAt()
+                )
+                .failureReason(
+                        identity.getFailureReason()
+                )
+                .build();
+    }
 }
