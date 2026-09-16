@@ -8,8 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
 import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
@@ -34,7 +36,10 @@ public class LinkedBankAccountController {
             @Valid @RequestBody LinkAccountRequest request
     ) {
         List<LinkedBankAccountResponse> responses =
-                linkedBankAccountService.linkSelectedAccounts(userDetails.getUserId(), request);
+                linkedBankAccountService.linkSelectedAccounts(userDetails.getUserId(), request)
+                        .stream()
+                        .map(LinkedBankAccountResponse::from)
+                        .toList();
         return ResponseEntity.ok(responses);
     }
 

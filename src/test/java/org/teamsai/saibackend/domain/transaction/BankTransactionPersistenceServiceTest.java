@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
@@ -40,7 +41,7 @@ class BankTransactionPersistenceServiceTest {
     private BankTransactionRepository bankTransactionRepository;
 
     @Mock
-    private LinkedBankAccountMapper linkedBankAccountMapper;
+    private LinkedBankAccountRepository linkedBankAccountRepository;
 
     @InjectMocks
     private BankTransactionPersistenceService bankTransactionPersistenceService;
@@ -81,7 +82,7 @@ class BankTransactionPersistenceServiceTest {
 
         assertThat(result).isZero();
         verify(bankTransactionRepository, never()).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
-        verify(linkedBankAccountMapper, never()).updateLastSyncedTransactionId(any(), any());
+        verify(linkedBankAccountRepository, never()).updateLastSyncedTransactionId(any(), any());
     }
 
     @Test
@@ -110,8 +111,8 @@ class BankTransactionPersistenceServiceTest {
         assertThat(syncedAtCaptor.getAllValues()).doesNotContainNull();
 
         // 마지막 원소(12)가 아니라 실제 최댓값(13)으로 갱신되어야 한다.
-        verify(linkedBankAccountMapper).updateLastSyncedTransactionId(eq(LINKED_ACCOUNT_ID), eq(13L));
-        verify(linkedBankAccountMapper).updateBalance(
+        verify(linkedBankAccountRepository).updateLastSyncedTransactionId(eq(LINKED_ACCOUNT_ID), eq(13L));
+        verify(linkedBankAccountRepository).updateBalance(
                 eq(LINKED_ACCOUNT_ID), eq(BigDecimal.valueOf(150_000)));
     }
 
@@ -129,7 +130,7 @@ class BankTransactionPersistenceServiceTest {
 
         bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions);
 
-        verify(linkedBankAccountMapper).updateBalance(
+        verify(linkedBankAccountRepository).updateBalance(
                 eq(LINKED_ACCOUNT_ID), eq(BigDecimal.valueOf(180_000)));
     }
 
@@ -144,8 +145,8 @@ class BankTransactionPersistenceServiceTest {
 
         bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions);
 
-        verify(linkedBankAccountMapper, never()).updateBalance(any(), any());
-        verify(linkedBankAccountMapper).updateLastSyncedTransactionId(
+        verify(linkedBankAccountRepository, never()).updateBalance(any(), any());
+        verify(linkedBankAccountRepository).updateLastSyncedTransactionId(
                 eq(LINKED_ACCOUNT_ID), eq(13L));
     }
 
@@ -164,7 +165,7 @@ class BankTransactionPersistenceServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(AccountErrorCode.INVALID_BANK_RESPONSE);
 
-        verify(linkedBankAccountMapper, never()).updateLastSyncedTransactionId(any(), any());
+        verify(linkedBankAccountRepository, never()).updateLastSyncedTransactionId(any(), any());
     }
 
     @Test
@@ -204,7 +205,7 @@ class BankTransactionPersistenceServiceTest {
                 .isSameAs(insertFailure);
 
         // 첫 거래 저장 시점에 이미 실패했으므로, 커서는 절대 갱신되지 않아야 한다.
-        verify(linkedBankAccountMapper, never()).updateLastSyncedTransactionId(any(), any());
+        verify(linkedBankAccountRepository, never()).updateLastSyncedTransactionId(any(), any());
     }
 
     @Test
@@ -217,7 +218,7 @@ class BankTransactionPersistenceServiceTest {
                 new DataIntegrityViolationException("커서 갱신 실패");
 
         willThrow(cursorUpdateFailure)
-                .given(linkedBankAccountMapper)
+                .given(linkedBankAccountRepository)
                 .updateLastSyncedTransactionId(eq(LINKED_ACCOUNT_ID), eq(11L));
 
         assertThatThrownBy(() ->

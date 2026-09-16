@@ -7,75 +7,81 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
-import org.teamsai.saibackend.domain.account.dto.*;
 import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
-import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 
-import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Predicate;
+
+import static org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus.AVAILABLE;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class LinkedBankAccountService {
 
-    private final LinkedBankAccountMapper linkedBankAccountMapper;
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
     private final UserService userService;
     private final MockBankClient mockBankClient;
     private final EntityManager entityManager;
 
-    public List<LinkedBankAccountResponse> linkSelectedAccounts(Long userId, LinkAccountRequest request) {
+    public List<LinkedBankAccount> linkSelectedAccounts(
+            Long userId,
+            LinkAccountRequest request
+    ) {
         String userKey = userService.getUserKeyByUserId(userId);
-        LocalDateTime now = LocalDateTime.now();
 
-        List<LinkedBankAccountDTO> candidates = request.selectedAccounts().stream()
-                .map(selected -> toLinkedAccountDTO(
+        Set<Long> alreadyLinkedIds =
+                new HashSet<>(getLinkedAccountIds(userId));
+
+        List<LinkedBankAccount> candidates = request.selectedAccounts().stream()
+                .filter(selected -> !alreadyLinkedIds.contains(selected.accountId()))
+                .filter(distinctByAccountId())
+                .map(selected -> toLinkedAccount(
                         userId,
                         selected.accountId(),
                         userKey,
-                        selected.accountAlias(),
-                        now
+                        selected.accountAlias()
                 ))
                 .toList();
 
-        List<LinkedBankAccountDTO> savedDtos = insertAllSkippingDuplicates(candidates);
-
-        return savedDtos.stream().map(LinkedBankAccountResponse::from).toList();
+        return insertAllSkippingDuplicates(candidates);
     }
 
-    @Transactional
-    public List<LinkedBankAccountResponse> linkAccountsByIds(Long userId, String userKey, List<Long> accountIds) {
-        Set<Long> alreadyLinkedIds = new HashSet<>(getLinkedAccountIds(userId));
+    public List<LinkedBankAccount> linkAccountsByIds(
+            Long userId,
+            String userKey,
+            List<Long> accountIds
+    ) {
+        Set<Long> alreadyLinkedIds =
+                new HashSet<>(getLinkedAccountIds(userId));
 
         List<Long> newAccountIds = accountIds.stream()
+                .distinct()
                 .filter(accountId -> !alreadyLinkedIds.contains(accountId))
                 .toList();
 
-        LocalDateTime now = LocalDateTime.now();
-
-        List<LinkedBankAccountDTO> candidates = newAccountIds.stream()
+        List<LinkedBankAccount> candidates = newAccountIds.stream()
                 .map(accountId -> {
-                    AccountDetailResponse detail = fetchAccountDetail(accountId, userKey);
-                    return toLinkedAccountDTO(
+                    AccountDetailResponse detail =
+                            fetchAccountDetail(accountId, userKey);
+
+                    return toLinkedAccount(
                             userId,
                             accountId,
                             detail,
-                            detail.accountName(),
-                            now
+                            detail.accountName()
                     );
                 })
                 .toList();
 
-        List<LinkedBankAccountDTO> savedDtos = insertAllSkippingDuplicates(candidates);
-
-        return savedDtos.stream().map(LinkedBankAccountResponse::from).toList();
+        return insertAllSkippingDuplicates(candidates);
     }
 
     @Transactional(readOnly = true)
@@ -84,9 +90,14 @@ public class LinkedBankAccountService {
             return Collections.emptyList();
         }
 
-        List<LinkedBankAccountDTO> linkedAccounts =
-                linkedBankAccountMapper.selectAvailableLinkedAccountsByUserId(userId);
-        if (linkedAccounts == null || linkedAccounts.isEmpty()) {
+        List<LinkedBankAccount> linkedAccounts =
+                linkedBankAccountRepository
+                        .findAllByUserIdAndConnectionStatus(
+                                userId,
+                                AVAILABLE
+                        );
+
+        if (linkedAccounts.isEmpty()) {
             return Collections.emptyList();
         }
 
@@ -96,7 +107,10 @@ public class LinkedBankAccountService {
     }
 
     public LinkedBankAccount getReferenceById(Long linkedAccountId) {
-        return entityManager.getReference(LinkedBankAccount.class, linkedAccountId);
+        return entityManager.getReference(
+                LinkedBankAccount.class,
+                linkedAccountId
+        );
     }
 
     public List<Long> getLinkedAccountIds(Long userId) {
@@ -104,92 +118,116 @@ public class LinkedBankAccountService {
             return Collections.emptyList();
         }
 
-        List<LinkedBankAccountDTO> linkedAccounts = linkedBankAccountMapper.selectLinkedAccountsByUserId(userId);
-        if (linkedAccounts == null || linkedAccounts.isEmpty()) {
+        List<LinkedBankAccount> linkedAccounts =
+                linkedBankAccountRepository.findAllByUserId(userId);
+
+        if (linkedAccounts.isEmpty()) {
             return Collections.emptyList();
         }
 
         return linkedAccounts.stream()
-                .map(LinkedBankAccountDTO::getAccountId)
+                .map(LinkedBankAccount::getAccountId)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public boolean isOwnedLinkedAccount(
-        Long userId,
-        Long linkedAccountId
+            Long userId,
+            Long linkedAccountId
     ) {
         if (userId == null || linkedAccountId == null) {
             return false;
         }
 
-        List<LinkedBankAccountDTO> linkedAccounts =
-            linkedBankAccountMapper
-                .selectLinkedAccountsByUserId(userId);
-
-        if (linkedAccounts == null) {
-            return false;
-        }
+        List<LinkedBankAccount> linkedAccounts =
+                linkedBankAccountRepository.findAllByUserId(userId);
 
         return linkedAccounts.stream()
-            .anyMatch(account ->
-                Objects.equals(
-                    account.getLinkedAccountId(),
-                    linkedAccountId
-                )
-                    && account.getConnectionStatus()
-                    == ConnectionStatus.AVAILABLE
-            );
+                .anyMatch(account ->
+                        Objects.equals(
+                                account.getLinkedAccountId(),
+                                linkedAccountId
+                        )
+                                && account.getConnectionStatus() == AVAILABLE
+                );
     }
 
-    private List<LinkedBankAccountDTO> insertAllSkippingDuplicates(List<LinkedBankAccountDTO> candidates) {
-        List<LinkedBankAccountDTO> savedDtos = new ArrayList<>();
+    private List<LinkedBankAccount> insertAllSkippingDuplicates(
+            List<LinkedBankAccount> candidates
+    ) {
+        List<LinkedBankAccount> savedEntities = new ArrayList<>();
 
-        for (LinkedBankAccountDTO dto : candidates) {
+        for (LinkedBankAccount candidate : candidates) {
             try {
-                linkedBankAccountMapper.insertOne(dto);
-                savedDtos.add(dto);
+                linkedBankAccountRepository.insertOne(candidate);
+
+                LinkedBankAccount saved =
+                        linkedBankAccountRepository
+                                .findByUserIdAndAccountId(
+                                        candidate.getUserId(),
+                                        candidate.getAccountId()
+                                )
+                                .orElseThrow();
+
+                savedEntities.add(saved);
+
             } catch (DuplicateKeyException e) {
                 log.info(
                         "[LinkedBankAccountService] 이미 연동된 계좌라 저장을 건너뜁니다 - accountId: {}",
-                        dto.getAccountId()
+                        candidate.getAccountId()
                 );
             }
         }
 
-        return savedDtos;
+        return savedEntities;
     }
 
-    private AccountDetailResponse fetchAccountDetail(Long accountId, String userKey) {
+    private AccountDetailResponse fetchAccountDetail(
+            Long accountId,
+            String userKey
+    ) {
         try {
-            return mockBankClient.getAccountDetail(accountId, userKey);
+            return mockBankClient.getAccountDetail(
+                    accountId,
+                    userKey
+            );
         } catch (RestClientException e) {
-            log.warn("[LinkedBankAccountService] 계좌 상세 조회 실패 - accountId: {}", accountId, e);
+            log.warn(
+                    "[LinkedBankAccountService] 계좌 상세 조회 실패 - accountId: {}",
+                    accountId,
+                    e
+            );
+
             throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
         }
     }
 
-    private LinkedBankAccountDTO toLinkedAccountDTO(
+    private LinkedBankAccount toLinkedAccount(
             Long userId,
             Long accountId,
             String userKey,
-            String accountAlias,
-            LocalDateTime now
+            String accountAlias
     ) {
-        AccountDetailResponse detail = fetchAccountDetail(accountId, userKey);
-        return toLinkedAccountDTO(userId, accountId, detail, accountAlias, now);
+        AccountDetailResponse detail =
+                fetchAccountDetail(accountId, userKey);
+
+        return toLinkedAccount(
+                userId,
+                accountId,
+                detail,
+                accountAlias
+        );
     }
 
-    private LinkedBankAccountDTO toLinkedAccountDTO(
+    private LinkedBankAccount toLinkedAccount(
             Long userId,
             Long accountId,
             AccountDetailResponse detail,
-            String accountAlias,
-            LocalDateTime now
+            String accountAlias
     ) {
         validateAccountDetail(detail, accountId);
 
-        return LinkedBankAccountDTO.builder()
+        return LinkedBankAccount.builder()
                 .userId(userId)
                 .accountId(accountId)
                 .bankCode(detail.bankCode())
@@ -197,28 +235,36 @@ public class LinkedBankAccountService {
                 .accountAlias(accountAlias)
                 .accountHolderName(detail.accountHolderName())
                 .balance(detail.balance())
-                .connectionStatus(ConnectionStatus.AVAILABLE)
-                .createdAt(now)
-                .updatedAt(now)
+                .connectionStatus(AVAILABLE)
                 .build();
     }
 
-    private void validateAccountDetail(AccountDetailResponse detail, Long accountId) {
+    private void validateAccountDetail(
+            AccountDetailResponse detail,
+            Long accountId
+    ) {
         if (detail == null
                 || isBlank(detail.bankCode())
                 || isBlank(detail.maskedAccountNumber())
                 || isBlank(detail.accountHolderName())
                 || detail.balance() == null) {
+
             log.error(
                     "[LinkedBankAccountService] 사이은행 응답에 필수 필드가 누락됨 - accountId: {}, detail: {}",
                     accountId,
                     detail
             );
+
             throw AccountErrorCode.INVALID_BANK_RESPONSE.toException();
         }
     }
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private Predicate<LinkAccountRequest.SelectedAccount> distinctByAccountId() {
+        Set<Long> seen = new HashSet<>();
+        return selected -> seen.add(selected.accountId());
     }
 }

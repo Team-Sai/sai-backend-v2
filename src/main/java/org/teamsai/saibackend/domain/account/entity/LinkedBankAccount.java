@@ -17,6 +17,7 @@ public class LinkedBankAccount {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "linked_account_id")
     private Long linkedAccountId;
 
     @Column(name = "user_id", nullable = false)

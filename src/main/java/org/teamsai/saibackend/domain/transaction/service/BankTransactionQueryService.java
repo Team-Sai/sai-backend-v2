@@ -5,9 +5,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.request.BankTransactionSearchCondition;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionListItemResponse;
@@ -25,7 +25,7 @@ public class BankTransactionQueryService {
 
     private final BankTransactionRepository bankTransactionRepository;
 
-    private final LinkedBankAccountMapper linkedBankAccountMapper;
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<BankTransactionListItemResponse> getTransactions(
@@ -118,8 +118,8 @@ public class BankTransactionQueryService {
             Long userId,
             Long linkedAccountId
     ) {
-        LinkedBankAccountDTO linkedAccount =
-                linkedBankAccountMapper.findById(linkedAccountId)
+        LinkedBankAccount linkedAccount =
+                linkedBankAccountRepository.findById(linkedAccountId)
                         .orElseThrow(
                                 AccountErrorCode
                                         .LINKED_ACCOUNT_NOT_FOUND::toException

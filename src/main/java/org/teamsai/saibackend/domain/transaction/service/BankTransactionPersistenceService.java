@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
@@ -21,7 +21,7 @@ import java.util.List;
 public class BankTransactionPersistenceService {
 
     private final BankTransactionRepository bankTransactionRepository;
-    private final LinkedBankAccountMapper linkedBankAccountMapper;
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
 
     @Transactional
     public int saveAndAdvanceCursor(
@@ -56,13 +56,13 @@ public class BankTransactionPersistenceService {
                 .orElseThrow();
 
         if (latestTransaction.balanceAfter() != null) {
-            linkedBankAccountMapper.updateBalance(
+            linkedBankAccountRepository.updateBalance(
                     linkedAccountId,
                     latestTransaction.balanceAfter()
             );
         }
 
-        linkedBankAccountMapper.updateLastSyncedTransactionId(
+        linkedBankAccountRepository.updateLastSyncedTransactionId(
                 linkedAccountId,
                 latestTransaction.transactionId()
         );
