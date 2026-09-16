@@ -2,6 +2,7 @@ package org.teamsai.saibackend.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
@@ -12,6 +13,7 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -58,13 +60,23 @@ public class SettlementAbandonmentDetectionService {
                     continue;
                 }
 
-                SettlementAbandonmentAlert alert =
-                        SettlementAbandonmentAlert.create(
-                                settlement.getSettlementId(),
-                                referenceDate
-                        );
+                try {
+                    SettlementAbandonmentAlert alert =
+                            SettlementAbandonmentAlert.create(
+                                    settlement.getSettlementId(),
+                                    referenceDate,
+                                    LocalDateTime.now()
+                            );
 
-                abandonmentAlertRepository.save(alert);
+                    abandonmentAlertRepository.saveAndFlush(alert);
+                } catch (DataIntegrityViolationException e) {
+                    log.debug(
+                            "이미 처리된 정산 포기 알림입니다. settlementId={}, referenceDate={}",
+                            settlement.getSettlementId(),
+                            referenceDate
+                    );
+                    continue;
+                }
 
                 notifyAbandoned(settlement, referenceDate, baseDate);
                 detectedCount++;

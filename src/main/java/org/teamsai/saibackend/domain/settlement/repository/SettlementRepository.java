@@ -78,16 +78,19 @@ public interface SettlementRepository extends JpaRepository<Settlement,Long> {
     );
 
     @Query("""
-        SELECT DISTINCT s
+        SELECT s
         FROM Settlement s
-        LEFT JOIN FETCH s.recurringSettlement rs
-        LEFT JOIN SettlementParticipant sp
-               ON sp.settlement = s
-              AND sp.user.userId = :userId
-              AND sp.participantStatus = :participantStatus
+        JOIN FETCH s.owner
+        LEFT JOIN FETCH s.recurringSettlement
         WHERE s.owner.userId = :userId
-           OR sp.participantId IS NOT NULL
-        ORDER BY s.createdAt DESC
+           OR EXISTS (
+                SELECT sp.participantId
+                FROM SettlementParticipant sp
+                WHERE sp.settlement = s
+                  AND sp.user.userId = :userId
+                  AND sp.participantStatus = :participantStatus
+           )
+        ORDER BY s.settlementId DESC
         """)
     List<Settlement> findAllAccessibleByUserId(
             @Param("userId") Long userId,

@@ -28,12 +28,13 @@ public class SettlementAbandonmentAlert {
 
     public static SettlementAbandonmentAlert create(
             Long settlementId,
-            LocalDate referenceDate
+            LocalDate referenceDate,
+            LocalDateTime notifiedAt
     ) {
         return SettlementAbandonmentAlert.builder()
                 .settlementId(settlementId)
                 .referenceDate(referenceDate)
-                .notifiedAt(LocalDateTime.now())
+                .notifiedAt(notifiedAt)
                 .build();
     }
 }
