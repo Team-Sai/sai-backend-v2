@@ -10,10 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.AccountService;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.client.UserKeyRevoker;
@@ -65,14 +63,20 @@ class AccountServiceTest {
         @Test
         @DisplayName("이미 userKey가 있으면 그대로 반환하고 mock-bank는 호출하지 않는다")
         void returnsExistingKeyWithoutCallingMockBank() {
-            given(userRepository.findById(USER_ID)).willReturn(Optional.of(createUser(EXISTING_KEY)));
+            given(userRepository.findById(USER_ID))
+                    .willReturn(Optional.of(createUser(EXISTING_KEY)));
 
-            UserKeyResponse response = accountService.issueOrGetUserKey(USER_ID);
+            UserKeyResponse response =
+                    accountService.issueOrGetUserKey(USER_ID);
 
             assertThat(response.userKey()).isEqualTo(EXISTING_KEY);
-            verify(mockBankClient, never()).requestUserKey(anyString(), anyString());
-            verify(mockBankClient, never()).confirmUserKey(anyString());
-            verify(userRepository, never()).updateUserKeyIfNull(anyLong(), anyString());
+
+            verify(mockBankClient, never())
+                    .requestUserKey(anyString(), anyString());
+            verify(mockBankClient, never())
+                    .confirmUserKey(anyString());
+            verify(userRepository, never())
+                    .updateUserKeyIfNull(anyLong(), anyString());
         }
 
         @Test
@@ -147,15 +151,20 @@ class AccountServiceTest {
         @Test
         @DisplayName("일치하는 회원이 없으면 USER_NOT_FOUND 예외가 발생하고 mock-bank는 호출되지 않는다")
         void throwsUserNotFoundWhenUserDoesNotExist() {
-            given(userRepository.findById(USER_ID)).willReturn(Optional.empty());
+            given(userRepository.findById(USER_ID))
+                    .willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> accountService.issueOrGetUserKey(USER_ID))
+            assertThatThrownBy(
+                    () -> accountService.issueOrGetUserKey(USER_ID)
+            )
                     .isInstanceOf(DomainException.class)
                     .extracting("errorCode")
                     .isEqualTo(UserErrorCode.USER_NOT_FOUND);
 
-            verify(mockBankClient, never()).requestUserKey(anyString(), anyString());
-            verify(mockBankClient, never()).confirmUserKey(anyString());
+            verify(mockBankClient, never())
+                    .requestUserKey(anyString(), anyString());
+            verify(mockBankClient, never())
+                    .confirmUserKey(anyString());
         }
     }
 }
