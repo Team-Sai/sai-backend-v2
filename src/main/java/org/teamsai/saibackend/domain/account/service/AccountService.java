@@ -5,10 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
-import org.teamsai.saibackend.domain.link.mapper.LinkMapper;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.client.UserKeyRevoker;
 
@@ -19,13 +18,12 @@ public class AccountService {
 
     private static final String CALLER = "AccountService";
 
-    private final UserMapper userMapper;
-    private final LinkMapper linkMapper;
+    private final UserRepository userRepository;
     private final MockBankClient mockBankClient;
     private final UserKeyRevoker userKeyRevoker;
 
     public UserKeyResponse issueOrGetUserKey(Long userId) {
-        UserDTO user = userMapper.findById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserErrorCode.USER_NOT_FOUND.toException());
 
         if (user.getUserKey() != null) {
@@ -43,7 +41,7 @@ public class AccountService {
 
         int updatedRow;
         try {
-            updatedRow = linkMapper.updateUserKey(userId, newKey);
+            updatedRow = userRepository.updateUserKeyIfNull(userId, newKey);
         } catch (Exception e) {
             log.error("[AccountService] confirm 성공 후 로컬 저장 중 오류 - userId: {}. "
                     + "mock-bank에 이 userKey가 ACTIVE 상태로 남아있어 revoke를 시도합니다.", userId, e);

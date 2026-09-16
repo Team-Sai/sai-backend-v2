@@ -10,10 +10,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.AccountService;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
-import org.teamsai.saibackend.domain.link.mapper.LinkMapper;
 import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.client.UserKeyRevoker;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -36,7 +36,7 @@ class AccountServiceTest {
     @Mock
     private UserMapper userMapper;
     @Mock
-    private LinkMapper linkMapper;
+    private UserRepository userRepository;
     @Mock
     private MockBankClient mockBankClient;
     @Mock
@@ -73,7 +73,7 @@ class AccountServiceTest {
             assertThat(response.userKey()).isEqualTo(EXISTING_KEY);
             verify(mockBankClient, never()).requestUserKey(anyString(), anyString());
             verify(mockBankClient, never()).confirmUserKey(anyString());
-            verify(linkMapper, never()).updateUserKey(anyLong(), anyString());
+            verify(userRepository, never()).updateUserKeyIfNull(anyLong(), anyString());
         }
 
         @Test
@@ -81,16 +81,16 @@ class AccountServiceTest {
         void issuesConfirmsAndSavesNewKey() {
             given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
             given(mockBankClient.requestUserKey(USER_NAME, USER_TOKEN)).willReturn(NEW_KEY);
-            given(linkMapper.updateUserKey(USER_ID, NEW_KEY)).willReturn(1);
+            given(userRepository.updateUserKeyIfNull(USER_ID, NEW_KEY)).willReturn(1);
 
             UserKeyResponse response = accountService.issueOrGetUserKey(USER_ID);
 
             assertThat(response.userKey()).isEqualTo(NEW_KEY);
 
-            var inOrder = org.mockito.Mockito.inOrder(mockBankClient, linkMapper);
+            var inOrder = org.mockito.Mockito.inOrder(mockBankClient, userRepository);
             inOrder.verify(mockBankClient).requestUserKey(USER_NAME, USER_TOKEN);
             inOrder.verify(mockBankClient).confirmUserKey(NEW_KEY);
-            inOrder.verify(linkMapper).updateUserKey(USER_ID, NEW_KEY);
+            inOrder.verify(userRepository).updateUserKeyIfNull(USER_ID, NEW_KEY);
             verify(userKeyRevoker, never()).revokeBestEffort(anyString(), anyLong(), anyString());
         }
 
@@ -107,7 +107,7 @@ class AccountServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.BANK_SERVER_UNAVAILABLE);
 
-            verify(linkMapper, never()).updateUserKey(anyLong(), anyString());
+            verify(userRepository, never()).updateUserKeyIfNull(anyLong(), anyString());
             verify(userKeyRevoker, never()).revokeBestEffort(anyString(), anyLong(), anyString());
         }
 
@@ -117,16 +117,16 @@ class AccountServiceTest {
             given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
             given(mockBankClient.requestUserKey(USER_NAME, USER_TOKEN)).willReturn(NEW_KEY);
             willThrow(new org.springframework.dao.DataAccessResourceFailureException("DB 연결 실패"))
-                    .given(linkMapper).updateUserKey(USER_ID, NEW_KEY);
+                    .given(userRepository).updateUserKeyIfNull(USER_ID, NEW_KEY);
 
             assertThatThrownBy(() -> accountService.issueOrGetUserKey(USER_ID))
                     .isInstanceOf(DomainException.class)
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.LOCAL_KEY_SAVE_FAILED);
 
-            var inOrder = org.mockito.Mockito.inOrder(mockBankClient, linkMapper);
+            var inOrder = org.mockito.Mockito.inOrder(mockBankClient, userRepository);
             inOrder.verify(mockBankClient).confirmUserKey(NEW_KEY);
-            inOrder.verify(linkMapper).updateUserKey(USER_ID, NEW_KEY);
+            inOrder.verify(userRepository).updateUserKeyIfNull(USER_ID, NEW_KEY);
             verify(userKeyRevoker).revokeBestEffort("AccountService", USER_ID, NEW_KEY);
         }
 
@@ -135,7 +135,7 @@ class AccountServiceTest {
         void revokesConfirmedKeyWhenUpdateAffectsZeroRows() {
             given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
             given(mockBankClient.requestUserKey(USER_NAME, USER_TOKEN)).willReturn(NEW_KEY);
-            given(linkMapper.updateUserKey(USER_ID, NEW_KEY)).willReturn(0);
+            given(userRepository.updateUserKeyIfNull(USER_ID, NEW_KEY)).willReturn(0);
 
             assertThatThrownBy(() -> accountService.issueOrGetUserKey(USER_ID))
                     .isInstanceOf(DomainException.class)
