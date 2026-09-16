@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDateTime;
@@ -74,5 +75,33 @@ public interface SettlementRepository extends JpaRepository<Settlement,Long> {
             @Param("closedAt") LocalDateTime closedAt,
             @Param("currentStatus") SettlementStatus currentStatus,
             @Param("closedStatus") SettlementStatus closedStatus
+    );
+
+    @Query("""
+        SELECT DISTINCT s
+        FROM Settlement s
+        LEFT JOIN FETCH s.recurringSettlement rs
+        LEFT JOIN SettlementParticipant sp
+               ON sp.settlement = s
+              AND sp.user.userId = :userId
+              AND sp.participantStatus = :participantStatus
+        WHERE s.owner.userId = :userId
+           OR sp.participantId IS NOT NULL
+        ORDER BY s.createdAt DESC
+        """)
+    List<Settlement> findAllAccessibleByUserId(
+            @Param("userId") Long userId,
+            @Param("participantStatus") SettlementParticipantStatus participantStatus
+    );
+
+    @Query("""
+        SELECT s
+        FROM Settlement s
+        LEFT JOIN FETCH s.recurringSettlement
+        JOIN FETCH s.owner
+        WHERE s.settlementId = :settlementId
+        """)
+    Optional<Settlement> findDetailById(
+            @Param("settlementId") Long settlementId
     );
 }
