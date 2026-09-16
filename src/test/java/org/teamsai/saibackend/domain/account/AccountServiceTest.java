@@ -11,6 +11,7 @@ import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.AccountService;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
 import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.mapper.UserMapper;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;
@@ -34,8 +35,6 @@ import static org.mockito.Mockito.verify;
 class AccountServiceTest {
 
     @Mock
-    private UserMapper userMapper;
-    @Mock
     private UserRepository userRepository;
     @Mock
     private MockBankClient mockBankClient;
@@ -50,8 +49,8 @@ class AccountServiceTest {
     private static final String NEW_KEY = "mb_newkey12345678";
     private static final String EXISTING_KEY = "mb_existingkey";
 
-    private UserDTO createUser(String userKey) {
-        return UserDTO.builder()
+    private User createUser(String userKey) {
+        return User.builder()
                 .userId(USER_ID)
                 .name(USER_NAME)
                 .userToken(USER_TOKEN)
@@ -66,7 +65,7 @@ class AccountServiceTest {
         @Test
         @DisplayName("이미 userKey가 있으면 그대로 반환하고 mock-bank는 호출하지 않는다")
         void returnsExistingKeyWithoutCallingMockBank() {
-            given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(EXISTING_KEY)));
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(createUser(EXISTING_KEY)));
 
             UserKeyResponse response = accountService.issueOrGetUserKey(USER_ID);
 
@@ -79,7 +78,7 @@ class AccountServiceTest {
         @Test
         @DisplayName("userKey가 없으면 발급 → confirm → 로컬 저장 순서로 성공한다")
         void issuesConfirmsAndSavesNewKey() {
-            given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
             given(mockBankClient.requestUserKey(USER_NAME, USER_TOKEN)).willReturn(NEW_KEY);
             given(userRepository.updateUserKeyIfNull(USER_ID, NEW_KEY)).willReturn(1);
 
@@ -97,7 +96,7 @@ class AccountServiceTest {
         @Test
         @DisplayName("confirm이 실패하면 BANK_SERVER_UNAVAILABLE 예외를 던지고 로컬에는 저장하지 않는다")
         void throwsExceptionAndDoesNotSaveWhenConfirmFails() {
-            given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
             given(mockBankClient.requestUserKey(USER_NAME, USER_TOKEN)).willReturn(NEW_KEY);
             willThrow(new RuntimeException("mock-bank 다운"))
                     .given(mockBankClient).confirmUserKey(NEW_KEY);
@@ -114,7 +113,7 @@ class AccountServiceTest {
         @Test
         @DisplayName("confirm 성공 후 로컬 저장 중 예외가 나면 revoke를 요청하고 LOCAL_KEY_SAVE_FAILED 예외를 던진다")
         void revokesConfirmedKeyWhenLocalSaveThrows() {
-            given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
             given(mockBankClient.requestUserKey(USER_NAME, USER_TOKEN)).willReturn(NEW_KEY);
             willThrow(new org.springframework.dao.DataAccessResourceFailureException("DB 연결 실패"))
                     .given(userRepository).updateUserKeyIfNull(USER_ID, NEW_KEY);
@@ -133,7 +132,7 @@ class AccountServiceTest {
         @Test
         @DisplayName("동시 요청으로 저장이 0 rows면 revoke를 요청하고 USER_KEY_ALREADY_LINKED 예외를 던진다")
         void revokesConfirmedKeyWhenUpdateAffectsZeroRows() {
-            given(userMapper.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(createUser(null)));
             given(mockBankClient.requestUserKey(USER_NAME, USER_TOKEN)).willReturn(NEW_KEY);
             given(userRepository.updateUserKeyIfNull(USER_ID, NEW_KEY)).willReturn(0);
 
@@ -148,7 +147,7 @@ class AccountServiceTest {
         @Test
         @DisplayName("일치하는 회원이 없으면 USER_NOT_FOUND 예외가 발생하고 mock-bank는 호출되지 않는다")
         void throwsUserNotFoundWhenUserDoesNotExist() {
-            given(userMapper.findById(USER_ID)).willReturn(Optional.empty());
+            given(userRepository.findById(USER_ID)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> accountService.issueOrGetUserKey(USER_ID))
                     .isInstanceOf(DomainException.class)
