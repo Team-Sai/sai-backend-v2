@@ -331,7 +331,6 @@ class LoanContractServiceTest {
             assertThat(contract.getDebtorAddress()).isEqualTo(debtorAddress);
             assertThat(contract.getDebtorSignature()).isEqualTo("uploads/signatures/1_signature.png");
             assertThat(contract.getStatus()).isEqualTo(ContractStatus.COMPLETED);
-            // PDF 아카이빙은 ContractArchiveEventListener가 ContractCompletedEvent를 구독해 비동기로 처리한다.
             verify(eventPublisher).publishEvent(any(ContractCompletedEvent.class));
             assertThat(status).isEqualTo(ContractStatus.COMPLETED);
         }

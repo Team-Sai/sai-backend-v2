@@ -1,14 +1,14 @@
 package org.teamsai.saibackend.domain.archive.service;
 
-import lombok.Getter;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StreamUtils;
-import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.entity.File;
-import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import org.teamsai.saibackend.domain.archive.entity.SettlementArchiveSnapshot;
+import org.teamsai.saibackend.domain.archive.repository.SettlementArchiveRepository;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
@@ -20,19 +20,9 @@ import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistory
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -42,42 +32,43 @@ public class SettlementArchiveService {
     private static final String DOCUMENT_VERSION = "v1";
     private static final String SETTLEMENT_DISPLAY_ID_PREFIX = "ST-";
 
-    private final TemplateEngine templateEngine;
-    private final ArchiveRepository archiveRepository;
-    private final HtmlToPdfRenderer htmlToPdfRenderer;
+    private final SettlementArchiveRepository settlementArchiveRepository;
+    private final ObjectMapper objectMapper;
     private final SettlementQueryService settlementQueryService;
     private final SettlementPaymentStatusService settlementPaymentStatusService;
     private final SettlementPaymentHistoryService settlementPaymentHistoryService;
     private final SettlementAccountService settlementAccountService;
 
-    @Getter
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    private ObjectMapper snapshotObjectMapper;
 
-    public byte[] generateSettlementPdfBytes(Long settlementId, Long userId) {
+    @PostConstruct
+    private void initSnapshotObjectMapper() {
+        snapshotObjectMapper = objectMapper.rebuild()
+                .changeDefaultVisibility(visibility -> visibility.withFieldVisibility(JsonAutoDetect.Visibility.ANY))
+                .build();
+    }
 
+    public SettlementArchivePreviewResponse getArchivePreview(Long settlementId, Long userId) {
         SettlementDetailResponse detail = settlementQueryService.getSettlementDetail(settlementId, userId);
         boolean closed = "CLOSED".equals(detail.settlementStatus());
 
         if (closed) {
-            Optional<byte[]> existingPdf = findExistingPdf(settlementId);
-            if (existingPdf.isPresent()) {
-                return existingPdf.get();
+            Optional<SettlementArchivePreviewResponse> existingSnapshot = findExistingSnapshot(settlementId);
+            if (existingSnapshot.isPresent()) {
+                return existingSnapshot.get();
             }
         }
 
-        byte[] pdfBytes = renderSettlementPdf(settlementId, userId, detail);
-        
+        SettlementArchivePreviewResponse preview = buildPreview(settlementId, userId, detail);
+
         if (closed) {
-            saveGeneratedPdf(settlementId, pdfBytes);
+            saveSnapshot(settlementId, preview);
         }
 
-        return pdfBytes;
+        return preview;
     }
 
-    public SettlementArchivePreviewResponse getArchivePreview(Long settlementId, Long userId) {
-
-        SettlementDetailResponse detail = settlementQueryService.getSettlementDetail(settlementId, userId);
+    private SettlementArchivePreviewResponse buildPreview(Long settlementId, Long userId, SettlementDetailResponse detail) {
         ArchiveData data = gatherArchiveData(settlementId, userId, detail);
 
         return SettlementArchivePreviewResponse.builder()
@@ -98,75 +89,35 @@ public class SettlementArchiveService {
                 .build();
     }
 
-    private byte[] renderSettlementPdf(Long settlementId, Long userId, SettlementDetailResponse detail) {
-
-        ArchiveData data = gatherArchiveData(settlementId, userId, detail);
-
-        String pdfCss = loadPdfCss();
-        LocalDateTime generatedAt = LocalDateTime.now();
-
-        Context context = new Context();
-        context.setVariable("archiveDetail", data.archiveDetail());
-        context.setVariable("detail", detail);
-        context.setVariable("paymentStatus", data.paymentStatus());
-        context.setVariable("paymentHistory", data.paymentHistory());
-        data.settlementAccount().ifPresent(account -> context.setVariable("settlementAccount", account));
-        context.setVariable("pdfCss", pdfCss);
-        context.setVariable("generatedAt", generatedAt);
-        context.setVariable("dataAsOfAt", generatedAt);
-        context.setVariable("documentVersion", DOCUMENT_VERSION);
-        context.setVariable("settlementDisplayId", data.settlementDisplayId());
-
-        String html = templateEngine.process("archive/settlement-pdf", context);
-
-        return htmlToPdfRenderer.render(html, "settlementId: " + settlementId);
+    private Optional<SettlementArchivePreviewResponse> findExistingSnapshot(Long settlementId) {
+        return settlementArchiveRepository.findBySettlementId(settlementId)
+                .flatMap(snapshot -> deserializeSnapshot(settlementId, snapshot.getSnapshotJson()));
     }
 
-    private Optional<byte[]> findExistingPdf(Long settlementId) {
-        List<File> savedFiles = archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(
-                ArchiveStatus.SETTLEMENT,
-                settlementId
-        );
-
-        if (savedFiles.isEmpty()) {
-            return Optional.empty();
-        }
-
-        File latestFile = savedFiles.get(0);
+    private Optional<SettlementArchivePreviewResponse> deserializeSnapshot(Long settlementId, String snapshotJson) {
         try {
-            Path filePath = Paths.get(uploadDir).resolve(latestFile.getSavedFilename());
-            return Optional.of(Files.readAllBytes(filePath));
-        } catch (IOException e) {
-            log.warn("저장된 정산 PDF 로딩 실패 - settlementId: {}, savedFilename: {}", settlementId, latestFile.getSavedFilename(), e);
+            return Optional.of(snapshotObjectMapper.readValue(snapshotJson, SettlementArchivePreviewResponse.class));
+        } catch (JacksonException e) {
+            log.warn("저장된 정산 기록 스냅샷 역직렬화 실패 - settlementId: {}", settlementId, e);
             return Optional.empty();
         }
     }
 
-    private void saveGeneratedPdf(Long settlementId, byte[] pdfBytes) {
+    private void saveSnapshot(Long settlementId, SettlementArchivePreviewResponse preview) {
         try {
-            Path dirPath = Paths.get(uploadDir);
-            if (!Files.exists(dirPath)) {
-                Files.createDirectories(dirPath);
-            }
+            String snapshotJson = snapshotObjectMapper.writeValueAsString(preview);
 
-            String savedFilename = ArchiveStatus.SETTLEMENT.name() + "_" + settlementId + "_" + UUID.randomUUID() + ".pdf";
-            Files.write(dirPath.resolve(savedFilename), pdfBytes);
+            settlementArchiveRepository.save(
+                    SettlementArchiveSnapshot.builder()
+                            .settlementId(settlementId)
+                            .snapshotJson(snapshotJson)
+                            .build()
+            );
 
-            File file = File.builder()
-                        .domainType(ArchiveStatus.SETTLEMENT)
-                        .referenceId(settlementId)
-                        .originalFilename("정산_" + settlementId + ".pdf")
-                        .savedFilename(savedFilename)
-                        .fileSize((long) pdfBytes.length)
-                        .fileType("application/pdf")
-                        .build();
-
-            archiveRepository.save(file);
-
-            log.info("[정산 PDF Saved] settlementId: {} -> {}", settlementId, savedFilename);
-        } catch (IOException e) {
-            log.error("정산 PDF 저장 중 오류 발생 - settlementId: {}", settlementId, e);
-            throw new RuntimeException("정산 PDF 저장 처리 중 오류가 발생했습니다.", e);
+            log.info("[정산 기록 스냅샷 저장] settlementId: {}", settlementId);
+        } catch (JacksonException e) {
+            log.error("정산 기록 스냅샷 저장 중 오류 발생 - settlementId: {}", settlementId, e);
+            throw new RuntimeException("정산 기록 스냅샷 저장 처리 중 오류가 발생했습니다.", e);
         }
     }
 
@@ -202,14 +153,6 @@ public class SettlementArchiveService {
                 return Optional.empty();
             }
             throw e;
-        }
-    }
-
-    private String loadPdfCss() {
-        try (InputStream cssStream = getClass().getResourceAsStream("/static/css/archive/settlement-pdf.css")) {
-            return StreamUtils.copyToString(cssStream, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException("정산 PDF 스타일시트 로딩 중 오류가 발생했습니다.", e);
         }
     }
 }

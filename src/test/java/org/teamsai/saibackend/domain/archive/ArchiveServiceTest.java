@@ -1,7 +1,5 @@
 package org.teamsai.saibackend.domain.archive;
 
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,12 +18,6 @@ import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
 import org.teamsai.saibackend.domain.archive.entity.File;
 import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
-import org.teamsai.saibackend.domain.archive.service.HtmlToPdfRenderer;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.thymeleaf.spring6.SpringTemplateEngine;
-import org.thymeleaf.templatemode.TemplateMode;
-import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -33,11 +25,8 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -181,56 +170,8 @@ class ArchiveServiceTest {
     }
 
     @Nested
-    @DisplayName("계약서 PDF 생성")
-    class RenderContractPdf {
-
-        @BeforeEach
-        void setUpTemplateEngine() {
-            ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
-            resolver.setPrefix("templates/");
-            resolver.setSuffix(".html");
-            resolver.setTemplateMode(TemplateMode.HTML);
-            resolver.setCharacterEncoding("UTF-8");
-            resolver.setCacheable(false);
-
-            SpringTemplateEngine templateEngine = new SpringTemplateEngine();
-            templateEngine.setTemplateResolver(resolver);
-
-            ReflectionTestUtils.setField(archiveService, "templateEngine", templateEngine);
-            ReflectionTestUtils.setField(archiveService, "htmlToPdfRenderer", new HtmlToPdfRenderer());
-        }
-
-        @Test
-        @DisplayName("계약 정보를 채워 PDF 바이트를 생성한다")
-        void renderContractPdfSuccess() throws IOException {
-            LoanContractResponse contract = createContract(RepaymentMethod.EQUAL_PRINCIPAL_AND_INTEREST);
-
-            byte[] pdfBytes = archiveService.renderContractPdf(contract);
-
-            assertThat(pdfBytes).isNotEmpty();
-            assertThat(new String(pdfBytes, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
-
-            try (PDDocument document = PDDocument.load(pdfBytes)) {
-                String text = new PDFTextStripper().getText(document);
-                assertThat(text).contains(contract.getCreditorName());
-                assertThat(text).contains(contract.getDebtorName());
-                assertThat(text).contains(RepaymentMethod.EQUAL_PRINCIPAL_AND_INTEREST.getDescription());
-                assertThat(text.replaceAll("\\s+", "")).contains("법적분쟁에대해책임을지지않습니다");
-            }
-        }
-
-        @Test
-        @DisplayName("상환 방식이 바뀌면 PDF 내용에도 반영된다")
-        void renderContractPdfReflectsRepaymentType() throws IOException {
-            LoanContractResponse contract = createContract(RepaymentMethod.BULLET_REPAYMENT);
-
-            byte[] pdfBytes = archiveService.renderContractPdf(contract);
-
-            try (PDDocument document = PDDocument.load(pdfBytes)) {
-                String text = new PDFTextStripper().getText(document);
-                assertThat(text).contains(RepaymentMethod.BULLET_REPAYMENT.getDescription());
-            }
-        }
+    @DisplayName("서명 이미지 처리")
+    class SignatureImage {
 
         @Test
         @DisplayName("알파 채널이 없는 서명 이미지는 흰 배경만 투명 처리되고 획만 빨갛게 남는다")
@@ -287,7 +228,7 @@ class ArchiveServiceTest {
             String savedFilename = "sig_" + UUID.randomUUID() + ".png";
             ImageIO.write(transparent, "png", tempDir.resolve(savedFilename).toFile());
 
-            String dataUri = ReflectionTestUtils.invokeMethod(archiveService, "loadSignatureDataUri", savedFilename);
+            String dataUri = archiveService.loadSignatureDataUri(savedFilename);
 
             assertThat(dataUri).startsWith("data:image/png;base64,");
 
@@ -298,24 +239,11 @@ class ArchiveServiceTest {
             assertThat(result.getRGB(0, 0) & 0xFFFFFF).isEqualTo(0xC0272D);
         }
 
-        private LoanContractResponse createContract(RepaymentMethod repaymentMethod) {
-            return LoanContractResponse.builder()
-                    .contractId(1L)
-                    .creditorName("김채권")
-                    .creditorBirthDate("1980-01-01")
-                    .creditorAddress("서울시 강남구")
-                    .debtorName("이채무")
-                    .debtorBirthDate("1990-05-05")
-                    .debtorAddress("서울시 서초구")
-                    .principalAmount(new BigDecimal("10000000"))
-                    .interestRate(new BigDecimal("5.0"))
-                    .repaymentType(repaymentMethod)
-                    .startDate(LocalDate.of(2026, 1, 1))
-                    .maturityDate(LocalDate.of(2027, 1, 1))
-                    .repaymentDay(25)
-                    .contractAlias("전세자금 대여")
-                    .terms("특약 없음")
-                    .build();
+        @Test
+        @DisplayName("파일명이 없으면 null을 반환한다")
+        void loadSignatureDataUriReturnsNullWhenFilenameBlank() {
+            assertThat(archiveService.loadSignatureDataUri(null)).isNull();
+            assertThat(archiveService.loadSignatureDataUri(" ")).isNull();
         }
     }
 
