@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;

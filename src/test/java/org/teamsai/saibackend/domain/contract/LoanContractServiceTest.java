@@ -28,7 +28,6 @@ import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;

@@ -6,7 +6,6 @@ import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.service.UserService;
 

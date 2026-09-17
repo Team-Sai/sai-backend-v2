@@ -7,7 +7,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;

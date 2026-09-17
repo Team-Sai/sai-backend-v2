@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserTokenLookupResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
