@@ -12,10 +12,12 @@ import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementReminderSender;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +30,7 @@ import static org.mockito.Mockito.*;
 class SettlementReminderSenderTest {
 
     @Mock
-    private SettlementParticipantMapper participantMapper;
+    private SettlementParticipantRepository participantRepository;
     @Mock
     private PaymentObligationRepository paymentObligationRepository;
     @Mock
@@ -37,17 +39,22 @@ class SettlementReminderSenderTest {
     @InjectMocks
     private SettlementReminderSender sender;
 
-    private SettlementDTO settlement(Long id) {
-        SettlementDTO dto = mock(SettlementDTO.class);
-        lenient().when(dto.getSettlementId()).thenReturn(id);
-        return dto;
+    private Settlement settlement(Long id) {
+        Settlement settlement = mock(Settlement.class);
+        lenient().when(settlement.getSettlementId()).thenReturn(id);
+        return settlement;
     }
 
-    private SettlementParticipantDTO participant(Long participantId, Long userId) {
-        SettlementParticipantDTO dto = mock(SettlementParticipantDTO.class);
-        lenient().when(dto.getParticipantId()).thenReturn(participantId);
-        lenient().when(dto.getUserId()).thenReturn(userId);
-        return dto;
+    private SettlementParticipant participant(Long participantId, Long userId) {
+        SettlementParticipant participant = mock(SettlementParticipant.class);
+        User user = mock(User.class);
+
+        lenient().when(participant.getParticipantId()).thenReturn(participantId);
+        lenient().when(participant.getParticipantStatus()).thenReturn(SettlementParticipantStatus.ACTIVE);
+        lenient().when(participant.getUser()).thenReturn(user);
+        lenient().when(user.getUserId()).thenReturn(userId);
+
+        return participant;
     }
 
     private PaymentObligationEntity obligation(Long obligationId, Long participantId, PaymentStatus status) {
@@ -63,8 +70,11 @@ class SettlementReminderSenderTest {
 
         @Test
         void 활성_참여자가_없으면_0을_반환하고_아무것도_조회하지_않는다() {
-            SettlementDTO s = settlement(1L);
-            when(participantMapper.findActiveBySettlementId(1L)).thenReturn(Collections.emptyList());
+            Settlement s = settlement(1L);
+            when(participantRepository.findBySettlementIdAndStatus(
+                    1L,
+                    SettlementParticipantStatus.ACTIVE
+            )).thenReturn(Collections.emptyList());
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
 
@@ -78,9 +88,12 @@ class SettlementReminderSenderTest {
 
         @Test
         void 미해결_의무만_필터링해서_리마인드를_보낸다() {
-            SettlementDTO s = settlement(1L);
-            SettlementParticipantDTO p1 = participant(10L, 100L);
-            when(participantMapper.findActiveBySettlementId(1L)).thenReturn(List.of(p1));
+            Settlement s = settlement(1L);
+            SettlementParticipant p1 = participant(10L, 100L);
+            when(participantRepository.findBySettlementIdAndStatus(
+                    1L,
+                    SettlementParticipantStatus.ACTIVE
+            )).thenReturn(List.of(p1));
 
             PaymentObligationEntity unresolvedOb = mock(PaymentObligationEntity.class);
             when(unresolvedOb.getParticipantId()).thenReturn(10L);
@@ -110,9 +123,12 @@ class SettlementReminderSenderTest {
 
         @Test
         void participantId에_매핑되는_userId가_없으면_스킵하고_카운트하지_않는다() {
-            SettlementDTO s = settlement(1L);
-            SettlementParticipantDTO p1 = participant(10L, 100L);
-            when(participantMapper.findActiveBySettlementId(1L)).thenReturn(List.of(p1));
+            Settlement s = settlement(1L);
+            SettlementParticipant p1 = participant(10L, 100L);
+            when(participantRepository.findBySettlementIdAndStatus(
+                    1L,
+                    SettlementParticipantStatus.ACTIVE
+            )).thenReturn(List.of(p1));
 
             // obligation의 participantId가 activeParticipants에 없는 20L (매핑 실패 상황)
             PaymentObligationEntity orphanOb = mock(PaymentObligationEntity.class);
@@ -137,10 +153,13 @@ class SettlementReminderSenderTest {
 
         @Test
         void 특정_알림_발송_실패해도_나머지는_계속_처리한다() {
-            SettlementDTO s = settlement(1L);
-            SettlementParticipantDTO p1 = participant(10L, 100L);
-            SettlementParticipantDTO p2 = participant(11L, 101L);
-            when(participantMapper.findActiveBySettlementId(1L)).thenReturn(List.of(p1, p2));
+            Settlement s = settlement(1L);
+            SettlementParticipant p1 = participant(10L, 100L);
+            SettlementParticipant p2 = participant(11L, 101L);
+            when(participantRepository.findBySettlementIdAndStatus(
+                    1L,
+                    SettlementParticipantStatus.ACTIVE
+            )).thenReturn(List.of(p1, p2));
 
             PaymentObligationEntity ob1 = mock(PaymentObligationEntity.class);
             when(ob1.getParticipantId()).thenReturn(10L);
@@ -165,7 +184,6 @@ class SettlementReminderSenderTest {
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
 
-            // ob1은 실패, ob2는 성공 -> sent = 1
             assertThat(result).isEqualTo(1);
             verify(notificationService).createIfAbsent(eq(100L), any(), any(), any(), eq(500L), eq(1L));
             verify(notificationService).createIfAbsent(eq(101L), any(), any(), any(), eq(501L), eq(1L));

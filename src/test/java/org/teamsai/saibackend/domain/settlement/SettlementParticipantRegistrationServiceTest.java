@@ -13,7 +13,7 @@ import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
 import org.teamsai.saibackend.domain.settlement.service.SettlementParticipantRegistrationService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementParticipantService;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.service.UserService;
 
 import java.math.BigDecimal;
@@ -76,14 +76,14 @@ class SettlementParticipantRegistrationServiceTest {
                 );
 
 
-        UserDTO firstUser =
-                UserDTO.builder()
+        User firstUser =
+                User.builder()
                         .userId(FIRST_USER_ID)
                         .userToken(FIRST_USER_TOKEN)
                         .build();
 
-        UserDTO secondUser =
-                UserDTO.builder()
+        User secondUser =
+                User.builder()
                         .userId(SECOND_USER_ID)
                         .userToken(SECOND_USER_TOKEN)
                         .build();
@@ -202,8 +202,8 @@ class SettlementParticipantRegistrationServiceTest {
                 );
 
 
-        UserDTO participantUser =
-                UserDTO.builder()
+        User participantUser =
+                User.builder()
                         .userId(FIRST_USER_ID)
                         .userToken(FIRST_USER_TOKEN)
                         .build();
