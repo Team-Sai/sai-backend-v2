@@ -2,11 +2,11 @@ package org.teamsai.saibackend.domain.user.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 @Getter
 @Builder
@@ -20,7 +20,7 @@ public class UserResponse {
     private LocalDate birthDate;
     private LocalDateTime createdAt;
 
-    public static UserResponse from(UserDTO user) {
+    public static UserResponse from(User user) {
         return UserResponse.builder()
                 .userToken(user.getUserToken())
                 .email(user.getEmail())

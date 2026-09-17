@@ -3,7 +3,7 @@ package org.teamsai.saibackend.global.security;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -15,7 +15,7 @@ public class CustomUserDetails implements UserDetails {
     private final String userKey;
     private final Long userId;
 
-    public CustomUserDetails(UserDTO user) {
+    public CustomUserDetails(User user) {
         this.userToken = user.getUserToken();
         this.userKey = user.getUserKey();
         this.userId = user.getUserId();

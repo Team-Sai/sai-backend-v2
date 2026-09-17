@@ -5,14 +5,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.UserLoginDTO;
 import org.teamsai.saibackend.domain.user.dto.request.UserLoginRequest;
 import org.teamsai.saibackend.domain.user.dto.request.UserSignUpRequest;
 import org.teamsai.saibackend.domain.user.dto.response.AccessTokenResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserSignUpResponse;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.jwt.JwtTokenProvider;
 
 import java.security.SecureRandom;
@@ -22,7 +22,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
     private final AuthValidator authValidator;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -36,8 +36,8 @@ public class AuthService {
 
         authValidator.validateSignUp(email);
 
-        UserDTO user = UserDTO.builder()
-                .userToken(createUserKey())
+        User user = User.builder()
+                .userToken(createUserToken())
                 .userKey(null)
                 .email(email)
                 .password(
@@ -48,24 +48,23 @@ public class AuthService {
                 .name(request.getName().trim())
                 .birthDate(request.getBirthDate())
                 .build();
-
+        User savedUser;
         try {
-            userMapper.insert(user);
+            savedUser = userRepository.save(user);
+            userRepository.flush();
         } catch (DataIntegrityViolationException exception) {
             if (isEmailUniqueConstraintViolation(exception)) {
                 throw UserErrorCode.DUPLICATE_EMAIL.toException();
             }
-
             throw exception;
         }
-
-        return UserSignUpResponse.from(user);
+        return UserSignUpResponse.from(savedUser);
     }
 
     public UserLoginDTO login(UserLoginRequest request) {
         String email = normalizeEmail(request.getEmail());
 
-        UserDTO user = userMapper.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(
                         UserErrorCode.INVALID_LOGIN_CREDENTIALS::toException
                 );
@@ -91,28 +90,28 @@ public class AuthService {
         );
     }
 
-    private static final String USER_KEY_PREFIX = "SAI-";
+    private static final String USER_TOKEN_PREFIX = "SAI-";
 
-    private static final String USER_KEY_CHARACTERS =
+    private static final String USER_TOKEN_CHARACTERS =
             "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-    private static final int USER_KEY_LENGTH = 8;
+    private static final int USER_TOKEN_LENGTH = 8;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
 
-    private String createUserKey() {
+    private String createUserToken() {
         for (int attempt = 0; attempt < 10; attempt++) {
-            StringBuilder token = new StringBuilder(USER_KEY_PREFIX);
+            StringBuilder token = new StringBuilder(USER_TOKEN_PREFIX);
 
-            for (int i = 0; i < USER_KEY_LENGTH; i++) {
-                int index = RANDOM.nextInt(USER_KEY_CHARACTERS.length());
-                token.append(USER_KEY_CHARACTERS.charAt(index));
+            for (int i = 0; i < USER_TOKEN_LENGTH; i++) {
+                int index = RANDOM.nextInt(USER_TOKEN_CHARACTERS.length());
+                token.append(USER_TOKEN_CHARACTERS.charAt(index));
             }
 
             String userToken = token.toString();
 
-            if (!userMapper.existsByUserToken(userToken)) {
+            if (!userRepository.existsByUserToken(userToken)) {
                 return userToken;
             }
         }

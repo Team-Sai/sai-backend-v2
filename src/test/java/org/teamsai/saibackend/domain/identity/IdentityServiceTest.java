@@ -20,9 +20,9 @@ import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.service.PortOneIdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDate;
@@ -56,13 +56,13 @@ class IdentityServiceTest {
     private static final String USER_NAME = "김사이";
 
     private static final LocalDate BIRTH_DATE =
-            LocalDate.of(2000, 01, 01);
+            LocalDate.of(2000, 1, 1);
 
     @Mock
     private IdentityMapper identityMapper;
 
     @Mock
-    private UserMapper userMapper;
+    private UserRepository userRepository;
 
     @Mock
     private PortOneIdentityService portOneIdentityService;
@@ -76,7 +76,7 @@ class IdentityServiceTest {
     void setUp() {
         identityService = new IdentityService(
                 identityMapper,
-                userMapper,
+                userRepository,
                 portOneIdentityService,
                 identityValidator,
                 STORE_ID,
@@ -97,8 +97,11 @@ class IdentityServiceTest {
                             IdentityPurpose.LOAN_CONTRACT
                     );
 
-            given(identityMapper.insert(any(IdentityDTO.class)))
-                    .willReturn(1);
+            given(
+                    identityMapper.insert(
+                            any(IdentityDTO.class)
+                    )
+            ).willReturn(1);
 
             IdentityPrepareResponse response =
                     identityService.prepare(
@@ -107,7 +110,9 @@ class IdentityServiceTest {
                     );
 
             ArgumentCaptor<IdentityDTO> captor =
-                    ArgumentCaptor.forClass(IdentityDTO.class);
+                    ArgumentCaptor.forClass(
+                            IdentityDTO.class
+                    );
 
             verify(identityMapper)
                     .insert(captor.capture());
@@ -131,13 +136,19 @@ class IdentityServiceTest {
             assertThat(savedIdentity.getRequestedAt())
                     .isNotNull();
 
-            assertThat(savedIdentity.getIdentityVerificationId())
-                    .startsWith("identity-verification-");
+            assertThat(
+                    savedIdentity
+                            .getIdentityVerificationId()
+            ).startsWith(
+                    "identity-verification-"
+            );
 
-            assertThat(response.identityVerificationId())
-                    .isEqualTo(
-                            savedIdentity.getIdentityVerificationId()
-                    );
+            assertThat(
+                    response.identityVerificationId()
+            ).isEqualTo(
+                    savedIdentity
+                            .getIdentityVerificationId()
+            );
 
             assertThat(response.storeId())
                     .isEqualTo(STORE_ID);
@@ -154,8 +165,11 @@ class IdentityServiceTest {
                             IdentityPurpose.LOAN_CONTRACT
                     );
 
-            given(identityMapper.insert(any(IdentityDTO.class)))
-                    .willReturn(0);
+            given(
+                    identityMapper.insert(
+                            any(IdentityDTO.class)
+                    )
+            ).willReturn(0);
 
             assertIdentityError(
                     () -> identityService.prepare(
@@ -183,8 +197,12 @@ class IdentityServiceTest {
                     IdentityErrorCode.UNAUTHENTICATED_USER
             );
 
-            verify(identityMapper, never())
-                    .insert(any(IdentityDTO.class));
+            verify(
+                    identityMapper,
+                    never()
+            ).insert(
+                    any(IdentityDTO.class)
+            );
         }
     }
 
@@ -198,7 +216,7 @@ class IdentityServiceTest {
             IdentityDTO identity =
                     createRequestedIdentity(USER_ID);
 
-            UserDTO user = createUser();
+            User user = createUser();
 
             PortOneIdentityResponse response =
                     createVerifiedPortOneResponse();
@@ -217,8 +235,11 @@ class IdentityServiceTest {
                             )
             ).willReturn(response);
 
-            given(userMapper.findById(USER_ID))
-                    .willReturn(Optional.of(user));
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.of(user)
+            );
 
             given(
                     identityMapper.updateVerified(
@@ -234,12 +255,14 @@ class IdentityServiceTest {
                             VERIFICATION_ID
                     );
 
-            ArgumentCaptor<LocalDateTime> verifiedAtCaptor =
+            ArgumentCaptor<LocalDateTime>
+                    verifiedAtCaptor =
                     ArgumentCaptor.forClass(
                             LocalDateTime.class
                     );
 
-            ArgumentCaptor<LocalDateTime> expiresAtCaptor =
+            ArgumentCaptor<LocalDateTime>
+                    expiresAtCaptor =
                     ArgumentCaptor.forClass(
                             LocalDateTime.class
                     );
@@ -264,17 +287,25 @@ class IdentityServiceTest {
                     );
 
             assertThat(result.status())
-                    .isEqualTo(IdentityStatus.VERIFIED);
-
-            assertThat(result.identityVerificationId())
-                    .isEqualTo(VERIFICATION_ID);
-
-            assertThat(expiresAtCaptor.getValue())
                     .isEqualTo(
-                            verifiedAtCaptor
-                                    .getValue()
-                                    .plusMinutes(VALID_MINUTES)
+                            IdentityStatus.VERIFIED
                     );
+
+            assertThat(
+                    result.identityVerificationId()
+            ).isEqualTo(
+                    VERIFICATION_ID
+            );
+
+            assertThat(
+                    expiresAtCaptor.getValue()
+            ).isEqualTo(
+                    verifiedAtCaptor
+                            .getValue()
+                            .plusMinutes(
+                                    VALID_MINUTES
+                            )
+            );
         }
 
         @Test
@@ -304,7 +335,7 @@ class IdentityServiceTest {
             verifyNoInteractions(
                     portOneIdentityService,
                     identityValidator,
-                    userMapper
+                    userRepository
             );
         }
 
@@ -332,7 +363,8 @@ class IdentityServiceTest {
                             )
                             .userId(USER_ID)
                             .purpose(
-                                    IdentityPurpose.LOAN_CONTRACT
+                                    IdentityPurpose
+                                            .LOAN_CONTRACT
                             )
                             .status(
                                     IdentityStatus.VERIFIED
@@ -355,7 +387,9 @@ class IdentityServiceTest {
                     );
 
             assertThat(result.status())
-                    .isEqualTo(IdentityStatus.VERIFIED);
+                    .isEqualTo(
+                            IdentityStatus.VERIFIED
+                    );
 
             assertThat(result.verifiedAt())
                     .isEqualTo(verifiedAt);
@@ -366,7 +400,7 @@ class IdentityServiceTest {
             verifyNoInteractions(
                     portOneIdentityService,
                     identityValidator,
-                    userMapper
+                    userRepository
             );
         }
 
@@ -381,7 +415,8 @@ class IdentityServiceTest {
                             VERIFICATION_ID,
                             "FAILED",
                             null,
-                            new PortOneIdentityResponse.Failure(
+                            new PortOneIdentityResponse
+                                    .Failure(
                                     "인증 실패",
                                     "PG-001",
                                     "사용자 인증 실패"
@@ -424,14 +459,18 @@ class IdentityServiceTest {
                             "인증 실패 | PG-001 | 사용자 인증 실패"
                     );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityMapper,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
 
-            verifyNoInteractions(userMapper);
+            verifyNoInteractions(
+                    userRepository
+            );
         }
 
         @Test
@@ -471,20 +510,26 @@ class IdentityServiceTest {
                             .IDENTITY_VERIFICATION_NOT_COMPLETED
             );
 
-            verify(identityMapper, never())
-                    .updateFailed(
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityMapper,
+                    never()
+            ).updateFailed(
+                    any(),
+                    any()
+            );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityMapper,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
 
-            verifyNoInteractions(userMapper);
+            verifyNoInteractions(
+                    userRepository
+            );
         }
 
         @Test
@@ -493,7 +538,7 @@ class IdentityServiceTest {
             IdentityDTO identity =
                     createRequestedIdentity(USER_ID);
 
-            UserDTO user = createUser();
+            User user = createUser();
 
             PortOneIdentityResponse response =
                     createVerifiedPortOneResponse();
@@ -517,8 +562,11 @@ class IdentityServiceTest {
                             )
             ).willReturn(response);
 
-            given(userMapper.findById(USER_ID))
-                    .willReturn(Optional.of(user));
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.of(user)
+            );
 
             doThrow(mismatchException)
                     .when(identityValidator)
@@ -539,7 +587,9 @@ class IdentityServiceTest {
                             USER_ID,
                             VERIFICATION_ID
                     )
-            ).isSameAs(mismatchException);
+            ).isSameAs(
+                    mismatchException
+            );
 
             verify(identityMapper)
                     .updateFailed(
@@ -547,12 +597,14 @@ class IdentityServiceTest {
                             "IDENTITY_INFORMATION_MISMATCH"
                     );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityMapper,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
         }
 
         @Test
@@ -578,8 +630,11 @@ class IdentityServiceTest {
                             )
             ).willReturn(response);
 
-            given(userMapper.findById(USER_ID))
-                    .willReturn(Optional.empty());
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.empty()
+            );
 
             assertThatThrownBy(
                     () -> identityService.complete(
@@ -588,25 +643,31 @@ class IdentityServiceTest {
                     )
             ).isInstanceOfSatisfying(
                     DomainException.class,
-                    exception -> assertThat(
-                            exception.getErrorCode()
-                    ).isEqualTo(
-                            UserErrorCode.USER_NOT_FOUND
-                    )
+                    exception ->
+                            assertThat(
+                                    exception.getErrorCode()
+                            ).isEqualTo(
+                                    UserErrorCode
+                                            .USER_NOT_FOUND
+                            )
             );
 
-            verify(identityValidator, never())
-                    .validateSameUser(
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityValidator,
+                    never()
+            ).validateSameUser(
+                    any(),
+                    any()
+            );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityMapper,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
         }
     }
 
@@ -682,13 +743,19 @@ class IdentityServiceTest {
                 .build();
     }
 
-    private UserDTO createUser() {
-        return UserDTO.builder()
+    private User createUser() {
+        return User.builder()
                 .userId(USER_ID)
-                .userToken("SAI-ABCDEFGH")
+                .userToken(
+                        "SAI-ABCDEFGH"
+                )
                 .userKey(null)
-                .email("user@example.com")
-                .password("encoded-password")
+                .email(
+                        "user@example.com"
+                )
+                .password(
+                        "encoded-password"
+                )
                 .name(USER_NAME)
                 .birthDate(BIRTH_DATE)
                 .build();
@@ -699,7 +766,8 @@ class IdentityServiceTest {
         return new PortOneIdentityResponse(
                 VERIFICATION_ID,
                 "VERIFIED",
-                new PortOneIdentityResponse.VerifiedCustomer(
+                new PortOneIdentityResponse
+                        .VerifiedCustomer(
                         USER_NAME,
                         BIRTH_DATE,
                         "ci-test"
@@ -712,12 +780,16 @@ class IdentityServiceTest {
             Runnable operation,
             IdentityErrorCode expectedErrorCode
     ) {
-        assertThatThrownBy(operation::run)
-                .isInstanceOfSatisfying(
-                        DomainException.class,
-                        exception -> assertThat(
+        assertThatThrownBy(
+                operation::run
+        ).isInstanceOfSatisfying(
+                DomainException.class,
+                exception ->
+                        assertThat(
                                 exception.getErrorCode()
-                        ).isEqualTo(expectedErrorCode)
-                );
+                        ).isEqualTo(
+                                expectedErrorCode
+                        )
+        );
     }
 }

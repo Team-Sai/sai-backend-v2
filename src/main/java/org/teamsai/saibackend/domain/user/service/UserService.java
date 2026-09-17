@@ -4,42 +4,43 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
-import org.teamsai.saibackend.domain.user.dto.response.UserTokenLookupResponse;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
 
     public UserResponse getMyInfo(Long userId) {
-        UserDTO user = getUser(userId);
+        User user = getUser(userId);
 
         return UserResponse.from(user);
     }
 
     @Transactional
     public void withdraw(Long userId) {
-        int deletedCount = userMapper.deleteByUserId(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(
+                  UserErrorCode.USER_NOT_FOUND::toException
+                );
+        userRepository.delete(user);
 
-        if (deletedCount == 0) {
-            throw UserErrorCode.USER_NOT_FOUND.toException();
-        }
     }
 
-    public UserDTO getUser(Long userId) {
-        return userMapper.findById(userId)
+    @Transactional(readOnly = true)
+    public User getUser(Long userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(
                         UserErrorCode.USER_NOT_FOUND::toException
                 );
     }
 
-    public UserDTO findRequestTarget(Long requestUserId, String userToken) {
-        UserDTO targetUser = userMapper.findByUserToken(userToken)
+    public User findRequestTarget(Long requestUserId, String userToken) {
+        User targetUser = userRepository.findByUserToken(userToken)
                 .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
 
         if (requestUserId.equals(targetUser.getUserId())) {
@@ -50,6 +51,6 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public String getUserKeyByUserId(Long userId){
-        return userMapper.findUserKeyByUserId(userId);
+        return userRepository.findUserKeyByUserId(userId);
     }
 }
