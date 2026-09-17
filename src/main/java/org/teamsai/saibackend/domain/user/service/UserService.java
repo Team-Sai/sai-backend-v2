@@ -40,14 +40,14 @@ public class UserService {
                 );
     }
 
-    public UserDTO findRequestTarget(Long requestUserId, String userToken) {
+    public User findRequestTarget(Long requestUserId, String userToken) {
         User targetUser = userRepository.findByUserToken(userToken)
                 .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
 
         if (requestUserId.equals(targetUser.getUserId())) {
             throw UserErrorCode.CANNOT_SELECT_SELF.toException();
         }
-        return UserDTO.from(targetUser);
+        return targetUser;
     }
 
     @Transactional(readOnly = true)

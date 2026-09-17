@@ -157,7 +157,7 @@ class UserServiceTest {
                     Optional.of(targetUser)
             );
 
-            UserDTO result =
+            User result =
                     userService.findRequestTarget(
                             requesterUserId,
                             userToken

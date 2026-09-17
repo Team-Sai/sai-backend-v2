@@ -250,7 +250,7 @@ class LoanContractServiceTest {
             given(fileService.saveSignatureFile(CONTRACT_ID, signature))
                     .willReturn("uploads/signatures/1_signature.png");
             given(userService.findRequestTarget(CREDITOR_ID, DEBTOR_USER_TOKEN))
-                    .willReturn(UserDTO.builder().userId(DEBTOR_ID).build());
+                    .willReturn(User.builder().userId(DEBTOR_ID).build());
             given(userService.getMyInfo(CREDITOR_ID))
                     .willReturn(UserResponse.builder().name("채권자").build());
             given(entityManager.getReference(User.class, DEBTOR_ID)).willReturn(userRef(DEBTOR_ID));

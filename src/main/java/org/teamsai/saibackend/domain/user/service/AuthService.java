@@ -5,7 +5,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.UserLoginDTO;
 import org.teamsai.saibackend.domain.user.dto.request.UserLoginRequest;
 import org.teamsai.saibackend.domain.user.dto.request.UserSignUpRequest;
@@ -59,8 +58,7 @@ public class AuthService {
             }
             throw exception;
         }
-        UserDTO userDTO = UserDTO.from(savedUser);
-        return UserSignUpResponse.from(userDTO);
+        return UserSignUpResponse.from(savedUser);
     }
 
     public UserLoginDTO login(UserLoginRequest request) {
@@ -86,7 +84,7 @@ public class AuthService {
 
 
         return UserLoginDTO.of(
-                UserDTO.from(user),
+                user,
                 accessToken,
                 refreshToken
         );

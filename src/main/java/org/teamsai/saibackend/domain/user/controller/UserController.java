@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserTokenLookupResponse;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.service.UserService;
 
 @Tag(
@@ -114,7 +115,7 @@ public class UserController {
             @Parameter(description = "요청 대상 회원 토큰", example = "SAI_ABCD1234")
             @PathVariable String userToken
     ){
-        UserDTO targetUser = userService.findRequestTarget(userId, userToken);
+        User targetUser = userService.findRequestTarget(userId, userToken);
 
         UserTokenLookupResponse response = UserTokenLookupResponse.from(targetUser);
 
