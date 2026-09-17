@@ -133,7 +133,7 @@ class SettlementAbandonmentDetectionServiceTest {
             verify(abandonmentAlertRepository)
                     .existsBySettlementIdAndReferenceDate(1L, referenceDate);
             verify(abandonmentAlertRepository)
-                    .save(any(SettlementAbandonmentAlert.class));
+                    .saveAndFlush(any(SettlementAbandonmentAlert.class));
             verify(slackNotifier).send(any());
         }
 
@@ -159,7 +159,7 @@ class SettlementAbandonmentDetectionServiceTest {
             assertThat(result.detectedCount()).isZero();
             verify(abandonmentAlertRepository)
                     .existsBySettlementIdAndReferenceDate(1L, referenceDate);
-            verify(abandonmentAlertRepository, never()).save(any());
+            verify(abandonmentAlertRepository, never()).saveAndFlush(any());
             verifyNoInteractions(slackNotifier);
         }
     }
@@ -264,7 +264,7 @@ class SettlementAbandonmentDetectionServiceTest {
                     .existsBySettlementIdAndReferenceDate(eq(3L), any());
 
             verify(abandonmentAlertRepository, times(1))
-                    .save(any(SettlementAbandonmentAlert.class));
+                    .saveAndFlush(any(SettlementAbandonmentAlert.class));
 
             verify(slackNotifier, times(1)).send(any());
         }
