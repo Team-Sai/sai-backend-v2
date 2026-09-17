@@ -2,6 +2,7 @@ package org.teamsai.saibackend.domain.identity.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
@@ -111,6 +112,7 @@ public class IdentityService {
 
     // 외부 API 호출은 트랜잭션 밖에서 수행한다.
     // 상태 갱신은 IdentityStatusService에서 커밋한 뒤 결과 또는 예외를 반환한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public IdentityCompleteResponse complete(
             Long userId,
             String identityVerificationId
