@@ -2,11 +2,12 @@ package org.teamsai.saibackend.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
-
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -20,24 +21,29 @@ public class SettlementDueReminderService {
     private static final int PAGE_SIZE = 100;
 
     private final OverdueCriteria overdueCriteria;
-    private final SettlementMapper settlementMapper;
+    private final SettlementRepository settlementRepository;
     private final SettlementReminderSender reminderSender;
 
     public SettlementReminderResult sendDueReminders(LocalDate baseDate) {
-        int totalCount = settlementMapper.countInProgressSettlements();
+        long totalCount = settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS);
         log.info("정산 리마인드 배치 시작, 대상 정산 총 {}건, baseDate={}", totalCount, baseDate);
 
         int processedCount = 0;
         int failedCount = 0;
-        int offset = 0;
+        int pageNumber = 0;
 
         while (true) {
-            List<SettlementDTO> page = settlementMapper.findInProgressSettlements(offset, PAGE_SIZE);
+            List<Settlement> page =
+                    settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
+                            SettlementStatus.IN_PROGRESS,
+                            PageRequest.of(pageNumber, PAGE_SIZE)
+                    );
+
             if (page.isEmpty()) {
                 break;
             }
 
-            for (SettlementDTO settlement : page) {
+            for (Settlement settlement : page) {
                 LocalDate referenceDate = overdueCriteria.resolveReferenceDate(settlement);
                 ReminderStage stage = resolveStage(referenceDate, baseDate);
                 if (stage == null) {
@@ -55,7 +61,7 @@ public class SettlementDueReminderService {
             if (page.size() < PAGE_SIZE) {
                 break;
             }
-            offset += PAGE_SIZE;
+            pageNumber++;
         }
 
         log.info("정산 리마인드 배치 종료, 발송 {}건 / 실패(정산 단위) {}건", processedCount, failedCount);
