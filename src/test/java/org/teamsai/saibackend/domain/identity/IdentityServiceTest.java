@@ -17,6 +17,7 @@ import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
+import org.teamsai.saibackend.domain.identity.service.IdentityStatusService;
 import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.service.PortOneIdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
@@ -71,6 +72,9 @@ class IdentityServiceTest {
     @Mock
     private IdentityValidator identityValidator;
 
+    @Mock
+    private IdentityStatusService identityStatusService;
+
     private IdentityService identityService;
 
     @BeforeEach
@@ -80,6 +84,7 @@ class IdentityServiceTest {
                 userRepository,
                 portOneIdentityService,
                 identityValidator,
+                identityStatusService,
                 STORE_ID,
                 CHANNEL_KEY,
                 VALID_MINUTES
@@ -93,6 +98,9 @@ class IdentityServiceTest {
         @Test
         @DisplayName("REQUESTED 상태의 인증 요청을 저장하고 SDK 정보를 반환한다")
         void prepareSuccess() {
+            User user = createUser();
+            given(userRepository.getReferenceById(USER_ID)).willReturn(user);
+
             IdentityPrepareRequest request =
                     new IdentityPrepareRequest(
                             IdentityPurpose.LOAN_CONTRACT
@@ -124,7 +132,10 @@ class IdentityServiceTest {
             Identity savedIdentity =
                     captor.getValue();
 
-            assertThat(savedIdentity.getUserId())
+            verify(userRepository).getReferenceById(USER_ID);
+            assertThat(savedIdentity.getUser()).isSameAs(user);
+
+            assertThat(savedIdentity.getUser().getUserId())
                     .isEqualTo(USER_ID);
 
             assertThat(savedIdentity.getPurpose())
@@ -247,7 +258,7 @@ class IdentityServiceTest {
             );
 
             given(
-                    identityRepository.updateVerified(
+                    identityStatusService.updateVerified(
                             eq(VERIFICATION_ID),
                             any(LocalDateTime.class),
                             any(LocalDateTime.class)
@@ -336,7 +347,7 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    identityRepository.updateFailed(
+                    identityStatusService.updateFailed(
                             VERIFICATION_ID,
                             "인증 실패 | PG-001 | 사용자 인증 실패"
                     )
@@ -366,7 +377,7 @@ class IdentityServiceTest {
                     );
 
             verify(
-                    identityRepository,
+                    identityStatusService,
                     never()
             ).updateVerified(
                     any(),
@@ -413,7 +424,7 @@ class IdentityServiceTest {
             );
 
             given(
-                    identityRepository.updateVerified(
+                    identityStatusService.updateVerified(
                             eq(VERIFICATION_ID),
                             any(LocalDateTime.class),
                             any(LocalDateTime.class)
@@ -488,7 +499,7 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    identityRepository.updateFailed(
+                    identityStatusService.updateFailed(
                             VERIFICATION_ID,
                             "인증 실패 | PG-001 | 사용자 인증 실패"
                     )
@@ -518,7 +529,7 @@ class IdentityServiceTest {
                     );
 
             verify(
-                    identityRepository,
+                    identityStatusService,
                     never()
             ).updateVerified(
                     any(),
@@ -565,7 +576,7 @@ class IdentityServiceTest {
             );
 
             given(
-                    identityRepository.updateVerified(
+                    identityStatusService.updateVerified(
                             eq(VERIFICATION_ID),
                             any(LocalDateTime.class),
                             any(LocalDateTime.class)
@@ -602,7 +613,7 @@ class IdentityServiceTest {
                             response.verifiedCustomer()
                     );
 
-            verify(identityRepository)
+            verify(identityStatusService)
                     .updateVerified(
                             eq(VERIFICATION_ID),
                             verifiedAtCaptor.capture(),
@@ -686,7 +697,7 @@ class IdentityServiceTest {
                             .identityVerificationId(
                                     VERIFICATION_ID
                             )
-                            .userId(USER_ID)
+                            .user(createUser())
                             .purpose(
                                     IdentityPurpose
                                             .LOAN_CONTRACT
@@ -767,7 +778,7 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    identityRepository.updateFailed(
+                    identityStatusService.updateFailed(
                             VERIFICATION_ID,
                             "인증 실패 | PG-001 | 사용자 인증 실패"
                     )
@@ -782,14 +793,14 @@ class IdentityServiceTest {
                             .PORTONE_VERIFICATION_NOT_VERIFIED
             );
 
-            verify(identityRepository)
+            verify(identityStatusService)
                     .updateFailed(
                             VERIFICATION_ID,
                             "인증 실패 | PG-001 | 사용자 인증 실패"
                     );
 
             verify(
-                    identityRepository,
+                    identityStatusService,
                     never()
             ).updateVerified(
                     any(),
@@ -842,7 +853,7 @@ class IdentityServiceTest {
             );
 
             verify(
-                    identityRepository,
+                    identityStatusService,
                     never()
             ).updateFailed(
                     any(),
@@ -850,7 +861,7 @@ class IdentityServiceTest {
             );
 
             verify(
-                    identityRepository,
+                    identityStatusService,
                     never()
             ).updateVerified(
                     any(),
@@ -909,7 +920,7 @@ class IdentityServiceTest {
                     );
 
             given(
-                    identityRepository.updateFailed(
+                    identityStatusService.updateFailed(
                             VERIFICATION_ID,
                             "IDENTITY_INFORMATION_MISMATCH"
                     )
@@ -924,14 +935,14 @@ class IdentityServiceTest {
                     mismatchException
             );
 
-            verify(identityRepository)
+            verify(identityStatusService)
                     .updateFailed(
                             VERIFICATION_ID,
                             "IDENTITY_INFORMATION_MISMATCH"
                     );
 
             verify(
-                    identityRepository,
+                    identityStatusService,
                     never()
             ).updateVerified(
                     any(),
@@ -996,7 +1007,7 @@ class IdentityServiceTest {
             );
 
             verify(
-                    identityRepository,
+                    identityStatusService,
                     never()
             ).updateVerified(
                     any(),
@@ -1065,7 +1076,7 @@ class IdentityServiceTest {
                 .identityVerificationId(
                         VERIFICATION_ID
                 )
-                .userId(ownerUserId)
+                .user(User.builder().userId(ownerUserId).build())
                 .purpose(
                         IdentityPurpose.LOAN_CONTRACT
                 )

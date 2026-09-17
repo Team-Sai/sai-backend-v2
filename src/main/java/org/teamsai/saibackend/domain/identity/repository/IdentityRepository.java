@@ -4,7 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
@@ -19,7 +18,6 @@ public interface IdentityRepository
             String identityVerificationId
     );
 
-    @Transactional
     @Modifying
     @Query("""
             update Identity i
@@ -41,7 +39,6 @@ public interface IdentityRepository
             LocalDateTime expiresAt
     );
 
-    @Transactional
     @Modifying
     @Query("""
             update Identity i
@@ -66,7 +63,7 @@ public interface IdentityRepository
                     org.teamsai.saibackend.domain.identity.type.IdentityStatus.USED,
                 i.usedAt = CURRENT_TIMESTAMP
             where i.identityVerificationId = :identityVerificationId
-              and i.userId = :userId
+              and i.user.userId = :userId
               and i.purpose = :purpose
               and i.status =
                     org.teamsai.saibackend.domain.identity.type.IdentityStatus.VERIFIED
@@ -85,7 +82,7 @@ public interface IdentityRepository
     @Query("""
         select new org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO(
             i.identityVerificationId,
-            i.userId,
+            i.user.userId,
             i.status,
             i.verifiedAt,
             i.expiresAt

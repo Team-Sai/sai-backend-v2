@@ -45,6 +45,7 @@ public class IdentityService {
 
     private final PortOneIdentityService portOneIdentityService;
     private final IdentityValidator identityValidator;
+    private final IdentityStatusService identityStatusService;
 
     private final String storeId;
     private final String channelKey;
@@ -55,6 +56,7 @@ public class IdentityService {
             UserRepository userRepository,
             PortOneIdentityService portOneIdentityService,
             IdentityValidator identityValidator,
+            IdentityStatusService identityStatusService,
 
             @Value("${portone.identity.store-id}")
             String storeId,
@@ -69,6 +71,7 @@ public class IdentityService {
         this.userRepository = userRepository;
         this.portOneIdentityService = portOneIdentityService;
         this.identityValidator = identityValidator;
+        this.identityStatusService = identityStatusService;
 
         this.storeId = storeId;
         this.channelKey = channelKey;
@@ -91,7 +94,7 @@ public class IdentityService {
 
         Identity identity = Identity.builder()
                 .identityVerificationId(identityVerificationId)
-                .userId(userId)
+                .user(userRepository.getReferenceById(userId))
                 .purpose(request.purpose())
                 .status(IdentityStatus.REQUESTED)
                 .requestedAt(requestedAt)
@@ -106,6 +109,8 @@ public class IdentityService {
         );
     }
 
+    // 외부 API 호출은 트랜잭션 밖에서 수행한다.
+    // 상태 갱신은 IdentityStatusService에서 커밋한 뒤 결과 또는 예외를 반환한다.
     public IdentityCompleteResponse complete(
             Long userId,
             String identityVerificationId
@@ -200,7 +205,7 @@ public class IdentityService {
                 verifiedAt.plusMinutes(validMinutes);
 
         int updatedCount =
-                identityRepository.updateVerified(
+                identityStatusService.updateVerified(
                         identityVerificationId,
                         verifiedAt,
                         expiresAt
@@ -272,7 +277,7 @@ public class IdentityService {
             Long userId
     ) {
         if (!Objects.equals(
-                identity.getUserId(),
+                identity.getUser().getUserId(),
                 userId
         )) {
             throw IdentityErrorCode
@@ -286,7 +291,7 @@ public class IdentityService {
             String failureReason
     ) {
         int updatedCount =
-                identityRepository.updateFailed(
+                identityStatusService.updateFailed(
                         identityVerificationId,
                         truncateFailureReason(failureReason)
                 );
