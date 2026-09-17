@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
-import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
