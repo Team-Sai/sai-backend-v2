@@ -8,18 +8,27 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.service.ArchiveService;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.LoanContractRequest;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Tag(
         name = "차용증 API",
@@ -32,6 +41,7 @@ public class LoanContractController {
 
     private final LoanContractService contractService;
     private final ContractChangeService contractChangeService;
+    private final ArchiveService archiveService;
 
     @Operation(hidden = true)
     @GetMapping("/contracts/new")
@@ -166,6 +176,63 @@ public class LoanContractController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return contractService.findContract(contractId, userDetails.getUserId());
+    }
+
+    @Operation(
+            summary = "차용증 보관함 PDF 조회",
+            description = "이전에 저장된 차용증 PDF 파일이 있으면 그 파일을 그대로 내려줍니다. 저장된 파일이 없으면 404를 반환합니다."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "404", description = "저장된 PDF가 없음"),
+            @ApiResponse(responseCode = "403", description = "해당 차용증에 대한 접근 권한이 없음")
+    })
+    @GetMapping("/api/contracts/{contractId}/pdf")
+    public ResponseEntity<Resource> getContractPdf(
+            @PathVariable Long contractId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        contractService.findContract(contractId, userDetails.getUserId());
+
+        List<org.teamsai.saibackend.domain.archive.entity.File> savedFiles =
+                archiveService.findFilesByReference(ArchiveStatus.CONTRACT, contractId);
+        if (savedFiles.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        org.teamsai.saibackend.domain.archive.entity.File latestFile = savedFiles.get(0);
+        Resource resource = archiveService.loadFileAsResource(latestFile.getSavedFilename());
+
+        String encodedFilename = URLEncoder.encode(latestFile.getOriginalFilename(), StandardCharsets.UTF_8).replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.valueOf("application/pdf"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
+                .body(resource);
+    }
+
+    @Operation(
+            summary = "차용증 보관함 PDF 저장",
+            description = "클라이언트에서 생성한 차용증 PDF를 보관합니다. 계약이 완료(COMPLETED) 상태가 아니면 저장하지 않습니다."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "저장 성공(또는 저장 대상이 아니어서 건너뜀)"),
+            @ApiResponse(responseCode = "403", description = "해당 차용증에 대한 접근 권한이 없음")
+    })
+    @PostMapping("/api/contracts/{contractId}/pdf")
+    @ResponseBody
+    public ResponseEntity<Void> saveContractPdf(
+            @PathVariable Long contractId,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam("file") MultipartFile file
+    ) {
+        LoanContractResponse contract = contractService.findContract(contractId, userDetails.getUserId());
+
+        if (contract.getStatus() == ContractStatus.COMPLETED) {
+            archiveService.saveFile(ArchiveStatus.CONTRACT.name(), contractId, file);
+        }
+
+        return ResponseEntity.ok().build();
     }
 
     @Operation(hidden = true)

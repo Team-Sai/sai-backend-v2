@@ -1,23 +1,15 @@
 package org.teamsai.saibackend.domain.archive;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.archive.entity.SettlementArchiveSnapshot;
-import org.teamsai.saibackend.domain.archive.repository.SettlementArchiveRepository;
 import org.teamsai.saibackend.domain.archive.service.SettlementArchiveService;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
@@ -28,20 +20,16 @@ import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
-import org.teamsai.saibackend.domain.settlement.type.SettlementAccountStatus;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -51,9 +39,6 @@ class SettlementArchiveServiceTest {
 
     private static final Long SETTLEMENT_ID = 1L;
     private static final Long USER_ID = 10L;
-
-    @Mock
-    private SettlementArchiveRepository settlementArchiveRepository;
 
     @Mock
     private SettlementQueryService settlementQueryService;
@@ -71,23 +56,17 @@ class SettlementArchiveServiceTest {
 
     @BeforeEach
     void setUp() {
-        ObjectMapper objectMapper = new JsonMapper();
-
         settlementArchiveService = new SettlementArchiveService(
-                settlementArchiveRepository,
-                objectMapper,
                 settlementQueryService,
                 settlementPaymentStatusService,
                 settlementPaymentHistoryService,
                 settlementAccountService
         );
-
-        ReflectionTestUtils.invokeMethod(settlementArchiveService, "initSnapshotObjectMapper");
     }
 
     @Nested
-    @DisplayName("아카이브 캐시 동작")
-    class CachingBehavior {
+    @DisplayName("정산 미리보기 조회")
+    class ArchivePreviewRetrieval {
 
         private void stubLiveDataDependencies() {
             given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
@@ -99,57 +78,22 @@ class SettlementArchiveServiceTest {
         }
 
         @Test
-        @DisplayName("종료된 정산이고 저장된 스냅샷이 없으면 새로 만들어서 JSON으로 저장한다")
-        void buildsAndSavesSnapshotWhenClosedSettlementHasNoCachedSnapshot() {
+        @DisplayName("종료된 정산도 매번 최신 이행현황을 실시간으로 조회한다 (캐시 없음)")
+        void alwaysBuildsFromLiveDataForClosedSettlement() {
             stubLiveDataDependencies();
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
-            given(settlementArchiveRepository.findBySettlementId(SETTLEMENT_ID))
-                    .willReturn(Optional.empty());
 
             SettlementArchivePreviewResponse preview = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
             assertThat(preview.settlementId()).isEqualTo(SETTLEMENT_ID);
             assertThat(preview.settlementStatus()).isEqualTo("CLOSED");
-
-            ArgumentCaptor<SettlementArchiveSnapshot> captor = ArgumentCaptor.forClass(SettlementArchiveSnapshot.class);
-            verify(settlementArchiveRepository).save(captor.capture());
-
-            SettlementArchiveSnapshot saved = captor.getValue();
-            assertThat(saved.getSettlementId()).isEqualTo(SETTLEMENT_ID);
-            assertThat(saved.getSnapshotJson()).contains("\"settlementId\"");
+            verify(settlementPaymentStatusService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
 
         @Test
-        @DisplayName("종료된 정산이고 저장된 스냅샷이 있으면 라이브 데이터를 조회하지 않고 캐시된 스냅샷을 그대로 반환한다")
-        void returnsCachedSnapshotWithoutQueryingLiveDataWhenClosedSettlementHasCachedSnapshot() {
-            given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
-                    .willReturn(detail("CLOSED"));
-
-            SettlementArchivePreviewResponse cachedSnapshot = previewSnapshot();
-            String snapshotJson = snapshotJson(cachedSnapshot);
-            given(settlementArchiveRepository.findBySettlementId(SETTLEMENT_ID))
-                    .willReturn(Optional.of(SettlementArchiveSnapshot.builder()
-                            .settlementId(SETTLEMENT_ID)
-                            .snapshotJson(snapshotJson)
-                            .build()));
-
-            SettlementArchivePreviewResponse result = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
-
-            assertThat(result.settlementId()).isEqualTo(cachedSnapshot.settlementId());
-            assertThat(result.title()).isEqualTo(cachedSnapshot.title());
-            assertThat(result.paymentStatus().getTotalPaidAmount()).isEqualByComparingTo(cachedSnapshot.paymentStatus().getTotalPaidAmount());
-            assertThat(result.paymentHistory()).hasSize(1);
-            assertThat(result.settlementAccount().getBankName()).isEqualTo("신한은행");
-
-            verify(settlementPaymentStatusService, never()).getPaymentStatus(any(), any());
-            verify(settlementPaymentHistoryService, never()).getPaymentHistory(any(), any());
-            verify(settlementArchiveRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("진행 중인 정산은 캐시를 조회하지 않고 매번 라이브 데이터로 새로 만들며 저장하지도 않는다")
-        void alwaysRebuildsFromLiveDataAndNeverCachesInProgressSettlement() {
+        @DisplayName("진행 중인 정산도 매번 최신 이행현황을 실시간으로 조회한다")
+        void alwaysBuildsFromLiveDataForInProgressSettlement() {
             stubLiveDataDependencies();
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("IN_PROGRESS"));
@@ -157,37 +101,20 @@ class SettlementArchiveServiceTest {
             SettlementArchivePreviewResponse preview = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
             assertThat(preview.settlementStatus()).isEqualTo("IN_PROGRESS");
-
-            verify(settlementArchiveRepository, never()).findBySettlementId(any());
-            verify(settlementArchiveRepository, never()).save(any());
             verify(settlementPaymentStatusService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
 
         @Test
-        @DisplayName("같은 종료 정산을 다시 조회하면 첫 저장 시점의 스냅샷 값 그대로 반환된다")
-        void secondCallReturnsSameSnapshotCapturedOnFirstCall() {
+        @DisplayName("같은 정산을 다시 조회하면 매번 라이브 데이터를 새로 조회한다")
+        void everyCallQueriesLiveDataAgain() {
             stubLiveDataDependencies();
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
 
-            List<SettlementArchiveSnapshot> savedSnapshots = new java.util.ArrayList<>();
-            given(settlementArchiveRepository.findBySettlementId(SETTLEMENT_ID))
-                    .willAnswer(invocation -> savedSnapshots.isEmpty()
-                            ? Optional.empty()
-                            : Optional.of(savedSnapshots.get(0)));
-            org.mockito.Mockito.doAnswer(invocation -> {
-                SettlementArchiveSnapshot saved = invocation.getArgument(0);
-                savedSnapshots.add(saved);
-                return saved;
-            }).when(settlementArchiveRepository).save(any());
+            settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
+            settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
-            SettlementArchivePreviewResponse first = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
-            SettlementArchivePreviewResponse second = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
-
-            assertThat(second.paymentStatus().getTotalPaidAmount()).isEqualByComparingTo(first.paymentStatus().getTotalPaidAmount());
-            verify(settlementArchiveRepository, times(1)).save(any());
-            // 두 번째 호출은 캐시된 스냅샷을 반환하므로 라이브 데이터를 다시 조회하지 않는다 (호출 1회 = 첫 호출뿐).
-            verify(settlementPaymentStatusService, times(1)).getPaymentStatus(SETTLEMENT_ID, USER_ID);
+            verify(settlementPaymentStatusService, times(2)).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
     }
 
@@ -241,8 +168,6 @@ class SettlementArchiveServiceTest {
         void reflectsSettlementDataIntoPreview() {
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
-            given(settlementArchiveRepository.findBySettlementId(SETTLEMENT_ID))
-                    .willReturn(Optional.empty());
             given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
                     .willReturn(paymentStatusWithObligation());
             given(settlementPaymentHistoryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
@@ -263,41 +188,6 @@ class SettlementArchiveServiceTest {
             assertThat(preview.paymentHistory().get(0).sourceType()).isEqualTo(SourceType.AUTO_MATCH);
             assertThat(preview.settlementAccount()).isNull();
         }
-    }
-
-    private String snapshotJson(SettlementArchivePreviewResponse snapshot) {
-        ObjectMapper snapshotMapper = JsonMapper.builder()
-                .changeDefaultVisibility(visibility -> visibility.withFieldVisibility(JsonAutoDetect.Visibility.ANY))
-                .build();
-        return snapshotMapper.writeValueAsString(snapshot);
-    }
-
-    private SettlementArchivePreviewResponse previewSnapshot() {
-        return SettlementArchivePreviewResponse.builder()
-                .settlementId(SETTLEMENT_ID)
-                .settlementDisplayId("ST-1")
-                .title("여행 정산")
-                .ownerName("홍길동")
-                .settlementType("SHARED")
-                .settlementCategory("생활비")
-                .settlementStatus("CLOSED")
-                .splitType("EQUAL")
-                .dueDate(LocalDate.of(2026, 8, 31))
-                .createdAt(LocalDateTime.of(2026, 8, 1, 10, 0))
-                .paymentStatus(paymentStatusWithObligation())
-                .paymentHistory(List.of(historyRecord()))
-                .settlementAccount(SettlementAccountResponse.builder()
-                        .settlementAccountId(1L)
-                        .settlementId(SETTLEMENT_ID)
-                        .linkedAccountId(2L)
-                        .accountStatus(SettlementAccountStatus.ACTIVE)
-                        .bankName("신한은행")
-                        .maskedAccountNumber("110-***-456789")
-                        .accountHolderName("홍길동")
-                        .selectedAt(LocalDateTime.of(2026, 8, 1, 10, 0))
-                        .build())
-                .documentVersion("v1")
-                .build();
     }
 
     private SettlementDetailResponse detail(String settlementStatus) {
