@@ -5,20 +5,6 @@
 
 <mapper namespace="org.teamsai.saibackend.domain.link.mapper.LinkMapper">
 
-    <resultMap id="userResultMap"
-               type="org.teamsai.saibackend.domain.user.dto.UserDTO">
-
-        <id property="userId" column="user_id"/>
-
-        <result property="userToken" column="user_token"/>
-        <result property="userKey" column="user_key"/>
-        <result property="email" column="email"/>
-        <result property="password" column="password"/>
-        <result property="name" column="name"/>
-        <result property="birthDate" column="birth_date"/>
-
-    </resultMap>
-
     <update id="updateUserKey">
         UPDATE users
         SET user_key = #{userKey}

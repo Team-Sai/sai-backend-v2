@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;
@@ -26,7 +25,7 @@ public class UserService {
     public void withdraw(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(
-                  UserErrorCode.USER_NOT_FOUND::toException
+                        UserErrorCode.USER_NOT_FOUND::toException
                 );
         userRepository.delete(user);
 
@@ -40,14 +39,14 @@ public class UserService {
                 );
     }
 
-    public UserDTO findRequestTarget(Long requestUserId, String userToken) {
+    public User findRequestTarget(Long requestUserId, String userToken) {
         User targetUser = userRepository.findByUserToken(userToken)
                 .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
 
         if (requestUserId.equals(targetUser.getUserId())) {
             throw UserErrorCode.CANNOT_SELECT_SELF.toException();
         }
-        return UserDTO.from(targetUser);
+        return targetUser;
     }
 
     @Transactional(readOnly = true)

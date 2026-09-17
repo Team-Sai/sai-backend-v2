@@ -5,14 +5,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.teamsai.saibackend.domain.identity.dto.IdentityDTO;
-import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityCompleteResponse;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityPrepareResponse;
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
-import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
-import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
+import org.teamsai.saibackend.domain.identity.mapper.IdentityMapper;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -41,7 +39,7 @@ public class IdentityService {
     private static final int FAILURE_REASON_MAX_LENGTH =
             255;
 
-    private final IdentityRepository identityRepository;
+    private final IdentityMapper identityMapper;
     private final UserRepository userRepository;
 
     private final PortOneIdentityService portOneIdentityService;
@@ -52,7 +50,7 @@ public class IdentityService {
     private final long validMinutes;
 
     public IdentityService(
-            IdentityRepository identityRepository,
+            IdentityMapper identityMapper,
             UserRepository userRepository,
             PortOneIdentityService portOneIdentityService,
             IdentityValidator identityValidator,
@@ -66,7 +64,7 @@ public class IdentityService {
             @Value("${portone.identity.valid-minutes:10}")
             long validMinutes
     ) {
-        this.identityRepository = identityRepository;
+        this.identityMapper = identityMapper;
         this.userRepository = userRepository;
         this.portOneIdentityService = portOneIdentityService;
         this.identityValidator = identityValidator;
@@ -90,7 +88,7 @@ public class IdentityService {
         LocalDateTime requestedAt =
                 LocalDateTime.now();
 
-        Identity identity = Identity.builder()
+        IdentityDTO identity = IdentityDTO.builder()
                 .identityVerificationId(identityVerificationId)
                 .userId(userId)
                 .purpose(request.purpose())
@@ -98,7 +96,14 @@ public class IdentityService {
                 .requestedAt(requestedAt)
                 .build();
 
-        identityRepository.save(identity);
+        int insertedCount =
+                identityMapper.insert(identity);
+
+        if (insertedCount != 1) {
+            throw IdentityErrorCode
+                    .IDENTITY_VERIFICATION_CREATE_FAILED
+                    .toException();
+        }
 
         return new IdentityPrepareResponse(
                 identityVerificationId,
@@ -201,7 +206,7 @@ public class IdentityService {
                 verifiedAt.plusMinutes(validMinutes);
 
         int updatedCount =
-                identityRepository.updateVerified(
+                identityMapper.updateVerified(
                         identityVerificationId,
                         verifiedAt,
                         expiresAt
@@ -238,7 +243,7 @@ public class IdentityService {
         }
 
         int updatedCount =
-                identityRepository.consume(
+                identityMapper.consume(
                         identityVerificationId,
                         userId,
                         purpose
@@ -254,18 +259,18 @@ public class IdentityService {
     private IdentityDTO findIdentity(
             String identityVerificationId
     ) {
-        Identity identity =
-                identityRepository
-                        .findByIdentityVerificationId(
-                                identityVerificationId
-                        )
-                        .orElseThrow(
-                                IdentityErrorCode
-                                        .IDENTITY_VERIFICATION_NOT_FOUND
-                                        ::toException
-                        );
+        IdentityDTO identity =
+                identityMapper.findByIdentityVerificationId(
+                        identityVerificationId
+                );
 
-        return IdentityDTO.from(identity);
+        if (identity == null) {
+            throw IdentityErrorCode
+                    .IDENTITY_VERIFICATION_NOT_FOUND
+                    .toException();
+        }
+
+        return identity;
     }
 
     private void validateOwner(
@@ -287,7 +292,7 @@ public class IdentityService {
             String failureReason
     ) {
         int updatedCount =
-                identityRepository.updateFailed(
+                identityMapper.updateFailed(
                         identityVerificationId,
                         truncateFailureReason(failureReason)
                 );
@@ -296,12 +301,10 @@ public class IdentityService {
             return;
         }
 
-        IdentityStateDTO latestIdentity =
-                findLatestIdentityState(
-                        identityVerificationId
-                );
+        IdentityDTO latestIdentity =
+                findIdentity(identityVerificationId);
 
-        if (latestIdentity.status()
+        if (latestIdentity.getStatus()
                 == IdentityStatus.FAILED) {
             return;
         }
@@ -315,48 +318,20 @@ public class IdentityService {
             Long userId,
             String identityVerificationId
     ) {
-        IdentityStateDTO latestIdentity =
-                findLatestIdentityState(
-                        identityVerificationId
-                );
+        IdentityDTO latestIdentity =
+                findIdentity(identityVerificationId);
 
-        if (!Objects.equals(
-                latestIdentity.userId(),
-                userId
-        )) {
-            throw IdentityErrorCode
-                    .IDENTITY_VERIFICATION_FORBIDDEN
-                    .toException();
-        }
+        validateOwner(latestIdentity, userId);
 
-        if (latestIdentity.status()
+        if (latestIdentity.getStatus()
                 == IdentityStatus.VERIFIED) {
 
-            return new IdentityCompleteResponse(
-                    latestIdentity.identityVerificationId(),
-                    latestIdentity.status(),
-                    latestIdentity.verifiedAt(),
-                    latestIdentity.expiresAt()
-            );
+            return toCompleteResponse(latestIdentity);
         }
 
         throw IdentityErrorCode
                 .IDENTITY_VERIFICATION_UPDATE_FAILED
                 .toException();
-    }
-
-    private IdentityStateDTO findLatestIdentityState(
-            String identityVerificationId
-    ) {
-        return identityRepository
-                .findStateByIdentityVerificationId(
-                        identityVerificationId
-                )
-                .orElseThrow(
-                        IdentityErrorCode
-                                .IDENTITY_VERIFICATION_NOT_FOUND
-                                ::toException
-                );
     }
 
     private IdentityCompleteResponse toCompleteResponse(

@@ -8,17 +8,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
-import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementAccount;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementAccountMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementAccountRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.*;
@@ -28,6 +27,7 @@ import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -55,10 +55,7 @@ class RecurringSettlementCycleGeneratorTest {
     private SettlementAmountCalculator settlementAmountCalculator;
 
     @Mock
-    private SettlementAccountMapper settlementAccountMapper;
-
-    @Mock
-    private SlackNotifier slackNotifier;
+    private SettlementAccountRepository settlementAccountRepository;
 
     @InjectMocks
     private RecurringSettlementCycleGenerator sut;
@@ -151,8 +148,11 @@ class RecurringSettlementCycleGeneratorTest {
     private void givenNoPreviousAccount() {
         lenient()
                 .when(
-                        settlementAccountMapper
-                                .findActiveBySettlementId(10L)
+                        settlementAccountRepository
+                                .findBySettlementIdAndStatus(
+                                        10L,
+                                        SettlementAccountStatus.ACTIVE
+                                )
                 )
                 .thenReturn(Optional.empty());
     }
@@ -915,26 +915,22 @@ class RecurringSettlementCycleGeneratorTest {
                     BigDecimal.valueOf(300000)
             );
 
-            SettlementAccountDTO existingAccount =
-                    SettlementAccountDTO.builder()
-                            .settlementAccountId(1L)
-                            .settlementId(10L)
-                            .linkedAccountId(500L)
-                            .accountStatus(
-                                    SettlementAccountStatus.ACTIVE
-                            )
-                            .build();
+            SettlementAccount existingAccount =
+                    SettlementAccount.create(
+                            previous,
+                            500L,
+                            LocalDateTime.now()
+                    );
 
             when(
-                    settlementAccountMapper
-                            .findActiveBySettlementId(10L)
+                    settlementAccountRepository
+                            .findBySettlementIdAndStatus(
+                                    10L,
+                                    SettlementAccountStatus.ACTIVE
+                            )
             ).thenReturn(
                     Optional.of(existingAccount)
             );
-
-            when(
-                    settlementAccountMapper.insert(any())
-            ).thenReturn(1);
 
             sut.generateOneCycle(
                     recurring,
@@ -942,8 +938,8 @@ class RecurringSettlementCycleGeneratorTest {
                     LocalDate.of(2026, 2, 28)
             );
 
-            verify(settlementAccountMapper)
-                    .insert(
+            verify(settlementAccountRepository)
+                    .saveAndFlush(
                             argThat(account ->
                                     account.getLinkedAccountId()
                                             .equals(500L)

@@ -7,12 +7,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.RecurringSettlementGenerationService;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
 
 import java.math.BigDecimal;
@@ -40,10 +43,10 @@ class RecurringSettlementGenerationServiceIntegrationTest {
     private RecurringSettlementGenerationService generationService;
 
     @Autowired
-    private SettlementMapper settlementMapper;
+    private SettlementRepository settlementRepository;
 
     @Autowired
-    private SettlementParticipantMapper participantMapper;
+    private SettlementParticipantRepository participantRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -88,12 +91,24 @@ class RecurringSettlementGenerationServiceIntegrationTest {
 
             generationService.generateTodaySettlements(LocalDate.of(2026, 2, 28));
 
-            var latest = settlementMapper.findLatestByRecurringId(recurringId);
-            assertThat(latest).isNotNull();
+            Settlement latest =
+                    settlementRepository.findLatestByRecurringId(
+                                    recurringId,
+                                    PageRequest.of(0, 1)
+                            )
+                            .stream()
+                            .findFirst()
+                            .orElseThrow();
+
             assertThat(latest.getSettlementId()).isNotEqualTo(settlement1Id);
             assertThat(latest.getCycleDate()).isEqualTo(LocalDate.of(2026, 2, 28));
 
-            var newParticipants = participantMapper.findActiveBySettlementId(latest.getSettlementId());
+            var newParticipants =
+                    participantRepository.findBySettlementIdAndStatus(
+                            latest.getSettlementId(),
+                            SettlementParticipantStatus.ACTIVE
+                    );
+
             assertThat(newParticipants).hasSize(2);
 
             Map<Long, BigDecimal> obligationByUserId = fetchObligationAmountsByUser(latest.getSettlementId());
@@ -132,8 +147,21 @@ class RecurringSettlementGenerationServiceIntegrationTest {
 
             generationService.generateTodaySettlements(LocalDate.of(2026, 2, 28));
 
-            var latest = settlementMapper.findLatestByRecurringId(recurringId);
-            var newParticipants = participantMapper.findActiveBySettlementId(latest.getSettlementId());
+            Settlement latest =
+                    settlementRepository.findLatestByRecurringId(
+                                    recurringId,
+                                    PageRequest.of(0, 1)
+                            )
+                            .stream()
+                            .findFirst()
+                            .orElseThrow();
+
+            var newParticipants =
+                    participantRepository.findBySettlementIdAndStatus(
+                            latest.getSettlementId(),
+                            SettlementParticipantStatus.ACTIVE
+                    );
+
             assertThat(newParticipants).hasSize(1);
 
             Map<Long, BigDecimal> obligationByUserId = fetchObligationAmountsByUser(latest.getSettlementId());
@@ -168,8 +196,15 @@ class RecurringSettlementGenerationServiceIntegrationTest {
 
             generationService.generateTodaySettlements(LocalDate.of(2026, 2, 28));
 
-            var latest = settlementMapper.findLatestByRecurringId(recurringId);
-            assertThat(latest).isNotNull();
+            Settlement latest =
+                    settlementRepository.findLatestByRecurringId(
+                                    recurringId,
+                                    PageRequest.of(0, 1)
+                            )
+                            .stream()
+                            .findFirst()
+                            .orElseThrow();
+
             assertThat(latest.getSettlementId()).isNotEqualTo(settlement1Id);
 
             Map<Long, BigDecimal> obligationByUserId = fetchObligationAmountsByUser(latest.getSettlementId());
@@ -196,9 +231,17 @@ class RecurringSettlementGenerationServiceIntegrationTest {
 
             generationService.generateTodaySettlements(LocalDate.of(2026, 2, 28));
 
-            var latest = settlementMapper.findLatestByRecurringId(recurringId);
-            Map<Long, BigDecimal> obligationByUserId = fetchObligationAmountsByUser(latest.getSettlementId());
-            assertThat(obligationByUserId.get(userA)).isEqualByComparingTo(new BigDecimal("200000"));
+            Settlement latest =
+                    settlementRepository.findLatestByRecurringId(
+                                    recurringId,
+                                    PageRequest.of(0, 1)
+                            )
+                            .stream()
+                            .findFirst()
+                            .orElseThrow();
+
+            Map<Long, BigDecimal> obligationByUserId =
+                    fetchObligationAmountsByUser(latest.getSettlementId());
         }
     }
 

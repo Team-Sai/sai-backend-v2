@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.account.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
 import org.teamsai.saibackend.domain.link.mapper.LinkMapper;
@@ -24,6 +25,7 @@ public class AccountService {
     private final MockBankClient mockBankClient;
     private final UserKeyRevoker userKeyRevoker;
 
+    @Transactional
     public UserKeyResponse issueOrGetUserKey(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserErrorCode.USER_NOT_FOUND.toException());

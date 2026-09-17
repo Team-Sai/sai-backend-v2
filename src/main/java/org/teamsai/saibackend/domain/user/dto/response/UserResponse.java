@@ -2,7 +2,6 @@ package org.teamsai.saibackend.domain.user.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Builder;
