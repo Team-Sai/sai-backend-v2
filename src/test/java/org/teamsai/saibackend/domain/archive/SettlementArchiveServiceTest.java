@@ -1,24 +1,16 @@
 package org.teamsai.saibackend.domain.archive;
 
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.entity.File;
-import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
-import org.teamsai.saibackend.domain.archive.service.HtmlToPdfRenderer;
 import org.teamsai.saibackend.domain.archive.service.SettlementArchiveService;
+import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
@@ -29,27 +21,16 @@ import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistory
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.spring6.SpringTemplateEngine;
-import org.thymeleaf.templatemode.TemplateMode;
-import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,12 +39,6 @@ class SettlementArchiveServiceTest {
 
     private static final Long SETTLEMENT_ID = 1L;
     private static final Long USER_ID = 10L;
-
-    @Mock
-    private TemplateEngine templateEngine;
-
-    @Mock
-    private ArchiveRepository archiveRepository;
 
     @Mock
     private SettlementQueryService settlementQueryService;
@@ -77,96 +52,69 @@ class SettlementArchiveServiceTest {
     @Mock
     private SettlementAccountService settlementAccountService;
 
-    @InjectMocks
     private SettlementArchiveService settlementArchiveService;
-
-    @TempDir
-    Path tempDir;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(settlementArchiveService, "uploadDir", tempDir.toString());
-        ReflectionTestUtils.setField(settlementArchiveService, "htmlToPdfRenderer", new HtmlToPdfRenderer());
+        settlementArchiveService = new SettlementArchiveService(
+                settlementQueryService,
+                settlementPaymentStatusService,
+                settlementPaymentHistoryService,
+                settlementAccountService
+        );
     }
 
     @Nested
-    @DisplayName("아카이브 캐시 동작")
-    class CachingBehavior {
+    @DisplayName("정산 미리보기 조회")
+    class ArchivePreviewRetrieval {
 
-        private void stubRenderingDependencies() {
+        private void stubLiveDataDependencies() {
             given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
                     .willReturn(paymentStatus());
             given(settlementPaymentHistoryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
                     .willReturn(List.of());
             given(settlementAccountService.findCurrentAccount(USER_ID, SETTLEMENT_ID))
                     .willThrow(SettlementErrorCode.SETTLEMENT_ACCOUNT_NOT_FOUND.toException());
-            given(templateEngine.process(eq("archive/settlement-pdf"), any()))
-                    .willReturn("<html><body>settlement pdf</body></html>");
         }
 
         @Test
-        @DisplayName("종료된 정산이고 저장된 PDF가 없으면 새로 렌더링하고 아카이브에 저장한다")
-        void rendersAndSavesWhenClosedSettlementHasNoCachedFile() {
-            stubRenderingDependencies();
-            given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
-                    .willReturn(detail("CLOSED"));
-            given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.SETTLEMENT, SETTLEMENT_ID))
-                    .willReturn(List.of());
-
-            byte[] pdfBytes = settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID);
-
-            assertThat(pdfBytes).isNotEmpty();
-            assertThat(new String(pdfBytes, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
-
-            ArgumentCaptor<File> captor = ArgumentCaptor.forClass(File.class);
-            verify(archiveRepository).save(captor.capture());
-
-            File saved = captor.getValue();
-            assertThat(saved.getDomainType()).isEqualTo(ArchiveStatus.SETTLEMENT);
-            assertThat(saved.getReferenceId()).isEqualTo(SETTLEMENT_ID);
-            assertThat(tempDir.resolve(saved.getSavedFilename())).exists();
-        }
-
-        @Test
-        @DisplayName("종료된 정산이고 저장된 PDF가 있으면 재렌더링 없이 캐시된 파일을 반환한다")
-        void returnsCachedPdfWithoutRerenderingWhenClosedSettlementHasCachedFile() throws IOException {
+        @DisplayName("종료된 정산도 매번 최신 이행현황을 실시간으로 조회한다 (캐시 없음)")
+        void alwaysBuildsFromLiveDataForClosedSettlement() {
+            stubLiveDataDependencies();
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
 
-            String savedFilename = "SETTLEMENT_1_cached.pdf";
-            byte[] cachedBytes = "%PDF-cached-bytes".getBytes(StandardCharsets.UTF_8);
-            Files.write(tempDir.resolve(savedFilename), cachedBytes);
+            SettlementArchivePreviewResponse preview = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
-            File cachedFile = File.builder()
-                    .savedFilename(savedFilename)
-                    .build();
-            given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.SETTLEMENT, SETTLEMENT_ID))
-                    .willReturn(List.of(cachedFile));
-
-            byte[] result = settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID);
-
-            assertThat(result).isEqualTo(cachedBytes);
-
-            verify(settlementPaymentStatusService, never()).getPaymentStatus(any(), any());
-            verify(settlementPaymentHistoryService, never()).getPaymentHistory(any(), any());
-            verify(templateEngine, never()).process(anyString(), any());
-            verify(archiveRepository, never()).save(any());
+            assertThat(preview.settlementId()).isEqualTo(SETTLEMENT_ID);
+            assertThat(preview.settlementStatus()).isEqualTo("CLOSED");
+            verify(settlementPaymentStatusService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
 
         @Test
-        @DisplayName("진행 중인 정산은 캐시를 조회하지 않고 매번 새로 렌더링하며 저장하지도 않는다")
-        void alwaysRerendersAndNeverCachesInProgressSettlement() {
-            stubRenderingDependencies();
+        @DisplayName("진행 중인 정산도 매번 최신 이행현황을 실시간으로 조회한다")
+        void alwaysBuildsFromLiveDataForInProgressSettlement() {
+            stubLiveDataDependencies();
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("IN_PROGRESS"));
 
-            byte[] pdfBytes = settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID);
+            SettlementArchivePreviewResponse preview = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
-            assertThat(pdfBytes).isNotEmpty();
-
-            verify(archiveRepository, never()).findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(any(), any());
-            verify(archiveRepository, never()).save(any());
+            assertThat(preview.settlementStatus()).isEqualTo("IN_PROGRESS");
             verify(settlementPaymentStatusService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
+        }
+
+        @Test
+        @DisplayName("같은 정산을 다시 조회하면 매번 라이브 데이터를 새로 조회한다")
+        void everyCallQueriesLiveDataAgain() {
+            stubLiveDataDependencies();
+            given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
+                    .willReturn(detail("CLOSED"));
+
+            settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
+            settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
+
+            verify(settlementPaymentStatusService, times(2)).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
     }
 
@@ -175,7 +123,7 @@ class SettlementArchiveServiceTest {
     class SettlementAccountHandling {
 
         @BeforeEach
-        void stubRenderingDependencies() {
+        void stubLiveDataDependencies() {
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("IN_PROGRESS"));
             given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
@@ -185,16 +133,14 @@ class SettlementArchiveServiceTest {
         }
 
         @Test
-        @DisplayName("정산 수취 계좌가 설정되어 있지 않아도 예외 없이 PDF를 생성한다")
-        void generatesPdfWhenSettlementAccountIsNotSet() {
+        @DisplayName("정산 수취 계좌가 설정되어 있지 않아도 예외 없이 미리보기를 생성한다")
+        void buildsPreviewWhenSettlementAccountIsNotSet() {
             given(settlementAccountService.findCurrentAccount(USER_ID, SETTLEMENT_ID))
                     .willThrow(SettlementErrorCode.SETTLEMENT_ACCOUNT_NOT_FOUND.toException());
-            given(templateEngine.process(eq("archive/settlement-pdf"), any()))
-                    .willReturn("<html><body>settlement pdf</body></html>");
 
-            byte[] pdfBytes = settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID);
+            SettlementArchivePreviewResponse preview = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
-            assertThat(pdfBytes).isNotEmpty();
+            assertThat(preview.settlementAccount()).isNull();
         }
 
         @Test
@@ -204,7 +150,7 @@ class SettlementArchiveServiceTest {
                     .willThrow(SettlementErrorCode.SETTLEMENT_ACCESS_DENIED.toException());
 
             assertThatThrownBy(() ->
-                    settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID)
+                    settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID)
             ).isInstanceOfSatisfying(
                     DomainException.class,
                     exception -> assertThat(exception.getErrorCode())
@@ -214,31 +160,14 @@ class SettlementArchiveServiceTest {
     }
 
     @Nested
-    @DisplayName("정산 PDF 렌더링 내용 검증")
-    class RenderSettlementPdfContent {
-
-        @BeforeEach
-        void setUpRealTemplateEngine() {
-            ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
-            resolver.setPrefix("templates/");
-            resolver.setSuffix(".html");
-            resolver.setTemplateMode(TemplateMode.HTML);
-            resolver.setCharacterEncoding("UTF-8");
-            resolver.setCacheable(false);
-
-            SpringTemplateEngine realTemplateEngine = new SpringTemplateEngine();
-            realTemplateEngine.setTemplateResolver(resolver);
-
-            ReflectionTestUtils.setField(settlementArchiveService, "templateEngine", realTemplateEngine);
-        }
+    @DisplayName("정산 미리보기 내용 검증")
+    class ArchivePreviewContent {
 
         @Test
-        @DisplayName("정산 기본정보, 이행현황, 상세 납부내역이 PDF 본문에 그대로 반영된다")
-        void rendersSettlementDataIntoPdfBody() throws IOException {
+        @DisplayName("정산 기본정보, 이행현황, 상세 납부내역이 미리보기에 그대로 반영된다")
+        void reflectsSettlementDataIntoPreview() {
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
-            given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.SETTLEMENT, SETTLEMENT_ID))
-                    .willReturn(List.of());
             given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
                     .willReturn(paymentStatusWithObligation());
             given(settlementPaymentHistoryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
@@ -246,20 +175,18 @@ class SettlementArchiveServiceTest {
             given(settlementAccountService.findCurrentAccount(USER_ID, SETTLEMENT_ID))
                     .willThrow(SettlementErrorCode.SETTLEMENT_ACCOUNT_NOT_FOUND.toException());
 
-            byte[] pdfBytes = settlementArchiveService.generateSettlementPdfBytes(SETTLEMENT_ID, USER_ID);
+            SettlementArchivePreviewResponse preview = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
-            try (PDDocument document = PDDocument.load(pdfBytes)) {
-                String text = new PDFTextStripper().getText(document);
-
-                assertThat(text).contains("여행 정산");
-                assertThat(text).contains("공동정산");
-                assertThat(text).contains("완료");
-                assertThat(text).contains("균등분담");
-                assertThat(text).contains("완납");
-                assertThat(text).contains("자동매칭");
-                assertThat(text).contains("설정된 정산 수취 계좌가 없습니다");
-                assertThat(text).contains("ST-1");
-            }
+            assertThat(preview.title()).isEqualTo("여행 정산");
+            assertThat(preview.settlementType()).isEqualTo("SHARED");
+            assertThat(preview.settlementStatus()).isEqualTo("CLOSED");
+            assertThat(preview.splitType()).isEqualTo("EQUAL");
+            assertThat(preview.settlementDisplayId()).isEqualTo("ST-1");
+            assertThat(preview.paymentStatus().getObligations()).hasSize(1);
+            assertThat(preview.paymentStatus().getObligations().get(0).getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+            assertThat(preview.paymentHistory()).hasSize(1);
+            assertThat(preview.paymentHistory().get(0).sourceType()).isEqualTo(SourceType.AUTO_MATCH);
+            assertThat(preview.settlementAccount()).isNull();
         }
     }
 
@@ -306,7 +233,7 @@ class SettlementArchiveServiceTest {
                                 .expectedAmount(new BigDecimal("10000"))
                                 .paidAmount(new BigDecimal("10000"))
                                 .remainingAmount(BigDecimal.ZERO)
-                                .paymentStatus(org.teamsai.saibackend.domain.payment.type.PaymentStatus.PAID)
+                                .paymentStatus(PaymentStatus.PAID)
                                 .build()
                 ))
                 .totalExpectedAmount(new BigDecimal("10000"))

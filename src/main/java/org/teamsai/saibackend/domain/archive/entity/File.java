@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "loan_contract_file")
+@Table(name = "archive_file")
 public class File {
 
     @Id

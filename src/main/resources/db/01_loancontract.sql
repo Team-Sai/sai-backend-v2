@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS loan_contract (
     DEFAULT CHARSET=utf8mb4
     COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS loan_contract_file (
+CREATE TABLE IF NOT EXISTS archive_file (
     file_id           BIGINT NOT NULL AUTO_INCREMENT,
     domain_type       VARCHAR(50) NOT NULL,
     reference_id      BIGINT NOT NULL,
