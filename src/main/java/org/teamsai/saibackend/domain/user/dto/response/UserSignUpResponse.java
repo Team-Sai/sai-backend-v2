@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 @Getter
 @Builder
@@ -16,7 +16,7 @@ public class UserSignUpResponse {
     private String email;
     private String name;
 
-    public static UserSignUpResponse from(UserDTO user) {
+    public static UserSignUpResponse from(User user) {
         return new UserSignUpResponse(
                 user.getUserToken(),
                 user.getEmail(),

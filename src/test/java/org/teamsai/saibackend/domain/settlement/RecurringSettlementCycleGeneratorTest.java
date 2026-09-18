@@ -939,7 +939,7 @@ class RecurringSettlementCycleGeneratorTest {
             );
 
             verify(settlementAccountRepository)
-                    .save(
+                    .saveAndFlush(
                             argThat(account ->
                                     account.getLinkedAccountId()
                                             .equals(500L)

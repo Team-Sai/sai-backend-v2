@@ -8,14 +8,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
 import org.teamsai.saibackend.domain.archive.entity.File;
 import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
 
 import javax.imageio.ImageIO;
 
@@ -25,9 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -39,8 +33,6 @@ import java.util.UUID;
 public class ArchiveService {
 
     private final ArchiveRepository archiveRepository;
-    private final TemplateEngine templateEngine;
-    private final HtmlToPdfRenderer htmlToPdfRenderer;
 
     @Getter
     @Value("${file.upload-dir}")
@@ -110,29 +102,9 @@ public class ArchiveService {
         }
     }
 
-    public byte[] renderContractPdf(LoanContractResponse contract) {
-        String pdfCss;
-        try (InputStream cssStream = getClass().getResourceAsStream("/static/css/archive/contract-pdf.css")) {
-            pdfCss = StreamUtils.copyToString(cssStream, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException("PDF 스타일시트 로딩 중 오류가 발생했습니다.", e);
-        }
-
-        Context context = new Context();
-        context.setVariable("contract", contract);
-        context.setVariable("repaymentTypeLabel", contract.getRepaymentType().getDescription());
-        context.setVariable("pdfCss", pdfCss);
-        context.setVariable("creditorSignatureDataUri", loadSignatureDataUri(contract.getCreditorSignature()));
-        context.setVariable("debtorSignatureDataUri", loadSignatureDataUri(contract.getDebtorSignature()));
-
-        String html = templateEngine.process("archive/contract-pdf", context);
-
-        return htmlToPdfRenderer.render(html, "contractId: " + contract.getContractId());
-    }
-
     private static final int SEAL_RED_RGB = 0xC0272D;
 
-    private String loadSignatureDataUri(String savedFilename) {
+    public String loadSignatureDataUri(String savedFilename) {
         if (savedFilename == null || savedFilename.isBlank()) {
             return null;
         }

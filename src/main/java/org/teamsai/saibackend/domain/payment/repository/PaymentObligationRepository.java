@@ -151,4 +151,19 @@ public interface PaymentObligationRepository
             @Param("paymentStatuses")
             List<PaymentStatus> paymentStatuses
     );
+
+    @Query("""
+        SELECT paymentObligation
+        FROM PaymentObligationEntity paymentObligation
+        WHERE paymentObligation.participantId IN :participantIds
+          AND paymentObligation.obligationStatus IN :obligationStatuses
+        ORDER BY paymentObligation.paymentObligationId ASC
+        """)
+    List<PaymentObligationEntity> findByParticipantIdsAndObligationStatuses(
+            @Param("participantIds")
+            List<Long> participantIds,
+
+            @Param("obligationStatuses")
+            List<ObligationStatus> obligationStatuses
+    );
 }

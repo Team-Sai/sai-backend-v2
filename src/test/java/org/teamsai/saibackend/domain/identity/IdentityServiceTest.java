@@ -8,21 +8,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.identity.dto.IdentityDTO;
+import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityCompleteResponse;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityPrepareResponse;
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
-import org.teamsai.saibackend.domain.identity.mapper.IdentityMapper;
+import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
+import org.teamsai.saibackend.domain.identity.service.IdentityStatusService;
 import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.service.PortOneIdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDate;
@@ -56,13 +58,13 @@ class IdentityServiceTest {
     private static final String USER_NAME = "김사이";
 
     private static final LocalDate BIRTH_DATE =
-            LocalDate.of(2000, 01, 01);
+            LocalDate.of(2000, 1, 1);
 
     @Mock
-    private IdentityMapper identityMapper;
+    private IdentityRepository identityRepository;
 
     @Mock
-    private UserMapper userMapper;
+    private UserRepository userRepository;
 
     @Mock
     private PortOneIdentityService portOneIdentityService;
@@ -70,15 +72,19 @@ class IdentityServiceTest {
     @Mock
     private IdentityValidator identityValidator;
 
+    @Mock
+    private IdentityStatusService identityStatusService;
+
     private IdentityService identityService;
 
     @BeforeEach
     void setUp() {
         identityService = new IdentityService(
-                identityMapper,
-                userMapper,
+                identityRepository,
+                userRepository,
                 portOneIdentityService,
                 identityValidator,
+                identityStatusService,
                 STORE_ID,
                 CHANNEL_KEY,
                 VALID_MINUTES
@@ -92,13 +98,22 @@ class IdentityServiceTest {
         @Test
         @DisplayName("REQUESTED 상태의 인증 요청을 저장하고 SDK 정보를 반환한다")
         void prepareSuccess() {
+            User user = createUser();
+            given(userRepository.getReferenceById(USER_ID)).willReturn(user);
+
             IdentityPrepareRequest request =
                     new IdentityPrepareRequest(
                             IdentityPurpose.LOAN_CONTRACT
                     );
 
-            given(identityMapper.insert(any(IdentityDTO.class)))
-                    .willReturn(1);
+            given(
+                    identityRepository.save(
+                            any(Identity.class)
+                    )
+            ).willAnswer(
+                    invocation ->
+                            invocation.getArgument(0)
+            );
 
             IdentityPrepareResponse response =
                     identityService.prepare(
@@ -106,16 +121,21 @@ class IdentityServiceTest {
                             request
                     );
 
-            ArgumentCaptor<IdentityDTO> captor =
-                    ArgumentCaptor.forClass(IdentityDTO.class);
+            ArgumentCaptor<Identity> captor =
+                    ArgumentCaptor.forClass(
+                            Identity.class
+                    );
 
-            verify(identityMapper)
-                    .insert(captor.capture());
+            verify(identityRepository)
+                    .save(captor.capture());
 
-            IdentityDTO savedIdentity =
+            Identity savedIdentity =
                     captor.getValue();
 
-            assertThat(savedIdentity.getUserId())
+            verify(userRepository).getReferenceById(USER_ID);
+            assertThat(savedIdentity.getUser()).isSameAs(user);
+
+            assertThat(savedIdentity.getUser().getUserId())
                     .isEqualTo(USER_ID);
 
             assertThat(savedIdentity.getPurpose())
@@ -131,40 +151,25 @@ class IdentityServiceTest {
             assertThat(savedIdentity.getRequestedAt())
                     .isNotNull();
 
-            assertThat(savedIdentity.getIdentityVerificationId())
-                    .startsWith("identity-verification-");
+            assertThat(
+                    savedIdentity
+                            .getIdentityVerificationId()
+            ).startsWith(
+                    "identity-verification-"
+            );
 
-            assertThat(response.identityVerificationId())
-                    .isEqualTo(
-                            savedIdentity.getIdentityVerificationId()
-                    );
+            assertThat(
+                    response.identityVerificationId()
+            ).isEqualTo(
+                    savedIdentity
+                            .getIdentityVerificationId()
+            );
 
             assertThat(response.storeId())
                     .isEqualTo(STORE_ID);
 
             assertThat(response.channelKey())
                     .isEqualTo(CHANNEL_KEY);
-        }
-
-        @Test
-        @DisplayName("인증 요청 저장 결과가 1건이 아니면 예외가 발생한다")
-        void prepareFailsWhenInsertFails() {
-            IdentityPrepareRequest request =
-                    new IdentityPrepareRequest(
-                            IdentityPurpose.LOAN_CONTRACT
-                    );
-
-            given(identityMapper.insert(any(IdentityDTO.class)))
-                    .willReturn(0);
-
-            assertIdentityError(
-                    () -> identityService.prepare(
-                            USER_ID,
-                            request
-                    ),
-                    IdentityErrorCode
-                            .IDENTITY_VERIFICATION_CREATE_FAILED
-            );
         }
 
         @Test
@@ -183,8 +188,12 @@ class IdentityServiceTest {
                     IdentityErrorCode.UNAUTHENTICATED_USER
             );
 
-            verify(identityMapper, never())
-                    .insert(any(IdentityDTO.class));
+            verify(
+                    identityRepository,
+                    never()
+            ).save(
+                    any(Identity.class)
+            );
         }
     }
 
@@ -193,22 +202,47 @@ class IdentityServiceTest {
     class Complete {
 
         @Test
-        @DisplayName("포트원 인증자와 회원정보가 일치하면 VERIFIED로 변경한다")
-        void completeSuccess() {
-            IdentityDTO identity =
+        @DisplayName("VERIFIED 변경에 실패했지만 최신 상태가 VERIFIED이면 최신 결과를 반환한다")
+        void completeReturnsLatestVerifiedResultWhenConcurrentUpdateOccurs() {
+            Identity identity =
                     createRequestedIdentity(USER_ID);
 
-            UserDTO user = createUser();
+            User user = createUser();
 
             PortOneIdentityResponse response =
                     createVerifiedPortOneResponse();
 
+            LocalDateTime verifiedAt =
+                    LocalDateTime.of(
+                            2026,
+                            9,
+                            17,
+                            10,
+                            0
+                    );
+
+            LocalDateTime expiresAt =
+                    verifiedAt.plusMinutes(
+                            VALID_MINUTES
+                    );
+
+            IdentityStateDTO latestIdentity =
+                    new IdentityStateDTO(
+                            VERIFICATION_ID,
+                            USER_ID,
+                            IdentityStatus.VERIFIED,
+                            verifiedAt,
+                            expiresAt
+                    );
+
             given(
-                    identityMapper
+                    identityRepository
                             .findByIdentityVerificationId(
                                     VERIFICATION_ID
                             )
-            ).willReturn(identity);
+            ).willReturn(
+                    Optional.of(identity)
+            );
 
             given(
                     portOneIdentityService
@@ -217,11 +251,332 @@ class IdentityServiceTest {
                             )
             ).willReturn(response);
 
-            given(userMapper.findById(USER_ID))
-                    .willReturn(Optional.of(user));
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.of(user)
+            );
 
             given(
-                    identityMapper.updateVerified(
+                    identityStatusService.updateVerified(
+                            eq(VERIFICATION_ID),
+                            any(LocalDateTime.class),
+                            any(LocalDateTime.class)
+                    )
+            ).willReturn(0);
+
+            given(
+                    identityRepository
+                            .findStateByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.of(latestIdentity)
+            );
+
+            IdentityCompleteResponse result =
+                    identityService.complete(
+                            USER_ID,
+                            VERIFICATION_ID
+                    );
+
+            assertThat(
+                    result.identityVerificationId()
+            ).isEqualTo(
+                    VERIFICATION_ID
+            );
+
+            assertThat(result.status())
+                    .isEqualTo(
+                            IdentityStatus.VERIFIED
+                    );
+
+            assertThat(result.verifiedAt())
+                    .isEqualTo(verifiedAt);
+
+            assertThat(result.expiresAt())
+                    .isEqualTo(expiresAt);
+
+            verify(identityRepository)
+                    .findStateByIdentityVerificationId(
+                            VERIFICATION_ID
+                    );
+        }
+
+        @Test
+        @DisplayName("FAILED 변경에 실패했지만 최신 상태가 FAILED이면 기존 실패 처리를 유지한다")
+        void completeKeepsFailureWhenConcurrentFailureOccurs() {
+            Identity identity =
+                    createRequestedIdentity(USER_ID);
+
+            PortOneIdentityResponse response =
+                    new PortOneIdentityResponse(
+                            VERIFICATION_ID,
+                            "FAILED",
+                            null,
+                            new PortOneIdentityResponse.Failure(
+                                    "인증 실패",
+                                    "PG-001",
+                                    "사용자 인증 실패"
+                            )
+                    );
+
+            IdentityStateDTO latestIdentity =
+                    new IdentityStateDTO(
+                            VERIFICATION_ID,
+                            USER_ID,
+                            IdentityStatus.FAILED,
+                            null,
+                            null
+                    );
+
+            given(
+                    identityRepository
+                            .findByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.of(identity)
+            );
+
+            given(
+                    portOneIdentityService
+                            .getIdentityVerification(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(response);
+
+            given(
+                    identityStatusService.updateFailed(
+                            VERIFICATION_ID,
+                            "인증 실패 | PG-001 | 사용자 인증 실패"
+                    )
+            ).willReturn(0);
+
+            given(
+                    identityRepository
+                            .findStateByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.of(latestIdentity)
+            );
+
+            assertIdentityError(
+                    () -> identityService.complete(
+                            USER_ID,
+                            VERIFICATION_ID
+                    ),
+                    IdentityErrorCode
+                            .PORTONE_VERIFICATION_NOT_VERIFIED
+            );
+
+            verify(identityRepository)
+                    .findStateByIdentityVerificationId(
+                            VERIFICATION_ID
+                    );
+
+            verify(
+                    identityStatusService,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
+
+            verifyNoInteractions(
+                    userRepository
+            );
+        }
+
+        @Test
+        @DisplayName("VERIFIED 변경에 실패하고 최신 상태를 찾을 수 없으면 예외가 발생한다")
+        void completeFailsWhenLatestStateDoesNotExistAfterConcurrentCompletion() {
+            Identity identity =
+                    createRequestedIdentity(USER_ID);
+
+            User user = createUser();
+
+            PortOneIdentityResponse response =
+                    createVerifiedPortOneResponse();
+
+            given(
+                    identityRepository
+                            .findByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.of(identity)
+            );
+
+            given(
+                    portOneIdentityService
+                            .getIdentityVerification(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(response);
+
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.of(user)
+            );
+
+            given(
+                    identityStatusService.updateVerified(
+                            eq(VERIFICATION_ID),
+                            any(LocalDateTime.class),
+                            any(LocalDateTime.class)
+                    )
+            ).willReturn(0);
+
+            given(
+                    identityRepository
+                            .findStateByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.empty()
+            );
+
+            assertIdentityError(
+                    () -> identityService.complete(
+                            USER_ID,
+                            VERIFICATION_ID
+                    ),
+                    IdentityErrorCode
+                            .IDENTITY_VERIFICATION_NOT_FOUND
+            );
+
+            verify(identityRepository)
+                    .findStateByIdentityVerificationId(
+                            VERIFICATION_ID
+                    );
+        }
+
+        @Test
+        @DisplayName("FAILED 변경에 실패하고 최신 상태가 FAILED가 아니면 예외가 발생한다")
+        void completeFailsWhenLatestStateIsUnexpectedAfterConcurrentFailure() {
+            Identity identity =
+                    createRequestedIdentity(USER_ID);
+
+            PortOneIdentityResponse response =
+                    new PortOneIdentityResponse(
+                            VERIFICATION_ID,
+                            "FAILED",
+                            null,
+                            new PortOneIdentityResponse.Failure(
+                                    "인증 실패",
+                                    "PG-001",
+                                    "사용자 인증 실패"
+                            )
+                    );
+
+            IdentityStateDTO latestIdentity =
+                    new IdentityStateDTO(
+                            VERIFICATION_ID,
+                            USER_ID,
+                            IdentityStatus.REQUESTED,
+                            null,
+                            null
+                    );
+
+            given(
+                    identityRepository
+                            .findByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.of(identity)
+            );
+
+            given(
+                    portOneIdentityService
+                            .getIdentityVerification(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(response);
+
+            given(
+                    identityStatusService.updateFailed(
+                            VERIFICATION_ID,
+                            "인증 실패 | PG-001 | 사용자 인증 실패"
+                    )
+            ).willReturn(0);
+
+            given(
+                    identityRepository
+                            .findStateByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.of(latestIdentity)
+            );
+
+            assertIdentityError(
+                    () -> identityService.complete(
+                            USER_ID,
+                            VERIFICATION_ID
+                    ),
+                    IdentityErrorCode
+                            .IDENTITY_VERIFICATION_UPDATE_FAILED
+            );
+
+            verify(identityRepository)
+                    .findStateByIdentityVerificationId(
+                            VERIFICATION_ID
+                    );
+
+            verify(
+                    identityStatusService,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
+
+            verifyNoInteractions(
+                    userRepository
+            );
+        }
+
+        @Test
+        @DisplayName("포트원 인증자와 회원정보가 일치하면 VERIFIED로 변경한다")
+        void completeSuccess() {
+            Identity identity =
+                    createRequestedIdentity(USER_ID);
+
+            User user = createUser();
+
+            PortOneIdentityResponse response =
+                    createVerifiedPortOneResponse();
+
+            given(
+                    identityRepository
+                            .findByIdentityVerificationId(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(
+                    Optional.of(identity)
+            );
+
+            given(
+                    portOneIdentityService
+                            .getIdentityVerification(
+                                    VERIFICATION_ID
+                            )
+            ).willReturn(response);
+
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.of(user)
+            );
+
+            given(
+                    identityStatusService.updateVerified(
                             eq(VERIFICATION_ID),
                             any(LocalDateTime.class),
                             any(LocalDateTime.class)
@@ -234,12 +589,14 @@ class IdentityServiceTest {
                             VERIFICATION_ID
                     );
 
-            ArgumentCaptor<LocalDateTime> verifiedAtCaptor =
+            ArgumentCaptor<LocalDateTime>
+                    verifiedAtCaptor =
                     ArgumentCaptor.forClass(
                             LocalDateTime.class
                     );
 
-            ArgumentCaptor<LocalDateTime> expiresAtCaptor =
+            ArgumentCaptor<LocalDateTime>
+                    expiresAtCaptor =
                     ArgumentCaptor.forClass(
                             LocalDateTime.class
                     );
@@ -256,7 +613,7 @@ class IdentityServiceTest {
                             response.verifiedCustomer()
                     );
 
-            verify(identityMapper)
+            verify(identityStatusService)
                     .updateVerified(
                             eq(VERIFICATION_ID),
                             verifiedAtCaptor.capture(),
@@ -264,33 +621,43 @@ class IdentityServiceTest {
                     );
 
             assertThat(result.status())
-                    .isEqualTo(IdentityStatus.VERIFIED);
-
-            assertThat(result.identityVerificationId())
-                    .isEqualTo(VERIFICATION_ID);
-
-            assertThat(expiresAtCaptor.getValue())
                     .isEqualTo(
-                            verifiedAtCaptor
-                                    .getValue()
-                                    .plusMinutes(VALID_MINUTES)
+                        IdentityStatus.VERIFIED
                     );
+
+            assertThat(
+                    result.identityVerificationId()
+            ).isEqualTo(
+                    VERIFICATION_ID
+            );
+
+            assertThat(
+                    expiresAtCaptor.getValue()
+            ).isEqualTo(
+                    verifiedAtCaptor
+                            .getValue()
+                            .plusMinutes(
+                                    VALID_MINUTES
+                            )
+            );
         }
 
         @Test
         @DisplayName("다른 회원의 인증 요청에는 접근할 수 없다")
         void completeFailsWhenOwnerIsDifferent() {
-            IdentityDTO identity =
+            Identity identity =
                     createRequestedIdentity(
                             OTHER_USER_ID
                     );
 
             given(
-                    identityMapper
+                    identityRepository
                             .findByIdentityVerificationId(
                                     VERIFICATION_ID
                             )
-            ).willReturn(identity);
+            ).willReturn(
+                    Optional.of(identity)
+            );
 
             assertIdentityError(
                     () -> identityService.complete(
@@ -304,7 +671,7 @@ class IdentityServiceTest {
             verifyNoInteractions(
                     portOneIdentityService,
                     identityValidator,
-                    userMapper
+                    userRepository
             );
         }
 
@@ -325,14 +692,15 @@ class IdentityServiceTest {
                             VALID_MINUTES
                     );
 
-            IdentityDTO identity =
-                    IdentityDTO.builder()
+            Identity identity =
+                    Identity.builder()
                             .identityVerificationId(
                                     VERIFICATION_ID
                             )
-                            .userId(USER_ID)
+                            .user(createUser())
                             .purpose(
-                                    IdentityPurpose.LOAN_CONTRACT
+                                    IdentityPurpose
+                                            .LOAN_CONTRACT
                             )
                             .status(
                                     IdentityStatus.VERIFIED
@@ -342,11 +710,13 @@ class IdentityServiceTest {
                             .build();
 
             given(
-                    identityMapper
+                    identityRepository
                             .findByIdentityVerificationId(
                                     VERIFICATION_ID
                             )
-            ).willReturn(identity);
+            ).willReturn(
+                    Optional.of(identity)
+            );
 
             IdentityCompleteResponse result =
                     identityService.complete(
@@ -355,7 +725,9 @@ class IdentityServiceTest {
                     );
 
             assertThat(result.status())
-                    .isEqualTo(IdentityStatus.VERIFIED);
+                    .isEqualTo(
+                            IdentityStatus.VERIFIED
+                    );
 
             assertThat(result.verifiedAt())
                     .isEqualTo(verifiedAt);
@@ -366,14 +738,14 @@ class IdentityServiceTest {
             verifyNoInteractions(
                     portOneIdentityService,
                     identityValidator,
-                    userMapper
+                    userRepository
             );
         }
 
         @Test
         @DisplayName("포트원 상태가 FAILED이면 로컬 인증도 FAILED로 변경한다")
         void completeFailsWhenPortOneStatusIsFailed() {
-            IdentityDTO identity =
+            Identity identity =
                     createRequestedIdentity(USER_ID);
 
             PortOneIdentityResponse response =
@@ -381,7 +753,8 @@ class IdentityServiceTest {
                             VERIFICATION_ID,
                             "FAILED",
                             null,
-                            new PortOneIdentityResponse.Failure(
+                            new PortOneIdentityResponse
+                                    .Failure(
                                     "인증 실패",
                                     "PG-001",
                                     "사용자 인증 실패"
@@ -389,11 +762,13 @@ class IdentityServiceTest {
                     );
 
             given(
-                    identityMapper
+                    identityRepository
                             .findByIdentityVerificationId(
                                     VERIFICATION_ID
                             )
-            ).willReturn(identity);
+            ).willReturn(
+                    Optional.of(identity)
+            );
 
             given(
                     portOneIdentityService
@@ -403,7 +778,7 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    identityMapper.updateFailed(
+                    identityStatusService.updateFailed(
                             VERIFICATION_ID,
                             "인증 실패 | PG-001 | 사용자 인증 실패"
                     )
@@ -418,26 +793,30 @@ class IdentityServiceTest {
                             .PORTONE_VERIFICATION_NOT_VERIFIED
             );
 
-            verify(identityMapper)
+            verify(identityStatusService)
                     .updateFailed(
                             VERIFICATION_ID,
                             "인증 실패 | PG-001 | 사용자 인증 실패"
                     );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityStatusService,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
 
-            verifyNoInteractions(userMapper);
+            verifyNoInteractions(
+                    userRepository
+            );
         }
 
         @Test
         @DisplayName("포트원 상태가 READY이면 DB 상태를 변경하지 않는다")
         void completeFailsWhenVerificationIsNotCompleted() {
-            IdentityDTO identity =
+            Identity identity =
                     createRequestedIdentity(USER_ID);
 
             PortOneIdentityResponse response =
@@ -449,11 +828,13 @@ class IdentityServiceTest {
                     );
 
             given(
-                    identityMapper
+                    identityRepository
                             .findByIdentityVerificationId(
                                     VERIFICATION_ID
                             )
-            ).willReturn(identity);
+            ).willReturn(
+                    Optional.of(identity)
+            );
 
             given(
                     portOneIdentityService
@@ -471,29 +852,35 @@ class IdentityServiceTest {
                             .IDENTITY_VERIFICATION_NOT_COMPLETED
             );
 
-            verify(identityMapper, never())
-                    .updateFailed(
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityStatusService,
+                    never()
+            ).updateFailed(
+                    any(),
+                    any()
+            );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityStatusService,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
 
-            verifyNoInteractions(userMapper);
+            verifyNoInteractions(
+                    userRepository
+            );
         }
 
         @Test
         @DisplayName("회원정보와 인증정보가 다르면 FAILED로 변경한다")
         void completeFailsWhenIdentityInformationDoesNotMatch() {
-            IdentityDTO identity =
+            Identity identity =
                     createRequestedIdentity(USER_ID);
 
-            UserDTO user = createUser();
+            User user = createUser();
 
             PortOneIdentityResponse response =
                     createVerifiedPortOneResponse();
@@ -504,11 +891,13 @@ class IdentityServiceTest {
                             .toException();
 
             given(
-                    identityMapper
+                    identityRepository
                             .findByIdentityVerificationId(
                                     VERIFICATION_ID
                             )
-            ).willReturn(identity);
+            ).willReturn(
+                    Optional.of(identity)
+            );
 
             given(
                     portOneIdentityService
@@ -517,8 +906,11 @@ class IdentityServiceTest {
                             )
             ).willReturn(response);
 
-            given(userMapper.findById(USER_ID))
-                    .willReturn(Optional.of(user));
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.of(user)
+            );
 
             doThrow(mismatchException)
                     .when(identityValidator)
@@ -528,7 +920,7 @@ class IdentityServiceTest {
                     );
 
             given(
-                    identityMapper.updateFailed(
+                    identityStatusService.updateFailed(
                             VERIFICATION_ID,
                             "IDENTITY_INFORMATION_MISMATCH"
                     )
@@ -539,37 +931,43 @@ class IdentityServiceTest {
                             USER_ID,
                             VERIFICATION_ID
                     )
-            ).isSameAs(mismatchException);
+            ).isSameAs(
+                    mismatchException
+            );
 
-            verify(identityMapper)
+            verify(identityStatusService)
                     .updateFailed(
                             VERIFICATION_ID,
                             "IDENTITY_INFORMATION_MISMATCH"
                     );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityStatusService,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
         }
 
         @Test
         @DisplayName("JWT의 userId에 해당하는 회원이 없으면 예외가 발생한다")
         void completeFailsWhenUserDoesNotExist() {
-            IdentityDTO identity =
+            Identity identity =
                     createRequestedIdentity(USER_ID);
 
             PortOneIdentityResponse response =
                     createVerifiedPortOneResponse();
 
             given(
-                    identityMapper
+                    identityRepository
                             .findByIdentityVerificationId(
                                     VERIFICATION_ID
                             )
-            ).willReturn(identity);
+            ).willReturn(
+                    Optional.of(identity)
+            );
 
             given(
                     portOneIdentityService
@@ -578,8 +976,11 @@ class IdentityServiceTest {
                             )
             ).willReturn(response);
 
-            given(userMapper.findById(USER_ID))
-                    .willReturn(Optional.empty());
+            given(
+                    userRepository.findById(USER_ID)
+            ).willReturn(
+                    Optional.empty()
+            );
 
             assertThatThrownBy(
                     () -> identityService.complete(
@@ -588,25 +989,31 @@ class IdentityServiceTest {
                     )
             ).isInstanceOfSatisfying(
                     DomainException.class,
-                    exception -> assertThat(
-                            exception.getErrorCode()
-                    ).isEqualTo(
-                            UserErrorCode.USER_NOT_FOUND
-                    )
+                    exception ->
+                            assertThat(
+                                    exception.getErrorCode()
+                            ).isEqualTo(
+                                    UserErrorCode
+                                            .USER_NOT_FOUND
+                            )
             );
 
-            verify(identityValidator, never())
-                    .validateSameUser(
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityValidator,
+                    never()
+            ).validateSameUser(
+                    any(),
+                    any()
+            );
 
-            verify(identityMapper, never())
-                    .updateVerified(
-                            any(),
-                            any(),
-                            any()
-                    );
+            verify(
+                    identityStatusService,
+                    never()
+            ).updateVerified(
+                    any(),
+                    any(),
+                    any()
+            );
         }
     }
 
@@ -618,7 +1025,7 @@ class IdentityServiceTest {
         @DisplayName("사용 가능한 인증 건을 USED 상태로 변경한다")
         void consumeSuccess() {
             given(
-                    identityMapper.consume(
+                    identityRepository.consume(
                             VERIFICATION_ID,
                             USER_ID,
                             IdentityPurpose.LOAN_CONTRACT
@@ -631,7 +1038,7 @@ class IdentityServiceTest {
                     IdentityPurpose.LOAN_CONTRACT
             );
 
-            verify(identityMapper)
+            verify(identityRepository)
                     .consume(
                             VERIFICATION_ID,
                             USER_ID,
@@ -643,7 +1050,7 @@ class IdentityServiceTest {
         @DisplayName("인증 건을 사용할 수 없으면 예외가 발생한다")
         void consumeFailsWhenVerificationIsUnavailable() {
             given(
-                    identityMapper.consume(
+                    identityRepository.consume(
                             VERIFICATION_ID,
                             USER_ID,
                             IdentityPurpose.LOAN_CONTRACT
@@ -662,14 +1069,14 @@ class IdentityServiceTest {
         }
     }
 
-    private IdentityDTO createRequestedIdentity(
+    private Identity createRequestedIdentity(
             Long ownerUserId
     ) {
-        return IdentityDTO.builder()
+        return Identity.builder()
                 .identityVerificationId(
                         VERIFICATION_ID
                 )
-                .userId(ownerUserId)
+                .user(User.builder().userId(ownerUserId).build())
                 .purpose(
                         IdentityPurpose.LOAN_CONTRACT
                 )
@@ -682,13 +1089,19 @@ class IdentityServiceTest {
                 .build();
     }
 
-    private UserDTO createUser() {
-        return UserDTO.builder()
+    private User createUser() {
+        return User.builder()
                 .userId(USER_ID)
-                .userToken("SAI-ABCDEFGH")
+                .userToken(
+                        "SAI-ABCDEFGH"
+                )
                 .userKey(null)
-                .email("user@example.com")
-                .password("encoded-password")
+                .email(
+                        "user@example.com"
+                )
+                .password(
+                        "encoded-password"
+                )
                 .name(USER_NAME)
                 .birthDate(BIRTH_DATE)
                 .build();
@@ -699,7 +1112,8 @@ class IdentityServiceTest {
         return new PortOneIdentityResponse(
                 VERIFICATION_ID,
                 "VERIFIED",
-                new PortOneIdentityResponse.VerifiedCustomer(
+                new PortOneIdentityResponse
+                        .VerifiedCustomer(
                         USER_NAME,
                         BIRTH_DATE,
                         "ci-test"
@@ -712,12 +1126,16 @@ class IdentityServiceTest {
             Runnable operation,
             IdentityErrorCode expectedErrorCode
     ) {
-        assertThatThrownBy(operation::run)
-                .isInstanceOfSatisfying(
-                        DomainException.class,
-                        exception -> assertThat(
+        assertThatThrownBy(
+                operation::run
+        ).isInstanceOfSatisfying(
+                DomainException.class,
+                exception ->
+                        assertThat(
                                 exception.getErrorCode()
-                        ).isEqualTo(expectedErrorCode)
-                );
+                        ).isEqualTo(
+                                expectedErrorCode
+                        )
+        );
     }
 }

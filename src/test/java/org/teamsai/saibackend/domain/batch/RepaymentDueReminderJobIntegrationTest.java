@@ -14,15 +14,21 @@ import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.batch.repaymentschedule.config.RepaymentDueReminderJobConfig;
+import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
+import org.teamsai.saibackend.domain.notification.entity.Notification;
+import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -43,7 +49,16 @@ class RepaymentDueReminderJobIntegrationTest {
 
     @TestConfiguration
     @EnableAutoConfiguration
-    @MapperScan(basePackages = "org.teamsai.saibackend.domain")
+    @MapperScan(basePackageClasses = RepaymentScheduleMapper.class)
+    @EnableJpaRepositories(
+            basePackageClasses = NotificationRepository.class
+    )
+    @EntityScan(
+            basePackageClasses = {
+                    Notification.class,
+                    User.class
+            }
+    )
     @ComponentScan(basePackages = {
             "org.teamsai.saibackend.domain.notification",
     })

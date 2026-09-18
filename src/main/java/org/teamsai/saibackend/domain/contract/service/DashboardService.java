@@ -14,7 +14,7 @@ import org.teamsai.saibackend.domain.contract.type.ContractRole;
 import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
 import org.teamsai.saibackend.domain.contract.type.DashboardPaymentStatus;
 import org.teamsai.saibackend.domain.contract.type.TransactionCategory;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
@@ -48,14 +48,14 @@ public class DashboardService {
                 .toList();
     }
 
-    private BigDecimal calculateTotalRemaining(List<RepaymentScheduleDTO> schedules) {
+    private BigDecimal calculateTotalRemaining(List<RepaymentScheduleWithRemainingProjection> schedules) {
         return schedules.stream()
                 .filter(s -> s.getStatus().isUnresolved())
                 .map(this::getRemainingPaymentAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private BigDecimal calculateThisMonthDue(List<RepaymentScheduleDTO> schedules) {
+    private BigDecimal calculateThisMonthDue(List<RepaymentScheduleWithRemainingProjection> schedules) {
         YearMonth thisMonth = YearMonth.now();
         return schedules.stream()
                 .filter(s -> s.getStatus().isUnresolved()
@@ -64,7 +64,7 @@ public class DashboardService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private BigDecimal calculateYearMonthDue(List<RepaymentScheduleDTO> schedules, YearMonth targetMonth) {
+    private BigDecimal calculateYearMonthDue(List<RepaymentScheduleWithRemainingProjection> schedules, YearMonth targetMonth) {
         return schedules.stream()
                 .filter(s -> s.getStatus().isUnresolved()
                         && YearMonth.from(s.getDueDate()).equals(targetMonth))
@@ -72,7 +72,7 @@ public class DashboardService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private BigDecimal getRemainingPaymentAmount(RepaymentScheduleDTO schedule) {
+    private BigDecimal getRemainingPaymentAmount(RepaymentScheduleWithRemainingProjection schedule) {
         return Optional.ofNullable(schedule.getRemainingPaymentAmount())
                 .orElse(schedule.getTotalPaymentDue());
     }
@@ -89,7 +89,7 @@ public class DashboardService {
                 : DashboardContractStatus.ONGOING;
     }
 
-    private String determineRepaymentStatus(LoanContractResponse contract, List<RepaymentScheduleDTO> schedules) {
+    private String determineRepaymentStatus(LoanContractResponse contract, List<RepaymentScheduleWithRemainingProjection> schedules) {
         if (schedules.isEmpty() || contract.getStatus() != ContractStatus.COMPLETED) return "ONGOING";
         return schedules.stream().allMatch(s -> s.getStatus().isSettled())
                 ? "COMPLETED" : "REPAYING";
@@ -113,7 +113,7 @@ public class DashboardService {
             Long userId
     ) {
         LoanContractResponse contract = context.contract();
-        List<RepaymentScheduleDTO> schedules = context.schedules();
+        List<RepaymentScheduleWithRemainingProjection> schedules = context.schedules();
 
 
         BigDecimal totalRemaining = calculateTotalRemaining(schedules);
@@ -123,8 +123,8 @@ public class DashboardService {
         TransactionCategory category = determineCategory(role);
         DashboardContractStatus contractStatus = determineContractStatus(totalRemaining);
         DashboardPaymentStatus paymentStatus = determinePaymentStatus(totalRemaining);
-        Optional<RepaymentScheduleDTO> nearestSchedule = findNearestSchedule(schedules);
-        LocalDate nearestDueDate = nearestSchedule.map(RepaymentScheduleDTO::getDueDate).orElse(null);
+        Optional<RepaymentScheduleWithRemainingProjection> nearestSchedule = findNearestSchedule(schedules);
+        LocalDate nearestDueDate = nearestSchedule.map(RepaymentScheduleWithRemainingProjection::getDueDate).orElse(null);
         BigDecimal nextDueAmount = nearestSchedule
                 .map(this::getRemainingPaymentAmount)
                 .orElse(null);
@@ -146,7 +146,7 @@ public class DashboardService {
                 .build();
     }
 
-    private RoleDueSummary calculateRoleDueSummary(List<DashboardContractRowResponse> roleRows, Map<Long, List<RepaymentScheduleDTO>> scheduleMap) {
+    private RoleDueSummary calculateRoleDueSummary(List<DashboardContractRowResponse> roleRows, Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap) {
         BigDecimal thisMonthDue = roleRows.stream()
                 .map(DashboardContractRowResponse::getThisMonthDueAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -176,7 +176,7 @@ public class DashboardService {
         return new RoleDueSummary(thisMonthDue, null);
     }
 
-    private DashboardSummaryResponse buildSummary(List<DashboardContractRowResponse> rows, Map<Long, List<RepaymentScheduleDTO>> scheduleMap) {
+    private DashboardSummaryResponse buildSummary(List<DashboardContractRowResponse> rows, Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap) {
         int totalContractCount = rows.size();
 
         BigDecimal totalLentAmount = rows.stream()
@@ -306,7 +306,7 @@ public class DashboardService {
         List<Long> contractIds = contracts.stream()
                 .map(LoanContractResponse::getContractId)
                 .toList();
-        Map<Long, List<RepaymentScheduleDTO>> scheduleMap =
+        Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap =
                 repaymentScheduleService.getSchedulesByContractIds(contractIds);
 
         return contracts.stream()
@@ -326,7 +326,7 @@ public class DashboardService {
             String sortType,
             int page
     ) {
-        Map<Long, List<RepaymentScheduleDTO>> scheduleMap = contexts.stream()
+        Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap = contexts.stream()
                 .collect(Collectors.toMap(
                         context -> context.contract().getContractId(),
                         ContractScheduleContext::schedules
@@ -353,10 +353,10 @@ public class DashboardService {
                 .build();
     }
 
-    private Optional<RepaymentScheduleDTO> findNearestSchedule(List<RepaymentScheduleDTO> schedules) {
+    private Optional<RepaymentScheduleWithRemainingProjection> findNearestSchedule(List<RepaymentScheduleWithRemainingProjection> schedules) {
         return schedules.stream()
                 .filter(s -> s.getStatus() == RepaymentScheduleStatus.PENDING)
-                .min(Comparator.comparing(RepaymentScheduleDTO::getDueDate));
+                .min(Comparator.comparing(RepaymentScheduleWithRemainingProjection::getDueDate));
     }
 
     public DashboardResponse getDashboard(Long userId, String keyword, String roleFilter, String statusFilter, String sortType, int page) {
@@ -391,13 +391,13 @@ public class DashboardService {
 
     private record ContractScheduleContext(
             LoanContractResponse contract,
-            List<RepaymentScheduleDTO> schedules
+            List<RepaymentScheduleWithRemainingProjection> schedules
     ) {
     }
 
     public record LoanScheduleContext(
             LoanContractResponse contract,
-            RepaymentScheduleDTO schedule
+            RepaymentScheduleWithRemainingProjection schedule
     ) {
     }
 

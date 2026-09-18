@@ -15,7 +15,6 @@ import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.user.entity.User;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -104,11 +103,8 @@ class NotificationServiceTest {
     @DisplayName("로그인 사용자의 알림 목록을 조회한다")
     void getNotificationsSuccess() {
         Long userId = 2L;
-        LocalDateTime createdAt = LocalDateTime.now();
 
         NotificationResponse expected = mock(NotificationResponse.class);
-        when(expected.getNotificationId()).thenReturn(1L);
-        when(expected.getCreatedAt()).thenReturn(createdAt);
 
         when(notificationRepository.findBankTransactionNotificationsByUserId(userId)).thenReturn(List.of());
         when(notificationRepository.findSettlementNotificationsByUserId(userId)).thenReturn(List.of(expected));

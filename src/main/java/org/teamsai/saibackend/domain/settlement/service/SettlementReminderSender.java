@@ -10,9 +10,10 @@ import org.teamsai.saibackend.domain.notification.type.ReminderStage;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementParticipantDTO;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -23,13 +24,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SettlementReminderSender {
 
-    private final SettlementParticipantMapper participantMapper;
+    private final SettlementParticipantRepository participantRepository;
     private final PaymentObligationRepository paymentObligationRepository;
     private final NotificationService notificationService;
 
-    public int sendForSettlement(SettlementDTO settlement, ReminderStage stage) {
-        List<SettlementParticipantDTO> activeParticipants =
-                participantMapper.findActiveBySettlementId(settlement.getSettlementId());
+    public int sendForSettlement(Settlement settlement, ReminderStage stage) {
+        List<SettlementParticipant> activeParticipants =
+                participantRepository.findBySettlementIdAndStatus(
+                        settlement.getSettlementId(),
+                        SettlementParticipantStatus.ACTIVE
+                );
 
         if (activeParticipants.isEmpty()) {
             return 0;
@@ -37,18 +41,18 @@ public class SettlementReminderSender {
 
         Map<Long, Long> userIdByParticipantId = activeParticipants.stream()
                 .collect(Collectors.toMap(
-                        SettlementParticipantDTO::getParticipantId,
-                        SettlementParticipantDTO::getUserId
+                        SettlementParticipant::getParticipantId,
+                        participant -> participant.getUser().getUserId()
                 ));
 
         List<Long> participantIds = activeParticipants.stream()
-                .map(SettlementParticipantDTO::getParticipantId)
+                .map(SettlementParticipant::getParticipantId)
                 .toList();
 
         List<PaymentObligationEntity> unresolvedObligations =
                 paymentObligationRepository.findLatestByParticipantIds(
-                            participantIds,
-                            ObligationStatus.ACTIVE
+                                participantIds,
+                                ObligationStatus.ACTIVE
                         ).stream()
                         .filter(o -> o.getPaymentStatus().isUnresolved())
                         .toList();
@@ -71,7 +75,7 @@ public class SettlementReminderSender {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void sendOneReminder(Long userId, PaymentObligationEntity obligation, SettlementDTO settlement, ReminderStage stage) {
+    public void sendOneReminder(Long userId, PaymentObligationEntity obligation, Settlement settlement, ReminderStage stage) {
         notificationService.createIfAbsent(
                 userId,
                 stage.type(),

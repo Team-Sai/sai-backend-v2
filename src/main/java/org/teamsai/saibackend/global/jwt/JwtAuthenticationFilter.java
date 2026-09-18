@@ -13,14 +13,11 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Optional;
 
 @Component

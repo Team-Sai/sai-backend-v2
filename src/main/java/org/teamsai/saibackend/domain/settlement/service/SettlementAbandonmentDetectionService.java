@@ -2,13 +2,18 @@ package org.teamsai.saibackend.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementAbandonmentAlertMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementAbandonmentAlert;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementAbandonmentAlertRepository;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -20,32 +25,56 @@ public class SettlementAbandonmentDetectionService {
     private static final int ABANDONMENT_DAYS_AFTER_DUE = 3;
 
     private final OverdueCriteria overdueCriteria;
-    private final SettlementMapper settlementMapper;
-    private final SettlementAbandonmentAlertMapper alertMapper;
+    private final SettlementRepository settlementRepository;
+    private final SettlementAbandonmentAlertRepository abandonmentAlertRepository;
     private final SlackNotifier slackNotifier;
 
     public SettlementAbandonmentResult detectAbandoned(LocalDate baseDate) {
-        int totalCount = settlementMapper.countInProgressSettlements();
+        long totalCount = settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS);
         log.info("정산 장기방치 감지 배치 시작, 대상 정산 총 {}건, baseDate={}", totalCount, baseDate);
 
         int detectedCount = 0;
-        int offset = 0;
+        int pageNumber = 0;
 
         while (true) {
-            List<SettlementDTO> page = settlementMapper.findInProgressSettlements(offset, PAGE_SIZE);
+            List<Settlement> page = settlementRepository.findBySettlementStatusOrderBySettlementIdAsc( SettlementStatus.IN_PROGRESS,
+                    PageRequest.of(pageNumber, PAGE_SIZE));
             if (page.isEmpty()) {
                 break;
             }
 
-            for (SettlementDTO settlement : page) {
+            for (Settlement settlement : page) {
                 LocalDate referenceDate = overdueCriteria.resolveReferenceDate(settlement);
 
                 if (!isAbandoned(referenceDate, baseDate)) {
                     continue;
                 }
 
-                int inserted = alertMapper.insertIfAbsent(settlement.getSettlementId(), referenceDate);
-                if (inserted != 1) {
+                boolean alreadyNotified =
+                        abandonmentAlertRepository.existsBySettlementIdAndReferenceDate(
+                                settlement.getSettlementId(),
+                                referenceDate
+                        );
+
+                if (alreadyNotified) {
+                    continue;
+                }
+
+                try {
+                    SettlementAbandonmentAlert alert =
+                            SettlementAbandonmentAlert.create(
+                                    settlement.getSettlementId(),
+                                    referenceDate,
+                                    LocalDateTime.now()
+                            );
+
+                    abandonmentAlertRepository.saveAndFlush(alert);
+                } catch (DataIntegrityViolationException e) {
+                    log.debug(
+                            "이미 처리된 정산 포기 알림입니다. settlementId={}, referenceDate={}",
+                            settlement.getSettlementId(),
+                            referenceDate
+                    );
                     continue;
                 }
 
@@ -56,7 +85,7 @@ public class SettlementAbandonmentDetectionService {
             if (page.size() < PAGE_SIZE) {
                 break;
             }
-            offset += PAGE_SIZE;
+            pageNumber++;
         }
 
         log.info("정산 장기방치 감지 배치 종료, 신규 방치 감지 {}건 (총 {}건 중)", detectedCount, totalCount);
@@ -70,7 +99,7 @@ public class SettlementAbandonmentDetectionService {
         return !referenceDate.plusDays(ABANDONMENT_DAYS_AFTER_DUE).isAfter(baseDate);
     }
 
-    private void notifyAbandoned(SettlementDTO settlement, LocalDate referenceDate, LocalDate baseDate) {
+    private void notifyAbandoned(Settlement settlement, LocalDate referenceDate, LocalDate baseDate) {
         long daysOverdue = java.time.temporal.ChronoUnit.DAYS.between(referenceDate, baseDate);
         slackNotifier.send(String.format(
                 "⚠️ *정산 장기 방치 감지* — settlementId=%d, title=%s, 기준일=%s (%d일 경과), 여전히 IN_PROGRESS",

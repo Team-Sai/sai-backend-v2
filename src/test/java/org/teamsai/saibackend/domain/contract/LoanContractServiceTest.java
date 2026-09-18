@@ -28,7 +28,6 @@ import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
@@ -250,7 +249,7 @@ class LoanContractServiceTest {
             given(fileService.saveSignatureFile(CONTRACT_ID, signature))
                     .willReturn("uploads/signatures/1_signature.png");
             given(userService.findRequestTarget(CREDITOR_ID, DEBTOR_USER_TOKEN))
-                    .willReturn(UserDTO.builder().userId(DEBTOR_ID).build());
+                    .willReturn(User.builder().userId(DEBTOR_ID).build());
             given(userService.getMyInfo(CREDITOR_ID))
                     .willReturn(UserResponse.builder().name("채권자").build());
             given(entityManager.getReference(User.class, DEBTOR_ID)).willReturn(userRef(DEBTOR_ID));
@@ -332,7 +331,6 @@ class LoanContractServiceTest {
             assertThat(contract.getDebtorAddress()).isEqualTo(debtorAddress);
             assertThat(contract.getDebtorSignature()).isEqualTo("uploads/signatures/1_signature.png");
             assertThat(contract.getStatus()).isEqualTo(ContractStatus.COMPLETED);
-            // PDF 아카이빙은 ContractArchiveEventListener가 ContractCompletedEvent를 구독해 비동기로 처리한다.
             verify(eventPublisher).publishEvent(any(ContractCompletedEvent.class));
             assertThat(status).isEqualTo(ContractStatus.COMPLETED);
         }
