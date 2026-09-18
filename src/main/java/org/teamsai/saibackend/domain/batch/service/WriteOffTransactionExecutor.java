@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
@@ -22,7 +21,6 @@ public class WriteOffTransactionExecutor {
     private static final int CHUNK_SIZE = 500;
 
     private final PaymentObligationRepository paymentObligationRepository;
-    private final RepaymentScheduleMapper repaymentScheduleMapper;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int writeOffOneBatch(List<Long> obligationIds) {
@@ -53,7 +51,7 @@ public class WriteOffTransactionExecutor {
     public int writeOffSchedulesInNewTransaction(List<Long> scheduleIds) {
         int total = 0;
         for (List<Long> chunk : partition(scheduleIds, CHUNK_SIZE)) {
-            total += repaymentScheduleMapper.writeOffBulk(chunk);
+            total += paymentObligationRepository.writeOffBulk(chunk);
         }
         log.info("상환 스케줄 상각 처리, {}건", total);
         return total;

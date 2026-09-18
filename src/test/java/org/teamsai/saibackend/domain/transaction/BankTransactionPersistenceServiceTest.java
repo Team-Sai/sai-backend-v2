@@ -9,7 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,13 +41,36 @@ class BankTransactionPersistenceServiceTest {
     private BankTransactionRepository bankTransactionRepository;
 
     @Mock
-    private LinkedBankAccountMapper linkedBankAccountMapper;
+    private LinkedBankAccountRepository linkedBankAccountRepository;
 
     @InjectMocks
     private BankTransactionPersistenceService bankTransactionPersistenceService;
 
     private static final Long LINKED_ACCOUNT_ID = 1L;
     private static final Long BANK_ACCOUNT_ID = 3L;
+
+    @Test
+    void acceptsUnchangedCursorWhenAccountStillExists() {
+        given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
+                .willReturn(0);
+        given(linkedBankAccountRepository.existsById(LINKED_ACCOUNT_ID)).willReturn(true);
+
+        int result = bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID,
+                List.of(createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT")));
+
+        assertThat(result).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsUnchangedCursorWhenAccountWasDeleted() {
+        given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
+                .willReturn(0);
+        given(linkedBankAccountRepository.existsById(LINKED_ACCOUNT_ID)).willReturn(false);
+
+        assertThatThrownBy(() -> bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID,
+                List.of(createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT"))))
+                .extracting("errorCode").isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND);
+    }
 
     private BankTransactionResponse createTransactionResponse(
             Long transactionId, String transactionKey, String transactionType
@@ -81,12 +105,14 @@ class BankTransactionPersistenceServiceTest {
 
         assertThat(result).isZero();
         verify(bankTransactionRepository, never()).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
-        verify(linkedBankAccountMapper, never()).updateLastSyncedTransactionId(any(), any());
+        verify(linkedBankAccountRepository, never()).advanceCursorAndBalance(any(), any(), any());
     }
 
     @Test
     @DisplayName("모든 거래를 저장하고, 응답 순서와 무관하게 실제 최댓값 transactionId로 커서를 갱신한다")
     void savesAllAndAdvancesCursorToMaxTransactionId() {
+        given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
+                .willReturn(1);
         // 정렬을 일부러 깨서 응답: 리스트 마지막 원소는 12, 실제 최댓값은 13
         List<BankTransactionResponse> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT"),
@@ -110,14 +136,15 @@ class BankTransactionPersistenceServiceTest {
         assertThat(syncedAtCaptor.getAllValues()).doesNotContainNull();
 
         // 마지막 원소(12)가 아니라 실제 최댓값(13)으로 갱신되어야 한다.
-        verify(linkedBankAccountMapper).updateLastSyncedTransactionId(eq(LINKED_ACCOUNT_ID), eq(13L));
-        verify(linkedBankAccountMapper).updateBalance(
-                eq(LINKED_ACCOUNT_ID), eq(BigDecimal.valueOf(150_000)));
+        verify(linkedBankAccountRepository).advanceCursorAndBalance(
+                eq(LINKED_ACCOUNT_ID), eq(13L), eq(BigDecimal.valueOf(150_000)));
     }
 
     @Test
     @DisplayName("가장 최근 거래의 balanceAfter를 연결 계좌 잔액으로 갱신한다")
     void updatesBalanceFromLatestTransaction() {
+        given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
+                .willReturn(1);
         List<BankTransactionResponse> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT",
                         BigDecimal.valueOf(120_000)),
@@ -129,13 +156,15 @@ class BankTransactionPersistenceServiceTest {
 
         bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions);
 
-        verify(linkedBankAccountMapper).updateBalance(
-                eq(LINKED_ACCOUNT_ID), eq(BigDecimal.valueOf(180_000)));
+        verify(linkedBankAccountRepository).advanceCursorAndBalance(
+                eq(LINKED_ACCOUNT_ID), eq(13L), eq(BigDecimal.valueOf(180_000)));
     }
 
     @Test
     @DisplayName("가장 최근 거래의 balanceAfter가 null이면 잔액을 갱신하지 않는다")
     void skipsBalanceUpdateWhenLatestBalanceIsNull() {
+        given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
+                .willReturn(1);
         List<BankTransactionResponse> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT",
                         BigDecimal.valueOf(120_000)),
@@ -144,9 +173,8 @@ class BankTransactionPersistenceServiceTest {
 
         bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions);
 
-        verify(linkedBankAccountMapper, never()).updateBalance(any(), any());
-        verify(linkedBankAccountMapper).updateLastSyncedTransactionId(
-                eq(LINKED_ACCOUNT_ID), eq(13L));
+        verify(linkedBankAccountRepository).advanceCursorAndBalance(
+                eq(LINKED_ACCOUNT_ID), eq(13L), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
@@ -164,12 +192,14 @@ class BankTransactionPersistenceServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(AccountErrorCode.INVALID_BANK_RESPONSE);
 
-        verify(linkedBankAccountMapper, never()).updateLastSyncedTransactionId(any(), any());
+        verify(linkedBankAccountRepository, never()).advanceCursorAndBalance(any(), any(), any());
     }
 
     @Test
     @DisplayName("정상적으로 정의된 거래유형(DEPOSIT/WITHDRAWAL)은 올바르게 매핑된다")
     void mapsKnownTransactionTypesCorrectly() {
+        given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
+                .willReturn(1);
         List<BankTransactionResponse> transactions = List.of(
                 createTransactionResponse(1L, "MOCK-TX-A", "DEPOSIT"),
                 createTransactionResponse(2L, "MOCK-TX-B", "WITHDRAWAL")
@@ -204,11 +234,11 @@ class BankTransactionPersistenceServiceTest {
                 .isSameAs(insertFailure);
 
         // 첫 거래 저장 시점에 이미 실패했으므로, 커서는 절대 갱신되지 않아야 한다.
-        verify(linkedBankAccountMapper, never()).updateLastSyncedTransactionId(any(), any());
+        verify(linkedBankAccountRepository, never()).advanceCursorAndBalance(any(), any(), any());
     }
 
     @Test
-    @DisplayName("커서 갱신(updateLastSyncedTransactionId) 중 DB 예외가 발생하면 그대로 전파한다")
+    @DisplayName("커서·잔액 원자적 갱신 중 DB 예외가 발생하면 그대로 전파한다")
     void propagatesExceptionWhenCursorUpdateFails() {
         List<BankTransactionResponse> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT")
@@ -217,8 +247,8 @@ class BankTransactionPersistenceServiceTest {
                 new DataIntegrityViolationException("커서 갱신 실패");
 
         willThrow(cursorUpdateFailure)
-                .given(linkedBankAccountMapper)
-                .updateLastSyncedTransactionId(eq(LINKED_ACCOUNT_ID), eq(11L));
+                .given(linkedBankAccountRepository)
+                .advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), eq(11L), any());
 
         assertThatThrownBy(() ->
                 bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions)

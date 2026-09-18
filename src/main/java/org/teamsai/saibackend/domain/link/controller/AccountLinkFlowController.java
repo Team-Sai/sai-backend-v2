@@ -14,12 +14,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
-import org.teamsai.saibackend.domain.link.service.AccountLinkService;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.service.UserService;
-import org.teamsai.saibackend.global.client.MockBankClient;
-import org.teamsai.saibackend.global.client.UserKeyRevoker;
 import org.teamsai.saibackend.global.exception.DomainException;
 import org.teamsai.saibackend.global.jwt.JwtTokenProvider;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
@@ -38,9 +36,6 @@ import java.util.stream.Collectors;
 )
 public class AccountLinkFlowController {
 
-    private static final String CALLER =
-            "AccountLinkFlowController";
-
     @Value("${sai.mock-bank.base-url}")
     private String mockBankBaseUrl;
 
@@ -52,11 +47,9 @@ public class AccountLinkFlowController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final LinkedBankAccountService linkedBankAccountService;
-    private final AccountLinkService accountLinkService;
+    private final AccountLinkCoordinator accountLinkCoordinator;
     private final UserService userService;
     private final IdentityValidator identityValidator;
-    private final MockBankClient mockBankClient;
-    private final UserKeyRevoker userKeyRevoker;
 
     @Operation(
             summary = "계좌 연동 시작",
@@ -176,18 +169,11 @@ public class AccountLinkFlowController {
         List<Long> ids;
 
         try {
-            ids =
-                    Arrays.stream(
-                                    accountIds.split(",")
-                            )
-                            .map(String::trim)
-                            .filter(
-                                    token ->
-                                            !token.isEmpty()
-                            )
-                            .map(Long::parseLong)
-                            .distinct()
-                            .toList();
+            ids = Arrays.stream(accountIds.split(","))
+                    .map(String::trim)
+                    .filter(token -> !token.isEmpty())
+                    .map(Long::parseLong)
+                    .toList();
         } catch (NumberFormatException e) {
             log.warn(
                     "[AccountLinkFlowController] accountIds 파싱 실패 - userId: {}, accountIds: {}",
@@ -208,131 +194,16 @@ public class AccountLinkFlowController {
             );
         }
 
-        /*
-         * completeLink 실패 시 최초 연동/재연동을
-         * 구분해 올바른 보상을 하기 위해
-         * confirm 이전에 미리 조회한다.
-         */
-        String previousUserKey =
-                userService
-                        .getUserKeyByUserId(
-                                userId
-                        );
-
+        if (userKey.isBlank() || ids.stream().anyMatch(id -> id <= 0)) {
+            return errorRedirect("계좌 연동 요청이 올바르지 않습니다.", state);
+        }
         try {
-            mockBankClient.confirmUserKey(
-                    userKey
-            );
-        } catch (Exception e) {
-            log.warn(
-                    "[AccountLinkFlowController] mock-bank confirm 실패 - userId: {}, userKey 앞 8자: {}",
-                    userId,
-                    userKey.substring(
-                            0,
-                            Math.min(
-                                    8,
-                                    userKey.length()
-                            )
-                    ),
-                    e
-            );
-
-            return errorRedirect(
-                    "계좌 연동에 실패했습니다.",
-                    state
-            );
+            accountLinkCoordinator.completeCallback(userId, state, userKey, ids);
+        } catch (DomainException e) {
+            log.warn("Account link failed - userId: {}, errorCode: {}", userId, e.getErrorCode());
+            return errorRedirect(e.getMessage(), state);
         }
-
-        try {
-            accountLinkService.completeLink(
-                    userId,
-                    userKey,
-                    ids
-            );
-        } catch (Exception e) {
-            compensateAfterCompleteLinkFailure(
-                    userId,
-                    userKey,
-                    previousUserKey
-            );
-
-            if (
-                    e instanceof DomainException
-                            domainException
-            ) {
-                log.warn(
-                        "[AccountLinkFlowController] 계좌 연동 실패 - userId: {}, accountIds: {}, errorCode: {}",
-                        userId,
-                        ids,
-                        domainException
-                                .getErrorCode()
-                );
-
-                return errorRedirect(
-                        "계좌 연동에 실패했습니다.",
-                        state
-                );
-            }
-
-            log.warn(
-                    "[AccountLinkFlowController] 계좌 연동 처리 중 예상치 못한 오류 발생 - userId: {}, accountIds: {}, message: {}",
-                    userId,
-                    ids,
-                    e.getMessage()
-            );
-
-            throw e;
-        }
-
-        return buildCompleteRedirect(
-                true,
-                null,
-                state
-        );
-    }
-
-    /**
-     * confirm(K2) 성공 후 completeLink가 실패했을 때
-     * mock-bank 상태를 정리한다.
-     *
-     * 최초 연동(previousUserKey == null)이었다면
-     * K2를 revoke하고,
-     * 재연동이었다면 mock-bank의 활성 키를
-     * K1으로 복원한다.
-     */
-    private void compensateAfterCompleteLinkFailure(
-            Long userId,
-            String newUserKey,
-            String previousUserKey
-    ) {
-        if (previousUserKey == null) {
-            userKeyRevoker.revokeBestEffort(
-                    CALLER,
-                    userId,
-                    newUserKey
-            );
-
-            return;
-        }
-
-        try {
-            mockBankClient.restoreUserKey(
-                    newUserKey,
-                    previousUserKey
-            );
-
-            log.info(
-                    "[AccountLinkFlowController] 재연동 실패로 mock-bank 활성 키를 이전 키로 복원 완료 - userId: {}",
-                    userId
-            );
-        } catch (Exception e) {
-            log.error(
-                    "[AccountLinkFlowController] mock-bank 이전 키 복원 실패 - userId: {}. "
-                            + "mock-bank에 새 키가 ACTIVE 상태로 남아있을 수 있어 수동 확인이 필요합니다.",
-                    userId,
-                    e
-            );
-        }
+        return buildCompleteRedirect(true, null, state);
     }
 
     private String errorRedirect(

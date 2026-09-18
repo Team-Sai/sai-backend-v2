@@ -6,12 +6,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.dto.response.LinkableAccountResponse;
-import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -23,7 +24,7 @@ public class ExternalBankService {
 
     private final MockBankClient mockBankClient;
     private final UserService userService;
-    private final LinkedBankAccountMapper linkedBankAccountMapper;
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
 
     public List<LinkableAccountResponse> fetchAvailableAccountsFromBank(Long userId) {
         String userKey = userService.getUserKeyByUserId(userId);
@@ -35,11 +36,9 @@ public class ExternalBankService {
             throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
         }
 
-        Set<Long> linkedMockAccountIds = linkedBankAccountMapper
-                .selectLinkedAccountsByUserId(userId)
-                .stream()
-                .map(LinkedBankAccountDTO::getAccountId)
-                .collect(Collectors.toSet());
+        Set<Long> linkedMockAccountIds = new HashSet<>(
+                linkedBankAccountRepository.findAccountIdsByUserId(userId)
+        );
 
         return allAccounts.stream()
                 .filter(account -> !linkedMockAccountIds.contains(account.accountId()))
@@ -47,12 +46,8 @@ public class ExternalBankService {
     }
 
     public AccountDetailResponse getAccountDetail(Long accountId, Long userId) {
-        boolean owns = linkedBankAccountMapper
-                .selectLinkedAccountsByUserId(userId)
-                .stream()
-                .anyMatch(linked -> linked.getAccountId().equals(accountId));
-
-        if (!owns) {
+        if (!linkedBankAccountRepository
+                .existsByUserIdAndAccountId(userId, accountId)) {
             throw AccountErrorCode.ACCOUNT_ACCESS_DENIED.toException();
         }
 

@@ -38,7 +38,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** Real security filter and exception handler; token cryptography and service mocked. */
 @WebMvcTest(IdentityController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, JwtAuthenticationEntryPoint.class,
         IdentityControllerTest.TestSecurity.class})
@@ -56,7 +55,6 @@ class IdentityControllerTest {
 
     @BeforeEach
     void setUp() {
-        // Register the security chain once, with JwtAuthenticationFilter at its configured position.
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
