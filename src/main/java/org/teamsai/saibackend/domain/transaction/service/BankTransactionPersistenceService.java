@@ -55,17 +55,8 @@ public class BankTransactionPersistenceService {
                         BankTransactionResponse::transactionId))
                 .orElseThrow();
 
-        if (latestTransaction.balanceAfter() != null) {
-            linkedBankAccountRepository.updateBalance(
-                    linkedAccountId,
-                    latestTransaction.balanceAfter()
-            );
-        }
-
-        linkedBankAccountRepository.updateLastSyncedTransactionId(
-                linkedAccountId,
-                latestTransaction.transactionId()
-        );
+        linkedBankAccountRepository.advanceCursorAndBalance(
+                linkedAccountId, latestTransaction.transactionId(), latestTransaction.balanceAfter());
 
         // 신규 INSERT 수가 아니라 중복 거래를 포함한 이번 요청의 처리 대상 수다.
         return transactions.size();
@@ -87,6 +78,9 @@ public class BankTransactionPersistenceService {
 
     private BankTransactionType toTransactionType(Long linkedAccountId, BankTransactionResponse tx) {
         try {
+            if (tx.transactionType() == null) {
+                throw new IllegalArgumentException("Missing transaction type");
+            }
             return switch (tx.transactionType()) {
                 case "DEPOSIT" -> BankTransactionType.DEPOSIT;
                 case "WITHDRAW", "WITHDRAWAL" -> BankTransactionType.WITHDRAWAL;

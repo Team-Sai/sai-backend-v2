@@ -54,6 +54,19 @@ public interface LinkedBankAccountRepository extends JpaRepository<LinkedBankAcc
     @Modifying
     @Query("""
         update LinkedBankAccount a
+        set a.lastSyncedTransactionId = :transactionId,
+            a.balance = coalesce(:balance, a.balance),
+            a.updatedAt = CURRENT_TIMESTAMP
+        where a.linkedAccountId = :linkedAccountId
+          and (a.lastSyncedTransactionId is null or a.lastSyncedTransactionId < :transactionId)
+        """)
+    int advanceCursorAndBalance(@Param("linkedAccountId") Long linkedAccountId,
+                                @Param("transactionId") Long transactionId,
+                                @Param("balance") BigDecimal balance);
+
+    @Modifying
+    @Query("""
+        update LinkedBankAccount a
         set a.balance = :balance,
             a.updatedAt = CURRENT_TIMESTAMP
         where a.linkedAccountId = :linkedAccountId

@@ -127,6 +127,7 @@ public class JwtTokenProvider {
                 );
 
         return Jwts.builder()
+                .id(java.util.UUID.randomUUID().toString())
                 .subject(String.valueOf(userId))
                 .claim(
                         CLAIM_PURPOSE,

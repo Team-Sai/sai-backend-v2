@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.List;
 public class LinkedBankAccountController {
 
     private final LinkedBankAccountService linkedBankAccountService;
+    private final AccountLinkCoordinator accountLinkCoordinator;
 
     @Operation(summary = "선택한 계좌들 등록", description = "사용자가 선택한 모의 은행 계좌들을 사이원장에 연동.")
     @PostMapping
@@ -34,7 +36,7 @@ public class LinkedBankAccountController {
             @Valid @RequestBody LinkAccountRequest request
     ) {
         List<LinkedBankAccountResponse> responses =
-                linkedBankAccountService.linkSelectedAccounts(userDetails.getUserId(), request)
+                accountLinkCoordinator.linkSelectedAccounts(userDetails.getUserId(), request)
                         .stream()
                         .map(LinkedBankAccountResponse::from)
                         .toList();

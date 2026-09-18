@@ -3,7 +3,6 @@ package org.teamsai.saibackend.domain.account.service;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
@@ -30,6 +29,7 @@ public class LinkedBankAccountService {
     private final UserService userService;
     private final MockBankClient mockBankClient;
     private final EntityManager entityManager;
+    private final LinkedAccountWriter linkedAccountWriter;
 
     public List<LinkedBankAccount> linkSelectedAccounts(
             Long userId,
@@ -51,7 +51,7 @@ public class LinkedBankAccountService {
                 ))
                 .toList();
 
-        return insertAllSkippingDuplicates(candidates);
+        return linkedAccountWriter.insertAll(candidates);
     }
 
     public List<LinkedBankAccount> linkAccountsByIds(
@@ -59,6 +59,10 @@ public class LinkedBankAccountService {
             String userKey,
             List<Long> accountIds
     ) {
+        return linkedAccountWriter.insertAll(prepareAccountsByIds(userId, userKey, accountIds));
+    }
+
+    public List<LinkedBankAccount> prepareAccountsByIds(Long userId, String userKey, List<Long> accountIds) {
         Set<Long> alreadyLinkedIds =
                 new HashSet<>(getLinkedAccountIds(userId));
 
@@ -72,6 +76,7 @@ public class LinkedBankAccountService {
                     AccountDetailResponse detail =
                             fetchAccountDetail(accountId, userKey);
 
+                    validateAccountDetail(detail, accountId);
                     return toLinkedAccount(
                             userId,
                             accountId,
@@ -81,7 +86,7 @@ public class LinkedBankAccountService {
                 })
                 .toList();
 
-        return insertAllSkippingDuplicates(candidates);
+        return candidates;
     }
 
     @Transactional(readOnly = true)
@@ -152,36 +157,6 @@ public class LinkedBankAccountService {
                 );
     }
 
-    private List<LinkedBankAccount> insertAllSkippingDuplicates(
-            List<LinkedBankAccount> candidates
-    ) {
-        List<LinkedBankAccount> savedEntities = new ArrayList<>();
-
-        for (LinkedBankAccount candidate : candidates) {
-            try {
-                linkedBankAccountRepository.insertOne(candidate);
-
-                LinkedBankAccount saved =
-                        linkedBankAccountRepository
-                                .findByUserIdAndAccountId(
-                                        candidate.getUserId(),
-                                        candidate.getAccountId()
-                                )
-                                .orElseThrow();
-
-                savedEntities.add(saved);
-
-            } catch (DuplicateKeyException e) {
-                log.info(
-                        "[LinkedBankAccountService] 이미 연동된 계좌라 저장을 건너뜁니다 - accountId: {}",
-                        candidate.getAccountId()
-                );
-            }
-        }
-
-        return savedEntities;
-    }
-
     private AccountDetailResponse fetchAccountDetail(
             Long accountId,
             String userKey
@@ -244,6 +219,7 @@ public class LinkedBankAccountService {
             Long accountId
     ) {
         if (detail == null
+                || !Objects.equals(detail.accountId(), accountId)
                 || isBlank(detail.bankCode())
                 || isBlank(detail.maskedAccountNumber())
                 || isBlank(detail.accountHolderName())
