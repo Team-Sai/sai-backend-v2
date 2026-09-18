@@ -14,7 +14,7 @@ import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowR
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.service.DashboardService;
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
@@ -26,6 +26,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardServiceTest {
@@ -64,7 +65,7 @@ class DashboardServiceTest {
     void getDashboard_calculatesAmountsCorrectly() {
         LoanContractResponse borrowedContract = buildContract(20L, null, ContractStatus.COMPLETED, "차량구입", 3L, 1L);
 
-        List<RepaymentScheduleDTO> schedules = List.of(
+        List<RepaymentScheduleWithRemainingProjection> schedules = List.of(
                 buildSchedule(RepaymentScheduleStatus.PAID, 500_000, LocalDate.now().minusMonths(1)),
                 buildSchedule(RepaymentScheduleStatus.PENDING, 600_000, LocalDate.now()),
                 buildSchedule(RepaymentScheduleStatus.PENDING, 650_000, LocalDate.now().plusMonths(1))
@@ -89,10 +90,10 @@ class DashboardServiceTest {
         );
 
         when(loanContractService.findContractsByUser(USER_ID)).thenReturn(List.of(contract));
+        RepaymentScheduleWithRemainingProjection writtenOffSchedule =
+                buildSchedule(RepaymentScheduleStatus.WRITTEN_OFF, 500_000, LocalDate.now());
         when(repaymentScheduleService.getSchedulesByContractIds(List.of(22L)))
-                .thenReturn(Map.of(22L, List.of(
-                        buildSchedule(RepaymentScheduleStatus.WRITTEN_OFF, 500_000, LocalDate.now())
-                )));
+                .thenReturn(Map.of(22L, List.of(writtenOffSchedule)));
 
         DashboardResponse response = dashboardService.getDashboard(
                 USER_ID, null, "ALL", null, null, 1
@@ -107,13 +108,11 @@ class DashboardServiceTest {
         LoanContractResponse contract = buildContract(
                 21L, null, ContractStatus.COMPLETED, "부분납부계약", 3L, 1L
         );
-        RepaymentScheduleDTO schedule = RepaymentScheduleDTO.builder()
-                .status(RepaymentScheduleStatus.PENDING)
-                .totalPaymentDue(BigDecimal.valueOf(50_000))
-                .remainingPrincipal(BigDecimal.valueOf(50_000))
-                .dueDate(LocalDate.now())
-                .remainingPaymentAmount(BigDecimal.valueOf(20_000))
-                .build();
+        RepaymentScheduleWithRemainingProjection schedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        when(schedule.getStatus()).thenReturn(RepaymentScheduleStatus.PENDING);
+        when(schedule.getTotalPaymentDue()).thenReturn(BigDecimal.valueOf(50_000));
+        when(schedule.getDueDate()).thenReturn(LocalDate.now());
+        when(schedule.getRemainingPaymentAmount()).thenReturn(BigDecimal.valueOf(20_000));
 
         when(loanContractService.findContractsByUser(USER_ID))
                 .thenReturn(List.of(contract));
@@ -136,10 +135,14 @@ class DashboardServiceTest {
 
         when(loanContractService.findContractsByUser(USER_ID))
                 .thenReturn(List.of(lentContract, borrowedContract));
+        RepaymentScheduleWithRemainingProjection lentSchedule =
+                buildSchedule(RepaymentScheduleStatus.PENDING, 200_000, LocalDate.now().plusMonths(1));
+        RepaymentScheduleWithRemainingProjection borrowedSchedule =
+                buildSchedule(RepaymentScheduleStatus.PENDING, 1_250_000, LocalDate.now());
         when(repaymentScheduleService.getSchedulesByContractIds(List.of(30L, 31L)))
                 .thenReturn(Map.of(
-                        30L, List.of(buildSchedule(RepaymentScheduleStatus.PENDING, 200_000, LocalDate.now().plusMonths(1))),
-                        31L, List.of(buildSchedule(RepaymentScheduleStatus.PENDING, 1_250_000, LocalDate.now()))
+                        30L, List.of(lentSchedule),
+                        31L, List.of(borrowedSchedule)
                 ));
 
         DashboardResponse response = dashboardService.getDashboard(USER_ID, null, "ALL", null, null, 1);
@@ -191,10 +194,14 @@ class DashboardServiceTest {
 
         when(loanContractService.findContractsByUser(USER_ID)).thenReturn(List.of(small, large));
 
+        RepaymentScheduleWithRemainingProjection smallSchedule =
+                buildSchedule(RepaymentScheduleStatus.PENDING, 100_000, LocalDate.now());
+        RepaymentScheduleWithRemainingProjection largeSchedule =
+                buildSchedule(RepaymentScheduleStatus.PENDING, 9_000_000, LocalDate.now());
         when(repaymentScheduleService.getSchedulesByContractIds(List.of(60L, 61L)))
                 .thenReturn(Map.of(
-                        60L, List.of(buildSchedule(RepaymentScheduleStatus.PENDING, 100_000, LocalDate.now())),
-                        61L, List.of(buildSchedule(RepaymentScheduleStatus.PENDING, 9_000_000, LocalDate.now()))
+                        60L, List.of(smallSchedule),
+                        61L, List.of(largeSchedule)
                 ));
         DashboardResponse response = dashboardService.getDashboard(USER_ID, null, "ALL", null, "AMOUNT_DESC", 1);
 
@@ -231,7 +238,7 @@ class DashboardServiceTest {
         LoanContractResponse contract = buildContract(
                 62L, null, ContractStatus.COMPLETED, "통합 대시보드 계약", 1L, 2L
         );
-        RepaymentScheduleDTO schedule = buildSchedule(
+        RepaymentScheduleWithRemainingProjection schedule = buildSchedule(
                 RepaymentScheduleStatus.PENDING, 500_000, LocalDate.now()
         );
         when(loanContractService.findContractsByUser(USER_ID)).thenReturn(List.of(contract));
@@ -293,13 +300,12 @@ class DashboardServiceTest {
                 .build();
     }
 
-    private RepaymentScheduleDTO buildSchedule(RepaymentScheduleStatus status, long amount, LocalDate dueDate) {
-        return RepaymentScheduleDTO.builder()
-                .status(status)
-                .totalPaymentDue(BigDecimal.valueOf(amount))
-                .remainingPrincipal(BigDecimal.valueOf(amount))
-                .dueDate(dueDate)
-                .build();
+    private RepaymentScheduleWithRemainingProjection buildSchedule(RepaymentScheduleStatus status, long amount, LocalDate dueDate) {
+        RepaymentScheduleWithRemainingProjection schedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(schedule.getStatus()).thenReturn(status);
+        lenient().when(schedule.getTotalPaymentDue()).thenReturn(BigDecimal.valueOf(amount));
+        lenient().when(schedule.getDueDate()).thenReturn(dueDate);
+        return schedule;
     }
 
     @Test
@@ -344,11 +350,14 @@ class DashboardServiceTest {
         when(loanContractService.findContractsByUser(USER_ID))
                 .thenReturn(List.of(lentContract, borrowedContract));
 
+        RepaymentScheduleWithRemainingProjection lentSchedule =
+                buildSchedule(RepaymentScheduleStatus.PENDING, 5_000_000, LocalDate.now());
+        RepaymentScheduleWithRemainingProjection borrowedSchedule =
+                buildSchedule(RepaymentScheduleStatus.PENDING, 100_000, LocalDate.now());
         when(repaymentScheduleService.getSchedulesByContractIds(List.of(100L, 101L)))
                 .thenReturn(Map.of(
-                        100L, List.of(buildSchedule(RepaymentScheduleStatus.PENDING, 5_000_000, LocalDate.now())),
-                        101L, List.of(buildSchedule(RepaymentScheduleStatus.PENDING, 100_000, LocalDate.now()))
-
+                        100L, List.of(lentSchedule),
+                        101L, List.of(borrowedSchedule)
                 ));
 
         DashboardResponse response = dashboardService.getDashboard(USER_ID, null, "ALL", null, null, 1);
@@ -386,10 +395,10 @@ class DashboardServiceTest {
         LoanContractResponse contract = buildContract(120L, null, ContractStatus.COMPLETED, "완납계약", 1L, 2L);
 
         when(loanContractService.findContractsByUser(USER_ID)).thenReturn(List.of(contract));
+        RepaymentScheduleWithRemainingProjection paidSchedule =
+                buildSchedule(RepaymentScheduleStatus.PAID, 500_000, LocalDate.now().minusMonths(1));
         when(repaymentScheduleService.getSchedulesByContractIds(List.of(120L)))
-                .thenReturn(Map.of(120L, List.of(
-                        buildSchedule(RepaymentScheduleStatus.PAID, 500_000, LocalDate.now().minusMonths(1))
-                )));
+                .thenReturn(Map.of(120L, List.of(paidSchedule)));
 
         DashboardResponse response = dashboardService.getDashboard(USER_ID, null, "ALL", null, null, 1);
         DashboardContractRowResponse row = response.getContracts().get(0);
@@ -403,7 +412,7 @@ class DashboardServiceTest {
     void getDashboard_returnsOngoingWhenNoDueThisMonthButBalanceRemains() {
         LoanContractResponse contract = buildContract(120L, null, ContractStatus.COMPLETED, "이번달납부없음", 1L, 2L);
 
-        List<RepaymentScheduleDTO> schedules = List.of(
+        List<RepaymentScheduleWithRemainingProjection> schedules = List.of(
                 buildSchedule(RepaymentScheduleStatus.PENDING, 500_000, LocalDate.now().plusMonths(2))
         );
 

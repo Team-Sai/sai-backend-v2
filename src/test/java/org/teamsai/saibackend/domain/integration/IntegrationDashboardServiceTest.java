@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -139,20 +141,15 @@ class IntegrationDashboardServiceTest {
                 .status(ContractStatus.COMPLETED)
                 .build();
 
-        RepaymentScheduleDTO paidSchedule = RepaymentScheduleDTO.builder()
-                .scheduleId(100L)
-                .contractId(20L)
-                .dueDate(requestedMonth.atDay(1))
-                .status(RepaymentScheduleStatus.PAID)
-                .paidAt(LocalDateTime.of(requestedMonth.atDay(1), java.time.LocalTime.NOON))
-                .build();
+        RepaymentScheduleWithRemainingProjection paidSchedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(paidSchedule.getScheduleId()).thenReturn(100L);
+        lenient().when(paidSchedule.getDueDate()).thenReturn(requestedMonth.atDay(1));
+        lenient().when(paidSchedule.getStatus()).thenReturn(RepaymentScheduleStatus.PAID);
 
-        RepaymentScheduleDTO pendingSchedule = RepaymentScheduleDTO.builder()
-                .scheduleId(101L)
-                .contractId(20L)
-                .dueDate(upcomingDueDate)
-                .status(RepaymentScheduleStatus.PENDING)
-                .build();
+        RepaymentScheduleWithRemainingProjection pendingSchedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(pendingSchedule.getScheduleId()).thenReturn(101L);
+        lenient().when(pendingSchedule.getDueDate()).thenReturn(upcomingDueDate);
+        lenient().when(pendingSchedule.getStatus()).thenReturn(RepaymentScheduleStatus.PENDING);
 
         when(contractDashboardService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(
@@ -194,11 +191,11 @@ class IntegrationDashboardServiceTest {
                 .status(ContractStatus.COMPLETED)
                 .build();
 
-        RepaymentScheduleDTO dueInFourDays = schedule(104L, today.plusDays(4), RepaymentScheduleStatus.PENDING);
-        RepaymentScheduleDTO paidToday = schedule(105L, today, RepaymentScheduleStatus.PAID);
-        RepaymentScheduleDTO dueInThreeDays = schedule(103L, today.plusDays(3), RepaymentScheduleStatus.PENDING);
-        RepaymentScheduleDTO dueToday = schedule(100L, today, RepaymentScheduleStatus.PENDING);
-        RepaymentScheduleDTO overdue = schedule(99L, today.minusDays(1), RepaymentScheduleStatus.PENDING);
+        RepaymentScheduleWithRemainingProjection dueInFourDays = schedule(104L, today.plusDays(4), RepaymentScheduleStatus.PENDING);
+        RepaymentScheduleWithRemainingProjection paidToday = schedule(105L, today, RepaymentScheduleStatus.PAID);
+        RepaymentScheduleWithRemainingProjection dueInThreeDays = schedule(103L, today.plusDays(3), RepaymentScheduleStatus.PENDING);
+        RepaymentScheduleWithRemainingProjection dueToday = schedule(100L, today, RepaymentScheduleStatus.PENDING);
+        RepaymentScheduleWithRemainingProjection overdue = schedule(99L, today.minusDays(1), RepaymentScheduleStatus.PENDING);
 
         when(contractDashboardService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), contract, List.of(
@@ -418,17 +415,16 @@ class IntegrationDashboardServiceTest {
                 .build();
     }
 
-    private RepaymentScheduleDTO schedule(
+    private RepaymentScheduleWithRemainingProjection schedule(
             Long scheduleId,
             LocalDate dueDate,
             RepaymentScheduleStatus status
     ) {
-        return RepaymentScheduleDTO.builder()
-                .scheduleId(scheduleId)
-                .contractId(20L)
-                .dueDate(dueDate)
-                .status(status)
-                .build();
+        RepaymentScheduleWithRemainingProjection schedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(schedule.getScheduleId()).thenReturn(scheduleId);
+        lenient().when(schedule.getDueDate()).thenReturn(dueDate);
+        lenient().when(schedule.getStatus()).thenReturn(status);
+        return schedule;
     }
 
     private DashboardResponse emptyContractDashboard() {
@@ -444,13 +440,13 @@ class IntegrationDashboardServiceTest {
     private DashboardService.IntegrationDashboardData loanData(
             DashboardResponse dashboard,
             LoanContractResponse contract,
-            List<RepaymentScheduleDTO> schedules
+            List<RepaymentScheduleWithRemainingProjection> schedules
     ) {
         List<DashboardService.LoanScheduleContext> contexts = contract == null
                 ? List.of()
                 : schedules.stream()
-                        .map(schedule -> new DashboardService.LoanScheduleContext(contract, schedule))
-                        .toList();
+                .map(schedule -> new DashboardService.LoanScheduleContext(contract, schedule))
+                .toList();
         return new DashboardService.IntegrationDashboardData(dashboard, contexts);
     }
 }

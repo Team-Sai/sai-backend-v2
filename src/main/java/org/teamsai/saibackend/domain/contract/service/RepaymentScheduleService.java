@@ -5,13 +5,14 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.event.ContractCreatedEvent;
-import org.teamsai.saibackend.domain.contract.service.LoanContractService;
+import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
+import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
-import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.util.ScheduleGenerator;
 
@@ -30,13 +31,43 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class RepaymentScheduleService {
 
-    private final RepaymentScheduleMapper repaymentScheduleMapper;
+    private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final LoanContractService loanContractService;
 
     @EventListener
     @Transactional
     public void onContractCreated(ContractCreatedEvent event) {
         generateSchedule(event.contractId());
+    }
+
+    private RepaymentScheduleEntity toEntity(RepaymentScheduleDTO dto) {
+        return new RepaymentScheduleEntity(
+                dto.getContractId(),
+                dto.getSequence(),
+                dto.getDueDate(),
+                dto.getPrincipalDue(),
+                dto.getInterestDue(),
+                dto.getTotalPaymentDue(),
+                dto.getRemainingPrincipal(),
+                dto.getStatus(),
+                dto.getCreatedAt()
+        );
+    }
+
+    private RepaymentScheduleDTO toDTO(RepaymentScheduleEntity entity) {
+        return RepaymentScheduleDTO.builder()
+                .scheduleId(entity.getScheduleId())
+                .contractId(entity.getContractId())
+                .sequence(entity.getSequence())
+                .dueDate(entity.getDueDate())
+                .principalDue(entity.getPrincipalDue())
+                .interestDue(entity.getInterestDue())
+                .totalPaymentDue(entity.getTotalPaymentDue())
+                .remainingPrincipal(entity.getRemainingPrincipal())
+                .status(entity.getStatus())
+                .paidAt(entity.getPaidAt())
+                .createdAt(entity.getCreatedAt())
+                .build();
     }
 
     @Transactional
@@ -59,35 +90,44 @@ public class RepaymentScheduleService {
                     contractId, contract.getPrincipalAmount(), contract.getInterestRate(), months, contract.getStartDate());
         };
 
-        repaymentScheduleMapper.insertAll(schedules);
+        List<RepaymentScheduleEntity> entities = schedules.stream()
+                .map(this::toEntity)
+                .toList();
+        repaymentScheduleRepository.saveAll(entities);
     }
 
-    public List<RepaymentScheduleDTO> getSchedule(Long contractId) {
-        return repaymentScheduleMapper.findByContractId(contractId);
+    public List<RepaymentScheduleEntity> getSchedule(Long contractId) {
+        return repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId);
     }
 
-    public Optional<RepaymentScheduleDTO> findNextPendingSchedule(Long contractId) {
-        return repaymentScheduleMapper.findEarliestPendingByContractId(contractId);
+    public Optional<RepaymentScheduleEntity> findNextPendingSchedule(Long contractId) {
+        return repaymentScheduleRepository.findFirstByContractIdAndStatusInOrderBySequenceAsc(
+                contractId, List.of(RepaymentScheduleStatus.PENDING, RepaymentScheduleStatus.OVERDUE)
+        );
     }
 
     @Transactional
     public void markAsPaid(Long scheduleId, LocalDateTime paidAt) {
-        repaymentScheduleMapper.updateStatusToPaid(scheduleId, paidAt);
+        RepaymentScheduleEntity schedule = repaymentScheduleRepository.findByIdForUpdate(scheduleId)
+                .orElseThrow(RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND::toException);
+        schedule.fullPayment(paidAt);
+        repaymentScheduleRepository.save(schedule);
+
     }
 
     public RepaymentScheduleSummaryResponse getScheduleSummary(Long contractId, Long userId) {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
 
-        List<RepaymentScheduleDTO> schedules = repaymentScheduleMapper.findByContractId(contractId);
+        List<RepaymentScheduleEntity> schedules = repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId);
 
         BigDecimal totalScheduledAmount = schedules.stream()
-                .map(RepaymentScheduleDTO::getTotalPaymentDue)
+                .map(RepaymentScheduleEntity::getTotalPaymentDue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal paidAmount = schedules.stream()
                 .filter(s -> s.getStatus() == RepaymentScheduleStatus.PAID)
-                .map(RepaymentScheduleDTO::getTotalPaymentDue)
+                .map(RepaymentScheduleEntity::getTotalPaymentDue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal remainingAmount = totalScheduledAmount.subtract(paidAmount);
@@ -97,9 +137,9 @@ public class RepaymentScheduleService {
                 .count();
         int totalCount = schedules.size();
 
-        Optional<RepaymentScheduleDTO> nextduedate = findNextPendingSchedule(contractId);
+        Optional<RepaymentScheduleEntity> nextduedate = findNextPendingSchedule(contractId);
         LocalDate nextDueDate = nextduedate
-                .map(RepaymentScheduleDTO::getDueDate)
+                .map(RepaymentScheduleEntity::getDueDate)
                 .orElse(null);
 
         List<RepaymentScheduleResponse> scheduleResponses = schedules.stream()
@@ -121,21 +161,21 @@ public class RepaymentScheduleService {
 
     @Transactional
     public void generateChangedSchedule(Long v1ContractId, Long v2ContractId) {
-        List<RepaymentScheduleDTO> v1Schedules = repaymentScheduleMapper.findByContractId(v1ContractId);
+        List<RepaymentScheduleEntity> v1Schedules = repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(v1ContractId);
 
-        Optional<RepaymentScheduleDTO> lastPaid = v1Schedules.stream()
+        Optional<RepaymentScheduleEntity> lastPaid = v1Schedules.stream()
                 .filter(s -> s.getStatus() == RepaymentScheduleStatus.PAID)
-                .max(Comparator.comparing(RepaymentScheduleDTO::getSequence));
+                .max(Comparator.comparing(RepaymentScheduleEntity::getSequence));
 
         LoanContractResponse v1 = loanContractService.getContractForInternalUse(v1ContractId);
         LoanContractResponse v2 = loanContractService.getContractForInternalUse(v2ContractId);
 
-        BigDecimal openingPrincipal = lastPaid.map(RepaymentScheduleDTO::getRemainingPrincipal)
+        BigDecimal openingPrincipal = lastPaid.map(RepaymentScheduleEntity::getRemainingPrincipal)
                 .orElse(v1.getPrincipalAmount());
-        LocalDate baseDate = lastPaid.map(RepaymentScheduleDTO::getDueDate)
+        LocalDate baseDate = lastPaid.map(RepaymentScheduleEntity::getDueDate)
                 .orElse(v1.getStartDate());
 
-        repaymentScheduleMapper.deletePendingByContractId(v1ContractId);
+        repaymentScheduleRepository.deleteByContractIdAndStatus(v1ContractId, RepaymentScheduleStatus.PENDING);
 
         Period period = Period.between(baseDate, v2.getMaturityDate());
         int months = period.getYears() * 12 + period.getMonths();
@@ -153,21 +193,26 @@ public class RepaymentScheduleService {
                     v2ContractId, openingPrincipal, v2.getInterestRate(), months, baseDate);
         };
 
-        repaymentScheduleMapper.insertAll(newSchedules);
+        List<RepaymentScheduleEntity> newEntities = newSchedules.stream()
+                        .map(this::toEntity)
+                        .toList();
+
+        repaymentScheduleRepository.saveAll(newEntities);
     }
 
     public RepaymentScheduleDTO getScheduleByScheduleId(Long scheduleId) {
-        return repaymentScheduleMapper.findById(scheduleId)
+        RepaymentScheduleEntity entity = repaymentScheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND.toException());
+        return toDTO(entity);
     }
 
-    public Map<Long, List<RepaymentScheduleDTO>> getSchedulesByContractIds(List<Long> contractIds) {
+    public Map<Long, List<RepaymentScheduleWithRemainingProjection>> getSchedulesByContractIds(List<Long> contractIds) {
         if (contractIds == null || contractIds.isEmpty()) {
             return Map.of();
         }
 
-        List<RepaymentScheduleDTO> all = repaymentScheduleMapper.findByContractIds(contractIds);
+        List<RepaymentScheduleWithRemainingProjection> all = repaymentScheduleRepository.findByContractIds(contractIds);
         return all.stream()
-                .collect(Collectors.groupingBy(RepaymentScheduleDTO::getContractId));
+                .collect(Collectors.groupingBy(RepaymentScheduleWithRemainingProjection::getContractId));
     }
 }
