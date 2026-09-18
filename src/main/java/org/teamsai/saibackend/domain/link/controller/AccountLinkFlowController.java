@@ -169,18 +169,11 @@ public class AccountLinkFlowController {
         List<Long> ids;
 
         try {
-            ids =
-                    Arrays.stream(
-                                    accountIds.split(",")
-                            )
-                            .map(String::trim)
-                            .filter(
-                                    token ->
-                                            !token.isEmpty()
-                            )
-                            .map(Long::parseLong)
-                            .distinct()
-                            .toList();
+            ids = Arrays.stream(accountIds.split(","))
+                    .map(String::trim)
+                    .filter(token -> !token.isEmpty())
+                    .map(Long::parseLong)
+                    .toList();
         } catch (NumberFormatException e) {
             log.warn(
                     "[AccountLinkFlowController] accountIds 파싱 실패 - userId: {}, accountIds: {}",

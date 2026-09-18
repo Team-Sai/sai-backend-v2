@@ -15,14 +15,28 @@ public class UserLinkLock {
     private final DataSource dataSource;
     private final Semaphore slots;
 
-    public UserLinkLock(DataSource dataSource,
-                        @Value("${spring.datasource.hikari.maximum-pool-size:10}") int poolSize) {
+    public UserLinkLock(
+            DataSource dataSource,
+            @Value("${spring.datasource.hikari.maximum-pool-size:10}")
+            int poolSize,
+            @Value("${account-link.max-concurrent}")
+            int maxConcurrent
+    ) {
         if (poolSize < 2) {
-            throw new IllegalArgumentException("계좌 연동에는 최소 2개의 DB 연결이 필요합니다.");
+            throw new IllegalArgumentException(
+                    "계좌 연동에는 최소 2개의 DB 연결이 필요합니다."
+            );
         }
-        this.dataSource = dataSource;
 
-        this.slots = new Semaphore(poolSize / 2);
+        // 연동 작업 하나가 잠금용 커넥션과 업무용 커넥션을 사용한다.
+        if (maxConcurrent < 1 || maxConcurrent > poolSize / 2) {
+            throw new IllegalArgumentException(
+                    "계좌 연동 동시 실행 수는 1 이상, DB 풀 크기의 절반 이하여야 합니다."
+            );
+        }
+
+        this.dataSource = dataSource;
+        this.slots = new Semaphore(maxConcurrent);
     }
 
     public <T> T execute(Long userId, Supplier<T> action) {

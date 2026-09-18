@@ -106,6 +106,13 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    /**
+     * 계좌 연동용 state JWT를 생성한다.
+     *
+     * identity-hash는 mock-bank의 validateExpectedIdentity()에서
+     * 서비스 사용자와 은행 로그인 사용자의 명의 일치 여부를 검증하는 데 사용한다.
+     * 양쪽 서버는 동일한 해시 생성 규칙과 link-identity.hash-secret을 사용해야 한다.
+     */
     public String createLinkStateToken(
             Long userId,
             String name,
@@ -125,7 +132,8 @@ public class JwtTokenProvider {
                         birthDate,
                         linkIdentityHashSecret
                 );
-
+        // 연동 시작마다 서로 다른 state를 생성한다.
+        // Coordinator는 state 전체의 해시를 작업 ID로 사용하여 중복 콜백을 구분한다.
         return Jwts.builder()
                 .id(java.util.UUID.randomUUID().toString())
                 .subject(String.valueOf(userId))

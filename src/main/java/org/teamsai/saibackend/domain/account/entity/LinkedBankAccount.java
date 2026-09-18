@@ -10,7 +10,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name="linked_bank_account")
+@Table(
+        name = "linked_bank_account",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_user_account",
+                columnNames = {"user_id", "account_id"}
+        )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LinkedBankAccount {

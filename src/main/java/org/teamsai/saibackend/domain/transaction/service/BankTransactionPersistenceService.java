@@ -54,10 +54,17 @@ public class BankTransactionPersistenceService {
                 .max(Comparator.comparing(
                         BankTransactionResponse::transactionId))
                 .orElseThrow();
+        int updated = linkedBankAccountRepository.advanceCursorAndBalance(
+                linkedAccountId,
+                latestTransaction.transactionId(),
+                latestTransaction.balanceAfter()
+        );
 
-        linkedBankAccountRepository.advanceCursorAndBalance(
-                linkedAccountId, latestTransaction.transactionId(), latestTransaction.balanceAfter());
-
+        if (updated == 0
+                && !linkedBankAccountRepository.existsById(linkedAccountId)) {
+            throw AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException();
+        }
+        
         // 신규 INSERT 수가 아니라 중복 거래를 포함한 이번 요청의 처리 대상 수다.
         return transactions.size();
     }

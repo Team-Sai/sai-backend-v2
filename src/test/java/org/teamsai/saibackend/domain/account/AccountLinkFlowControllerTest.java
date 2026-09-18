@@ -33,12 +33,12 @@ class AccountLinkFlowControllerTest {
  @MockitoBean IdentityValidator identityValidator;
  @MockitoBean JwtAuthenticationFilter jwtAuthenticationFilter;
  @MockitoBean JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
- @Test void validCallbackDeduplicatesAndRedirects() throws Exception {
+ @Test void validCallbackParsesAndRedirects() throws Exception {
   when(jwtTokenProvider.getUserIdFromLinkState("state")).thenReturn(Optional.of(1L));
   mvc.perform(get("/accounts/link/callback").param("state","state").param("userKey","key")
     .param("accountIds","1, 2,1")).andExpect(status().is3xxRedirection())
     .andExpect(redirectedUrl("http://localhost:5173/link/complete?success=true&state=state"));
-  verify(coordinator).completeCallback(1L,"state","key",List.of(1L,2L));
+  verify(coordinator).completeCallback(1L,"state","key",List.of(1L,2L,1L));
  }
  @Test void invalidStateDoesNotChangeBank() throws Exception {
   when(jwtTokenProvider.getUserIdFromLinkState("bad")).thenReturn(Optional.empty());

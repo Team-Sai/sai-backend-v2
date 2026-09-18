@@ -87,7 +87,7 @@ class ExternalBankServiceTest {
             given(mockBankClient.getAccountsByUserKey(USER_KEY))
                     .willReturn(List.of(account1, account2));
 
-            given(linkedBankAccountRepository.findAllByUserId(USER_ID))
+            given(linkedBankAccountRepository.findAccountIdsByUserId(USER_ID))
                     .willReturn(List.of());
 
             List<LinkableAccountResponse> result =
@@ -103,7 +103,7 @@ class ExternalBankServiceTest {
                     .getAccountsByUserKey(USER_KEY);
 
             verify(linkedBankAccountRepository)
-                    .findAllByUserId(USER_ID);
+                    .findAccountIdsByUserId(USER_ID);
         }
 
         @Test
@@ -115,7 +115,7 @@ class ExternalBankServiceTest {
             given(mockBankClient.getAccountsByUserKey(USER_KEY))
                     .willReturn(List.of());
 
-            given(linkedBankAccountRepository.findAllByUserId(USER_ID))
+            given(linkedBankAccountRepository.findAccountIdsByUserId(USER_ID))
                     .willReturn(List.of());
 
             List<LinkableAccountResponse> result =
@@ -135,8 +135,8 @@ class ExternalBankServiceTest {
 
             LinkedBankAccount linked = linkedAccount(account1.accountId());
 
-            given(linkedBankAccountRepository.findAllByUserId(USER_ID))
-                    .willReturn(List.of(linked));
+            given(linkedBankAccountRepository.findAccountIdsByUserId(USER_ID))
+                    .willReturn(List.of(linked.getAccountId()));
 
             List<LinkableAccountResponse> result =
                     externalBankService.fetchAvailableAccountsFromBank(USER_ID);
@@ -162,7 +162,7 @@ class ExternalBankServiceTest {
                     .isEqualTo(AccountErrorCode.BANK_SERVER_UNAVAILABLE);
 
             verify(linkedBankAccountRepository, never())
-                    .findAllByUserId(USER_ID);
+                    .findAccountIdsByUserId(USER_ID);
         }
     }
 
@@ -173,10 +173,10 @@ class ExternalBankServiceTest {
         @Test
         @DisplayName("본인이 연동한 계좌면 상세 정보를 정상적으로 반환한다")
         void returnsAccountDetailWhenOwned() {
-            LinkedBankAccount linked = linkedAccount(ACCOUNT_ID);
 
-            given(linkedBankAccountRepository.findAllByUserId(USER_ID))
-                    .willReturn(List.of(linked));
+
+            given(linkedBankAccountRepository.existsByUserIdAndAccountId(USER_ID, ACCOUNT_ID))
+                    .willReturn(true);
 
             given(userService.getUserKeyByUserId(USER_ID))
                     .willReturn(USER_KEY);
@@ -211,8 +211,8 @@ class ExternalBankServiceTest {
         @Test
         @DisplayName("본인이 연동하지 않은 계좌면 ACCOUNT_ACCESS_DENIED 예외를 던지고 조회하지 않는다")
         void throwsExceptionWhenNotOwned() {
-            given(linkedBankAccountRepository.findAllByUserId(USER_ID))
-                    .willReturn(List.of());
+            given(linkedBankAccountRepository.existsByUserIdAndAccountId(USER_ID, ACCOUNT_ID))
+                    .willReturn(false);
 
             assertThatThrownBy(() ->
                     externalBankService.getAccountDetail(
@@ -234,10 +234,10 @@ class ExternalBankServiceTest {
         @Test
         @DisplayName("계좌 상세 조회 실패 시 BANK_SERVER_UNAVAILABLE 예외를 던진다")
         void throwsExceptionWhenBankServerUnavailable() {
-            LinkedBankAccount linked = linkedAccount(ACCOUNT_ID);
 
-            given(linkedBankAccountRepository.findAllByUserId(USER_ID))
-                    .willReturn(List.of(linked));
+
+            given(linkedBankAccountRepository.existsByUserIdAndAccountId(USER_ID, ACCOUNT_ID))
+                    .willReturn(true);
 
             given(userService.getUserKeyByUserId(USER_ID))
                     .willReturn(USER_KEY);

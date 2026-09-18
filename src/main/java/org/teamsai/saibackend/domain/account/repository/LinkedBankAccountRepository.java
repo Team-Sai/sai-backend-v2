@@ -27,6 +27,15 @@ public interface LinkedBankAccountRepository extends JpaRepository<LinkedBankAcc
             Long accountId
     );
 
+    boolean existsByUserIdAndAccountId(Long userId, Long accountId);
+
+    @Query("""
+        select a.accountId
+        from LinkedBankAccount a
+        where a.userId = :userId
+        """)
+    List<Long> findAccountIdsByUserId(@Param("userId") Long userId);
+
     @Query("""
             select a.lastSyncedTransactionId
             from LinkedBankAccount a

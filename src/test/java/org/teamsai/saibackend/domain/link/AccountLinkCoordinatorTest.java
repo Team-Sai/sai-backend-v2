@@ -95,8 +95,9 @@ class AccountLinkCoordinatorTest {
                     receipt.previousKey(), receipt.newKey(), COMPLETED);
             throw new IllegalStateException("commit response lost");
         }).when(persistence).completeLink(anyLong(),anyString(),isNull(),anyList(),anyString());
-        coordinator.completeCallback(1L,"state","new",List.of(1L));
-        coordinator.completeCallback(1L,"state","new",List.of(1L));
+        coordinator.completeCallback(1L,"state","new",List.of(2L,1L,2L));
+        coordinator.completeCallback(1L,"state","new",List.of(1L,2L));
+        verify(accounts).prepareAccountsByIds(1L, "new", List.of(1L,2L));
         verify(bank,times(1)).confirmUserKey("new");
         verify(bank,never()).revokeUserKey(anyString());
     }

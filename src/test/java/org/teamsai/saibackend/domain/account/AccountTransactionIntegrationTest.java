@@ -48,6 +48,7 @@ import static org.mockito.Mockito.*;
         "spring.datasource.username=${SAI_ACCOUNT_TEST_DB_USER:root}",
         "spring.datasource.password=${SAI_ACCOUNT_TEST_DB_PASSWORD:account-test-only}",
         "spring.datasource.hikari.maximum-pool-size=10",
+        "account-link.max-concurrent=3",
         "spring.sql.init.mode=always",
         "spring.sql.init.schema-locations=classpath:db/user.sql,classpath:db/linked_bank_account.sql,classpath:db/account_link_operation.sql,classpath:db/bank_transaction.sql",
         "spring.jpa.hibernate.ddl-auto=none", "spring.jpa.open-in-view=false",
@@ -76,10 +77,43 @@ class AccountTransactionIntegrationTest {
     @Autowired UserLinkLock lock;
     @Autowired BankTransactionPersistenceService transactions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired UserService userService;
     @MockitoBean MockBankClient bank;
     Long userId;
     String state;
     String key;
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStore.Status.class,
+            names = {"COMPLETED", "FAILED"})
+    void withdrawalPreservesFinishedOperation(LinkOperationStore.Status status) {
+        operations.begin(new LinkOperationStore.Operation(state, userId, "request-hash", null, key,
+                LinkOperationStore.Status.PROCESSING));
+        operations.mark(state, status);
+
+        userService.withdraw(userId);
+
+        assertThat(users.existsById(userId)).isFalse();
+        assertThat(operations.find(state)).hasValueSatisfying(operation -> {
+            assertThat(operation.userId()).isEqualTo(userId);
+            assertThat(operation.status()).isEqualTo(status);
+        });
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStore.Status.class,
+            names = {"PROCESSING", "CONFIRM_UNKNOWN", "COMPENSATION_PENDING"})
+    void unresolvedOperationBlocksWithdrawal(LinkOperationStore.Status status) {
+        operations.begin(new LinkOperationStore.Operation(state, userId, "request-hash", null, key,
+                LinkOperationStore.Status.PROCESSING));
+        operations.mark(state, status);
+
+        assertError(() -> userService.withdraw(userId), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+
+        assertThat(users.existsById(userId)).isTrue();
+        assertThat(operations.find(state)).hasValueSatisfying(operation ->
+                assertThat(operation.status()).isEqualTo(status));
+    }
 
     @BeforeEach void fixture() {
         state = UUID.randomUUID().toString();
