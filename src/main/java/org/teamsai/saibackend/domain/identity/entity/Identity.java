@@ -8,10 +8,18 @@ import lombok.NoArgsConstructor;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
 
+import org.teamsai.saibackend.domain.user.entity.User;
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "identity")
+@Table(
+        name = "identity",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_identity_verification_id",
+                columnNames = "identity_verification_id"
+        )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Identity {
@@ -23,27 +31,32 @@ public class Identity {
 
     @Column(
             name = "identity_verification_id",
-            nullable = false
+            nullable = false,
+            length = 100
     )
     private String identityVerificationId;
 
-    @Column(
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
             name = "user_id",
-            nullable = false
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_identity_verification_user")
     )
-    private Long userId;
+    private User user;
 
     @Enumerated(EnumType.STRING)
     @Column(
             name = "purpose",
-            nullable = false
+            nullable = false,
+            length = 30
     )
     private IdentityPurpose purpose;
 
     @Enumerated(EnumType.STRING)
     @Column(
             name = "status",
-            nullable = false
+            nullable = false,
+            length = 20
     )
     private IdentityStatus status;
 
@@ -62,14 +75,14 @@ public class Identity {
     @Column(name = "used_at")
     private LocalDateTime usedAt;
 
-    @Column(name = "failure_reason")
+    @Column(name = "failure_reason", length = 255)
     private String failureReason;
 
     @Builder
     public Identity(
             Long identityId,
             String identityVerificationId,
-            Long userId,
+            User user,
             IdentityPurpose purpose,
             IdentityStatus status,
             LocalDateTime requestedAt,
@@ -82,8 +95,8 @@ public class Identity {
                 identityId;
         this.identityVerificationId =
                 identityVerificationId;
-        this.userId =
-                userId;
+        this.user =
+                user;
         this.purpose =
                 purpose;
         this.status =

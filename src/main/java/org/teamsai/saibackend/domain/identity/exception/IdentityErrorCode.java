@@ -41,11 +41,6 @@ public enum IdentityErrorCode
             "현재 상태에서는 본인인증을 완료할 수 없습니다."
     ),
 
-    IDENTITY_VERIFICATION_CREATE_FAILED(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "본인인증 요청 생성에 실패했습니다."
-    ),
-
     IDENTITY_VERIFICATION_UPDATE_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "본인인증 결과 저장에 실패했습니다."

@@ -2,9 +2,9 @@ package org.teamsai.saibackend.domain.identity.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.teamsai.saibackend.domain.identity.dto.IdentityDTO;
 import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityCompleteResponse;
@@ -46,6 +46,7 @@ public class IdentityService {
 
     private final PortOneIdentityService portOneIdentityService;
     private final IdentityValidator identityValidator;
+    private final IdentityStatusService identityStatusService;
 
     private final String storeId;
     private final String channelKey;
@@ -56,6 +57,7 @@ public class IdentityService {
             UserRepository userRepository,
             PortOneIdentityService portOneIdentityService,
             IdentityValidator identityValidator,
+            IdentityStatusService identityStatusService,
 
             @Value("${portone.identity.store-id}")
             String storeId,
@@ -70,6 +72,7 @@ public class IdentityService {
         this.userRepository = userRepository;
         this.portOneIdentityService = portOneIdentityService;
         this.identityValidator = identityValidator;
+        this.identityStatusService = identityStatusService;
 
         this.storeId = storeId;
         this.channelKey = channelKey;
@@ -92,7 +95,8 @@ public class IdentityService {
 
         Identity identity = Identity.builder()
                 .identityVerificationId(identityVerificationId)
-                .userId(userId)
+                .user(userRepository.getReferenceById(userId))
+
                 .purpose(request.purpose())
                 .status(IdentityStatus.REQUESTED)
                 .requestedAt(requestedAt)
@@ -107,6 +111,9 @@ public class IdentityService {
         );
     }
 
+    // 외부 API 호출은 트랜잭션 밖에서 수행한다.
+    // 상태 갱신은 IdentityStatusService에서 커밋한 뒤 결과 또는 예외를 반환한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public IdentityCompleteResponse complete(
             Long userId,
             String identityVerificationId
@@ -114,7 +121,7 @@ public class IdentityService {
         validateUserId(userId);
         validateIdentityVerificationId(identityVerificationId);
 
-        IdentityDTO identity =
+        Identity identity =
                 findIdentity(identityVerificationId);
 
         validateOwner(identity, userId);
@@ -201,7 +208,7 @@ public class IdentityService {
                 verifiedAt.plusMinutes(validMinutes);
 
         int updatedCount =
-                identityRepository.updateVerified(
+                identityStatusService.updateVerified(
                         identityVerificationId,
                         verifiedAt,
                         expiresAt
@@ -251,7 +258,7 @@ public class IdentityService {
         }
     }
 
-    private IdentityDTO findIdentity(
+    private Identity findIdentity(
             String identityVerificationId
     ) {
         Identity identity =
@@ -265,15 +272,15 @@ public class IdentityService {
                                         ::toException
                         );
 
-        return IdentityDTO.from(identity);
+        return identity;
     }
 
     private void validateOwner(
-            IdentityDTO identity,
+            Identity identity,
             Long userId
     ) {
         if (!Objects.equals(
-                identity.getUserId(),
+                identity.getUser().getUserId(),
                 userId
         )) {
             throw IdentityErrorCode
@@ -287,7 +294,7 @@ public class IdentityService {
             String failureReason
     ) {
         int updatedCount =
-                identityRepository.updateFailed(
+                identityStatusService.updateFailed(
                         identityVerificationId,
                         truncateFailureReason(failureReason)
                 );
@@ -360,7 +367,7 @@ public class IdentityService {
     }
 
     private IdentityCompleteResponse toCompleteResponse(
-            IdentityDTO identity
+            Identity identity
     ) {
         return new IdentityCompleteResponse(
                 identity.getIdentityVerificationId(),
