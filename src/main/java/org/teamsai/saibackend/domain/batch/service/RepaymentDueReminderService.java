@@ -51,7 +51,7 @@ public class RepaymentDueReminderService {
             }
 
             try {
-                notificationService.createIfAbsent(
+                notificationService.createIfAbsentInNewTransaction(
                         debtorUserId,
                         stage.type(),
                         stage.title(),
