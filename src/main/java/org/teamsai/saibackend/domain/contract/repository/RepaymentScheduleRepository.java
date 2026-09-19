@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.contract.repository;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -64,4 +65,10 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM RepaymentScheduleEntity r WHERE r.contractId = :contractId ORDER BY r.sequence Asc")
     List<RepaymentScheduleEntity> findByContractIdForUpdate(@Param("contractId")Long contractId);
+
+    @Modifying
+    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :status WHERE r.scheduleId IN :scheduleIds")
+    int updateStatusBulk(
+            @Param("scheduleIds") List<Long> scheduleIds,
+            @Param("status") RepaymentScheduleStatus status);
 }

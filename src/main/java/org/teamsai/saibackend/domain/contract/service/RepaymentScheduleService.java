@@ -215,4 +215,31 @@ public class RepaymentScheduleService {
         return all.stream()
                 .collect(Collectors.groupingBy(RepaymentScheduleWithRemainingProjection::getContractId));
     }
+
+    public List<Long> findWriteOffCandidateScheduleIds(LocalDate cutoffDate) {
+        return repaymentScheduleRepository
+                .findByStatusAndDueDateLessThanEqual(RepaymentScheduleStatus.OVERDUE, cutoffDate)
+                .stream()
+                .map(RepaymentScheduleEntity::getScheduleId)
+                .toList();
+    }
+
+    @Transactional
+    public int writeOffSchedules(List<Long> scheduleIds) {
+        return repaymentScheduleRepository.updateStatusBulk(scheduleIds, RepaymentScheduleStatus.WRITTEN_OFF);
+    }
+
+    @Transactional
+    public int markSchedulesOverdue(LocalDate baseDate) {
+        List<Long> candidateIds = repaymentScheduleRepository
+                .findByStatusAndDueDateBefore(RepaymentScheduleStatus.PENDING, baseDate)
+                .stream()
+                .map(RepaymentScheduleEntity::getScheduleId)
+                .toList();
+
+        if (candidateIds.isEmpty()) {
+            return 0;
+        }
+        return repaymentScheduleRepository.updateStatusBulk(candidateIds, RepaymentScheduleStatus.OVERDUE);
+    }
 }
