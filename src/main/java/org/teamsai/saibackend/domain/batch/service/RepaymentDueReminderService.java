@@ -50,15 +50,19 @@ public class RepaymentDueReminderService {
                 continue;
             }
 
-            notificationService.createIfAbsent(
-                    debtorUserId,
-                    stage.type(),
-                    stage.title(),
-                    stage.contentFor(schedule.getDueDate()),
-                    schedule.getScheduleId(),
-                    null
-            );
-            processed++;
+            try {
+                notificationService.createIfAbsent(
+                        debtorUserId,
+                        stage.type(),
+                        stage.title(),
+                        stage.contentFor(schedule.getDueDate()),
+                        schedule.getScheduleId(),
+                        null
+                );
+                processed++;
+            } catch (Exception e) {
+                log.error("[repaymentDueReminder] 알림 생성 실패, 다음 스케줄 계속 진행 scheduleId={}", schedule.getScheduleId(), e);
+            }
         }
         return processed;
     }

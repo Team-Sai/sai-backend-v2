@@ -67,8 +67,10 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
     List<RepaymentScheduleEntity> findByContractIdForUpdate(@Param("contractId")Long contractId);
 
     @Modifying
-    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :status WHERE r.scheduleId IN :scheduleIds")
+    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :status " +
+            "WHERE r.scheduleId IN :scheduleIds AND r.status = :expectedStatus")
     int updateStatusBulk(
             @Param("scheduleIds") List<Long> scheduleIds,
-            @Param("status") RepaymentScheduleStatus status);
+            @Param("status") RepaymentScheduleStatus status,
+            @Param("expectedStatus") RepaymentScheduleStatus expectedStatus);
 }

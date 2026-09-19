@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus.OVERDUE;
 
 @Slf4j
 @Service

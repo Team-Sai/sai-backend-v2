@@ -226,7 +226,8 @@ public class RepaymentScheduleService {
 
     @Transactional
     public int writeOffSchedules(List<Long> scheduleIds) {
-        return repaymentScheduleRepository.updateStatusBulk(scheduleIds, RepaymentScheduleStatus.WRITTEN_OFF);
+        return repaymentScheduleRepository.updateStatusBulk(
+                scheduleIds, RepaymentScheduleStatus.WRITTEN_OFF, RepaymentScheduleStatus.OVERDUE);
     }
 
     @Transactional
@@ -240,6 +241,7 @@ public class RepaymentScheduleService {
         if (candidateIds.isEmpty()) {
             return 0;
         }
-        return repaymentScheduleRepository.updateStatusBulk(candidateIds, RepaymentScheduleStatus.OVERDUE);
+        return repaymentScheduleRepository.updateStatusBulk(
+                candidateIds, RepaymentScheduleStatus.OVERDUE, RepaymentScheduleStatus.PENDING);
     }
 }
