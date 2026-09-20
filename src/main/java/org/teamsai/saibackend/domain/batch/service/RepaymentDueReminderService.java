@@ -5,10 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
-import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
-import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 
 import java.time.LocalDate;
@@ -20,12 +18,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RepaymentDueReminderService {
 
-    private final RepaymentScheduleRepository repaymentScheduleRepository;
-    private final LoanContractRepository loanContractRepository;
-    private final NotificationService notificationService;
+    private static final int FAILURE_THRESHOLD = 10;
 
-    @Transactional
-    public int sendDueReminders(LocalDate baseDate) {
+    private final RepaymentScheduleRepository repaymentScheduleRepository;
+    private final ReminderNotificationSender reminderNotificationSender;
+
+    public record ReminderResult(int processed, int skipped, int failed) {
+    }
+
+    @Transactional(readOnly = true)
+    public ReminderResult sendDueReminders(LocalDate baseDate) {
         List<LocalDate> targetDates = List.of(
                 baseDate.plusDays(3),
                 baseDate.plusDays(1),
@@ -36,35 +38,43 @@ public class RepaymentDueReminderService {
                 .findByDueDateInAndStatus(targetDates, RepaymentScheduleStatus.PENDING);
 
         int processed = 0;
+        int skipped = 0;
+        int failed = 0;
+
         for (RepaymentScheduleEntity schedule : schedules) {
             NotificationStage stage = resolveStage(schedule.getDueDate(), baseDate);
             if (stage == null) {
                 continue;
             }
 
-            Long debtorUserId = loanContractRepository
-                    .findDebtorUserIdByContractId(schedule.getContractId())
-                    .orElse(null);
-            if (debtorUserId == null) {
-                log.warn("[repaymentDueReminder] 채무자 조회 실패 - contractId={}", schedule.getContractId());
-                continue;
-            }
-
             try {
-                notificationService.createIfAbsentInNewTransaction(
-                        debtorUserId,
+                ReminderNotificationSender.Outcome outcome = reminderNotificationSender.sendOne(
+                        schedule.getContractId(),
+                        schedule.getScheduleId(),
                         stage.type(),
                         stage.title(),
-                        stage.contentFor(schedule.getDueDate()),
-                        schedule.getScheduleId(),
-                        null
+                        stage.contentFor(schedule.getDueDate())
                 );
-                processed++;
+
+                if (outcome == ReminderNotificationSender.Outcome.SKIPPED) {
+                    skipped++;
+                    log.warn("[repaymentDueReminder] 채무자 조회 실패 - contractId={}", schedule.getContractId());
+                } else {
+                    processed++;
+                }
             } catch (Exception e) {
+                failed++;
                 log.error("[repaymentDueReminder] 알림 생성 실패, 다음 스케줄 계속 진행 scheduleId={}", schedule.getScheduleId(), e);
+
+                if (failed > FAILURE_THRESHOLD) {
+                    throw new IllegalStateException(
+                            "리마인더 알림 실패 건수가 허용 임계값(%d)을 초과했습니다. failed=%d"
+                                    .formatted(FAILURE_THRESHOLD, failed), e);
+                }
             }
         }
-        return processed;
+
+        return new ReminderResult(processed, skipped, failed);
     }
 
     private NotificationStage resolveStage(LocalDate dueDate, LocalDate today) {

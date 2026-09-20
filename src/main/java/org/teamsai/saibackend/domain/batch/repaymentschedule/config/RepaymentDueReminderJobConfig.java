@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.batch.repaymentschedule.config;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -17,6 +18,7 @@ import org.teamsai.saibackend.domain.batch.service.RepaymentDueReminderService;
 
 import java.time.LocalDate;
 
+@Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class RepaymentDueReminderJobConfig {
@@ -43,8 +45,20 @@ public class RepaymentDueReminderJobConfig {
     private Tasklet repaymentDueReminderTasklet(RepaymentDueReminderService repaymentDueReminderService) {
         return (contribution, chunkContext) -> {
             LocalDate baseDate = resolveBaseDate(chunkContext);
-            int processed = repaymentDueReminderService.sendDueReminders(baseDate);
-            contribution.incrementWriteCount(processed);
+
+            RepaymentDueReminderService.ReminderResult result =
+                    repaymentDueReminderService.sendDueReminders(baseDate);
+
+            contribution.incrementWriteCount(result.processed());
+
+            var executionContext = contribution.getStepExecution().getExecutionContext();
+            executionContext.putInt("reminderProcessed", result.processed());
+            executionContext.putInt("reminderSkipped", result.skipped());
+            executionContext.putInt("reminderFailed", result.failed());
+
+            log.info("[repaymentDueReminderJob] processed={}, skipped={}, failed={}",
+                    result.processed(), result.skipped(), result.failed());
+
             return RepeatStatus.FINISHED;
         };
     }

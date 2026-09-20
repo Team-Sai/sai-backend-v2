@@ -217,11 +217,8 @@ public class RepaymentScheduleService {
     }
 
     public List<Long> findWriteOffCandidateScheduleIds(LocalDate cutoffDate) {
-        return repaymentScheduleRepository
-                .findByStatusAndDueDateLessThanEqual(RepaymentScheduleStatus.OVERDUE, cutoffDate)
-                .stream()
-                .map(RepaymentScheduleEntity::getScheduleId)
-                .toList();
+        return repaymentScheduleRepository.findScheduleIdsByStatusAndDueDateLessThanEqual(
+                RepaymentScheduleStatus.OVERDUE, cutoffDate);
     }
 
     @Transactional
@@ -232,16 +229,7 @@ public class RepaymentScheduleService {
 
     @Transactional
     public int markSchedulesOverdue(LocalDate baseDate) {
-        List<Long> candidateIds = repaymentScheduleRepository
-                .findByStatusAndDueDateBefore(RepaymentScheduleStatus.PENDING, baseDate)
-                .stream()
-                .map(RepaymentScheduleEntity::getScheduleId)
-                .toList();
-
-        if (candidateIds.isEmpty()) {
-            return 0;
-        }
-        return repaymentScheduleRepository.updateStatusBulk(
-                candidateIds, RepaymentScheduleStatus.OVERDUE, RepaymentScheduleStatus.PENDING);
+        return repaymentScheduleRepository.markOverdueBulk(
+                RepaymentScheduleStatus.OVERDUE, RepaymentScheduleStatus.PENDING, baseDate);
     }
 }

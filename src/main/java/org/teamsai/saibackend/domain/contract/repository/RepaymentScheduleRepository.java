@@ -73,4 +73,18 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             @Param("scheduleIds") List<Long> scheduleIds,
             @Param("status") RepaymentScheduleStatus status,
             @Param("expectedStatus") RepaymentScheduleStatus expectedStatus);
+
+    @Modifying
+    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :newStatus " +
+            "WHERE r.status = :expectedStatus AND r.dueDate < :baseDate")
+    int markOverdueBulk(
+            @Param("newStatus") RepaymentScheduleStatus newStatus,
+            @Param("expectedStatus") RepaymentScheduleStatus expectedStatus,
+            @Param("baseDate") LocalDate baseDate);
+
+    @Query("SELECT r.scheduleId FROM RepaymentScheduleEntity r " +
+            "WHERE r.status = :status AND r.dueDate <= :cutoffDate")
+    List<Long> findScheduleIdsByStatusAndDueDateLessThanEqual(
+            @Param("status") RepaymentScheduleStatus status,
+            @Param("cutoffDate") LocalDate cutoffDate);
 }

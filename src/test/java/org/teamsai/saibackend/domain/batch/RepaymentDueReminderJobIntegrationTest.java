@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = {
         RepaymentDueReminderJobConfig.class,
         RepaymentDueReminderService.class,
+        org.teamsai.saibackend.domain.batch.service.ReminderNotificationSender.class,
         org.teamsai.saibackend.domain.batch.common.config.BatchInfraConfig.class,
         LoggingJobExecutionListener.class,
         org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener.class,
@@ -287,7 +288,7 @@ class RepaymentDueReminderJobIntegrationTest {
         jdbcTemplate.update(
                 """
                 INSERT INTO repayment_schedule (
-                    schedule_id, contract_id, sequence, due_date,
+                    schedule_id, contract_id, `sequence`, due_date,
                     principal_due, interest_due, total_payment_due, remaining_principal,
                     status, created_at
                 )
