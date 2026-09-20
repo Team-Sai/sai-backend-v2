@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.contract.repository;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -64,4 +65,26 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM RepaymentScheduleEntity r WHERE r.contractId = :contractId ORDER BY r.sequence Asc")
     List<RepaymentScheduleEntity> findByContractIdForUpdate(@Param("contractId")Long contractId);
+
+    @Modifying
+    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :status " +
+            "WHERE r.scheduleId IN :scheduleIds AND r.status = :expectedStatus")
+    int updateStatusBulk(
+            @Param("scheduleIds") List<Long> scheduleIds,
+            @Param("status") RepaymentScheduleStatus status,
+            @Param("expectedStatus") RepaymentScheduleStatus expectedStatus);
+
+    @Modifying
+    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :newStatus " +
+            "WHERE r.status = :expectedStatus AND r.dueDate < :baseDate")
+    int markOverdueBulk(
+            @Param("newStatus") RepaymentScheduleStatus newStatus,
+            @Param("expectedStatus") RepaymentScheduleStatus expectedStatus,
+            @Param("baseDate") LocalDate baseDate);
+
+    @Query("SELECT r.scheduleId FROM RepaymentScheduleEntity r " +
+            "WHERE r.status = :status AND r.dueDate <= :cutoffDate")
+    List<Long> findScheduleIdsByStatusAndDueDateLessThanEqual(
+            @Param("status") RepaymentScheduleStatus status,
+            @Param("cutoffDate") LocalDate cutoffDate);
 }

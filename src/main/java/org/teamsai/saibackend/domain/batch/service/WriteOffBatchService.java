@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -22,7 +23,7 @@ public class WriteOffBatchService {
     private static final int WRITE_OFF_DAYS_AFTER_OVERDUE = 30;
 
     private final PaymentObligationRepository paymentObligationRepository;
-    private final RepaymentScheduleMapper repaymentScheduleMapper;
+    private final RepaymentScheduleService repaymentScheduleService;
     private final SettlementCloseService settlementCloseService;
     private final WriteOffTransactionExecutor writeOffTransactionExecutor;  // 추가
 
@@ -67,7 +68,7 @@ public class WriteOffBatchService {
     @Transactional
     public int writeOffRepaymentSchedules(LocalDate baseDate) {
         LocalDate cutoffDate = baseDate.minusDays(WRITE_OFF_DAYS_AFTER_OVERDUE);
-        List<Long> candidateIds = repaymentScheduleMapper.findWriteOffCandidateIds(cutoffDate);
+        List<Long> candidateIds = repaymentScheduleService.findWriteOffCandidateScheduleIds(cutoffDate);
         if (candidateIds.isEmpty()) {
             return 0;
         }

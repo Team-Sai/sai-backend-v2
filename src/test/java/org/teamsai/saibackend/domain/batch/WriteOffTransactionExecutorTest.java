@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.batch.service.WriteOffTransactionExecutor;
-import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
@@ -27,7 +27,7 @@ class WriteOffTransactionExecutorTest {
     @Mock
     private PaymentObligationRepository paymentObligationRepository;
     @Mock
-    private RepaymentScheduleMapper repaymentScheduleMapper;
+    private RepaymentScheduleService repaymentScheduleService;
     @InjectMocks
     private WriteOffTransactionExecutor writeOffTransactionExecutor;
 
@@ -85,9 +85,9 @@ class WriteOffTransactionExecutorTest {
     @Test
     void 상환스케줄_500건_초과시_청크로_나누어_호출된다() {
         List<Long> ids = LongStream.rangeClosed(1, 700).boxed().collect(Collectors.toList());
-        when(repaymentScheduleMapper.writeOffBulk(anyList())).thenReturn(500, 200);
+        when(repaymentScheduleService.writeOffSchedules(anyList())).thenReturn(500, 200);
         int total = writeOffTransactionExecutor.writeOffSchedulesInNewTransaction(ids);
         assertThat(total).isEqualTo(700);
-        verify(repaymentScheduleMapper, times(2)).writeOffBulk(anyList());
+        verify(repaymentScheduleService, times(2)).writeOffSchedules(anyList());
     }
 }
