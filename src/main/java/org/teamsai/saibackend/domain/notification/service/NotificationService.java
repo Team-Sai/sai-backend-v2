@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.notification.service;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.notification.dto.response.NotificationResponse;
 import org.teamsai.saibackend.domain.notification.entity.Notification;
@@ -63,6 +64,18 @@ public class NotificationService {
                 referenceId,
                 secondaryReferenceId
         );
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void createIfAbsentInNewTransaction(
+            Long userId,
+            NotificationType type,
+            String title,
+            String content,
+            Long referenceId,
+            Long secondaryReferenceId
+    ) {
+        createIfAbsent(userId, type, title, content, referenceId, secondaryReferenceId);
     }
 
     @Transactional(readOnly = true)

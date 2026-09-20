@@ -8,8 +8,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.batch.service.WriteOffBatchService;
 import org.teamsai.saibackend.domain.batch.service.WriteOffResult;
 import org.teamsai.saibackend.domain.batch.service.WriteOffTransactionExecutor;
-import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
@@ -25,7 +25,7 @@ class WriteOffBatchServiceTest {
     @Mock
     private PaymentObligationRepository paymentObligationRepository;
     @Mock
-    private RepaymentScheduleMapper repaymentScheduleMapper;
+    private RepaymentScheduleService repaymentScheduleService;
     @Mock
     private SettlementCloseService settlementCloseService;
     @Mock
@@ -124,16 +124,17 @@ class WriteOffBatchServiceTest {
     class WriteOffRepaymentSchedules {
         @Test
         void 대상이_없으면_0을_반환한다() {
-            when(repaymentScheduleMapper.findWriteOffCandidateIds(any()))
+            when(repaymentScheduleService.findWriteOffCandidateScheduleIds(any()))
                     .thenReturn(Collections.emptyList());
             int result = writeOffBatchService.writeOffRepaymentSchedules(baseDate);
             assertThat(result).isZero();
             verifyNoInteractions(writeOffTransactionExecutor);
         }
+
         @Test
         void 대상이_있으면_상각건수를_반환한다() {
             List<Long> candidateIds = List.of(10L, 20L, 30L);
-            when(repaymentScheduleMapper.findWriteOffCandidateIds(any()))
+            when(repaymentScheduleService.findWriteOffCandidateScheduleIds(any()))
                     .thenReturn(candidateIds);
             when(writeOffTransactionExecutor.writeOffSchedulesInNewTransaction(candidateIds))
                     .thenReturn(3);
@@ -141,12 +142,13 @@ class WriteOffBatchServiceTest {
             assertThat(result).isEqualTo(3);
             verify(writeOffTransactionExecutor).writeOffSchedulesInNewTransaction(candidateIds);
         }
+
         @Test
         void cutoffDate가_baseDate에서_30일_전으로_계산되어_전달된다() {
-            when(repaymentScheduleMapper.findWriteOffCandidateIds(any()))
+            when(repaymentScheduleService.findWriteOffCandidateScheduleIds(any()))
                     .thenReturn(Collections.emptyList());
             writeOffBatchService.writeOffRepaymentSchedules(baseDate);
-            verify(repaymentScheduleMapper).findWriteOffCandidateIds(baseDate.minusDays(30));
+            verify(repaymentScheduleService).findWriteOffCandidateScheduleIds(baseDate.minusDays(30));
         }
     }
 }
