@@ -79,6 +79,8 @@ class AccountTransactionIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired UserService userService;
     @MockitoBean MockBankClient bank;
+    @org.springframework.beans.factory.annotation.Value("${account-link.max-concurrent}")
+    int maxConcurrentLinks;
     Long userId;
     String state;
     String key;
@@ -182,7 +184,7 @@ class AccountTransactionIntegrationTest {
         } finally {pool.shutdownNow();}
     }
 
-    @Test void callbackWriteFailureRollsBackKeyAccountsAndReceiptThenRevokes() {
+    @Test void callbackWriteFailureRollsBackKeyAccountsAndReceiptThenRecovers() {
         when(bank.getAccountDetail(1L,key)).thenReturn(detail(1L));
         var invalid=new AccountDetailResponse(2L,"088","masked","x".repeat(51),"holder",BigDecimal.TEN,"ACTIVE",null,null);
         when(bank.getAccountDetail(2L,key)).thenReturn(invalid);
@@ -191,7 +193,7 @@ class AccountTransactionIntegrationTest {
         assertThat(users.findUserKeyByUserId(userId)).isNull();
         assertThat(accounts.findAllByUserId(userId)).isEmpty();
         assertThat(status()).isEqualTo("FAILED");
-        verify(bank).revokeUserKey(key);
+        verify(bank).recoverUserKey(state, key, null);
     }
 
     @Test void relinkFailureRestoresOriginalKey() {
@@ -200,7 +202,7 @@ class AccountTransactionIntegrationTest {
         when(bank.getAccountDetail(1L,key)).thenThrow(new RestClientException("failed"));
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(old);
-        verify(bank).restoreUserKey(key,old);
+        verify(bank).recoverUserKey(state, key, old);
         assertThat(status()).isEqualTo("FAILED");
     }
 
@@ -209,31 +211,45 @@ class AccountTransactionIntegrationTest {
         when(bank.getAccountDetail(1L,key)).thenThrow(new RestClientException("failed"));
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         verify(bank,never()).confirmUserKey(anyString());
-        verify(bank,never()).restoreUserKey(anyString(),anyString());
+        verify(bank,never()).recoverUserKey(anyString(),anyString(),nullable(String.class));
         verify(bank,never()).revokeUserKey(anyString());
         assertThat(status()).isEqualTo("FAILED");
     }
 
     @Test void compensationFailureIsDurableAndRetryOnlyCompensates() {
         when(bank.getAccountDetail(1L,key)).thenThrow(new RestClientException("failed"));
-        doThrow(new RestClientException("offline")).doNothing().when(bank).revokeUserKey(key);
+
+        doThrow(new RestClientException("offline")).doThrow(new RestClientException("offline")).doNothing()
+                .when(bank).recoverUserKey(state, key, null);
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
         assertThat(status()).isEqualTo("COMPENSATION_PENDING");
         assertError(() -> accountService.issueOrGetUserKey(userId),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.LINK_REQUEST_CONFLICT);
         assertThat(status()).isEqualTo("FAILED");
         verify(bank,times(1)).confirmUserKey(key);
-        verify(bank,times(2)).revokeUserKey(key);
+        verify(bank,never()).revokeUserKey(anyString());
+        verify(bank,times(3)).recoverUserKey(state, key, null);
     }
 
     @Test void confirmTimeoutIsRecordedAndBlocksBlindRetries() {
         doThrow(new RestClientException("response lost")).when(bank).confirmUserKey(key);
+        doThrow(new RestClientException("offline")).when(bank).recoverUserKey(state, key, null);
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         assertThat(status()).isEqualTo("CONFIRM_UNKNOWN");
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
         assertError(() -> coordinator.completeCallback(userId,state+"other",key,List.of(1L)),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
         verify(bank,times(1)).confirmUserKey(key);
         verify(bank,never()).revokeUserKey(anyString());
+    }
+
+    @Test void recoveryClosesDurableOperationWithoutOriginalState() {
+        operations.begin(new LinkOperationStore.Operation(state, userId, "hash", null, key,
+                LinkOperationStore.Status.PROCESSING));
+        operations.mark(state, LinkOperationStore.Status.CONFIRM_UNKNOWN);
+        coordinator.recoverUnresolved(userId);
+        assertThat(operations.hasUnresolved(userId)).isFalse();
+        assertThat(status()).isEqualTo("FAILED");
+        verify(bank).recoverUserKey(state, key, null);
     }
 
     @Test void concurrentCallbackAndKeyIssueCannotChangeSameUser() throws Exception {
@@ -262,11 +278,11 @@ class AccountTransactionIntegrationTest {
     }
 
     @Test void concurrentUsersCannotExhaustPoolWithLockConnections() throws Exception {
-        CountDownLatch entered = new CountDownLatch(5), release = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(5);
+        CountDownLatch entered = new CountDownLatch(maxConcurrentLinks), release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(maxConcurrentLinks);
         List<Future<Integer>> work = new java.util.ArrayList<>();
         try {
-            for (long i = 1; i <= 5; i++) {
+            for (long i = 1; i <= maxConcurrentLinks; i++) {
                 long lockId = -1000 - i;
                 work.add(pool.submit(() -> lock.execute(lockId, () -> {
                     entered.countDown();
@@ -331,7 +347,7 @@ class AccountTransactionIntegrationTest {
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(newer);
         assertThat(status()).isEqualTo("COMPENSATION_PENDING");
         verify(bank,never()).revokeUserKey(anyString());
-        verify(bank,never()).restoreUserKey(anyString(),anyString());
+        verify(bank,never()).recoverUserKey(anyString(),anyString(),nullable(String.class));
     }
 
     @Test void staleExpectedKeyCannotOverwriteNewKeyOrCompleteReceipt() {

@@ -68,6 +68,8 @@ public class AccountLinkFlowController {
                 myInfo
         );
 
+        accountLinkCoordinator.recoverUnresolved(userId);
+
         String state =
                 jwtTokenProvider.createLinkStateToken(
                         userId,

@@ -33,6 +33,38 @@ class AccountLinkFlowControllerTest {
     @MockitoBean IdentityValidator identityValidator;
     @MockitoBean JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockitoBean JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    @Test void startRecoversBeforeIssuingNewState() {
+        var user = org.teamsai.saibackend.domain.user.entity.User.builder()
+                .userId(1L).name("name").birthDate(java.time.LocalDate.of(2000, 1, 1)).build();
+        when(userService.getUser(1L)).thenReturn(user);
+        when(jwtTokenProvider.createLinkStateToken(1L, user.getName(), user.getBirthDate()))
+                .thenReturn("fresh-state");
+        var controller = new AccountLinkFlowController(jwtTokenProvider, linkedBankAccountService,
+                coordinator, userService, identityValidator);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "mockBankBaseUrl", "http://localhost:8081");
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "backendBaseUrl", "http://localhost:8080");
+
+        controller.startLink(new org.teamsai.saibackend.global.security.CustomUserDetails(user));
+
+        var order = inOrder(coordinator, jwtTokenProvider);
+        order.verify(coordinator).recoverUnresolved(1L);
+        order.verify(jwtTokenProvider).createLinkStateToken(1L, user.getName(), user.getBirthDate());
+    }
+
+    @Test void failedRecoveryPreventsNewLinkState() {
+        var user = org.teamsai.saibackend.domain.user.entity.User.builder().userId(1L).build();
+        when(userService.getUser(1L)).thenReturn(user);
+        doThrow(AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException())
+                .when(coordinator).recoverUnresolved(1L);
+        var controller = new AccountLinkFlowController(jwtTokenProvider, linkedBankAccountService,
+                coordinator, userService, identityValidator);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.startLink(
+                new org.teamsai.saibackend.global.security.CustomUserDetails(user)))
+                .extracting("errorCode").isEqualTo(AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+        verifyNoInteractions(jwtTokenProvider);
+    }
+
     @Test void validCallbackParsesAndRedirects() throws Exception {
         when(jwtTokenProvider.getUserIdFromLinkState("state")).thenReturn(Optional.of(1L));
         mvc.perform(get("/accounts/link/callback").param("state","state").param("userKey","key")

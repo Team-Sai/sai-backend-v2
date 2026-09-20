@@ -19,7 +19,7 @@ public class UserLinkLock {
             DataSource dataSource,
             @Value("${spring.datasource.hikari.maximum-pool-size:10}")
             int poolSize,
-            @Value("${account-link.max-concurrent}")
+            @Value("${account-link.max-concurrent:1}")
             int maxConcurrent
     ) {
         if (poolSize < 2) {

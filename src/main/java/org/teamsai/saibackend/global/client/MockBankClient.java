@@ -55,6 +55,18 @@ public class MockBankClient {
         return requireBody(response).userKey();
     }
 
+    public void recoverUserKey(String userToken, String currentUserKey, String previousUserKey) {
+        restClient.post()
+                .uri("/api/link/recover-key")
+                .header("X-Internal-Api-Key", internalApiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new RecoverKeyRequest(userToken, currentUserKey, previousUserKey))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    private record RecoverKeyRequest(String userToken, String currentUserKey, String previousUserKey) {}
+
     public void confirmUserKey(String userKey) {
         restClient.post()
                 .uri("/api/link/confirm-key")
@@ -75,19 +87,7 @@ public class MockBankClient {
                 .toBodilessEntity();
     }
 
-    public void restoreUserKey(String currentUserKey, String previousUserKey){
-        restClient.post()
-                .uri("/api/link/restore-key")
-                .header("X-Internal-Api-Key", internalApiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new RestoreKeyRequest(currentUserKey, previousUserKey))
-                .retrieve()
-                .toBodilessEntity();
-    }
-
     private record UserKeyRequest(String userKey) {}
-
-    private record RestoreKeyRequest(String currentUserKey, String previousUserKey) {}
 
     public List<LinkableAccountResponse> getAccountsByUserKey(String userKey) {
         return requireBody(

@@ -64,12 +64,11 @@ public class AccountLinkCoordinator {
                 if (operation.status() == COMPLETED) {
                     return null;
                 }
-                if (operation.status() == COMPENSATION_PENDING) {
-                    compensate(operation);
+                if (operation.status() != FAILED) {
+                    recover(operation);
                     throw AccountErrorCode.LINK_REQUEST_CONFLICT.toException();
                 }
-                throw (operation.status() == FAILED ? AccountErrorCode.LINK_REQUEST_CONFLICT
-                        : AccountErrorCode.LINK_RECONCILIATION_REQUIRED).toException();
+                throw AccountErrorCode.LINK_REQUEST_CONFLICT.toException();
             }
             requireResolved(userId);
             users.findById(userId).orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
@@ -114,8 +113,39 @@ public class AccountLinkCoordinator {
         });
     }
 
+    /** Access-token authenticated entry point; does not require an unexpired link state. */
+    public void recoverUnresolved(Long userId) {
+        lock.execute(userId, () -> {
+            requireResolved(userId);
+            return null;
+        });
+    }
+
     private void requireResolved(Long userId) {
+        for (var operation : operations.findUnresolved(userId)) {
+            recover(operation);
+        }
         if (operations.hasUnresolved(userId)) {
+            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+        }
+    }
+
+    private void recover(LinkOperationStore.Operation operation) {
+        try {
+            if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
+                throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+            }
+            if (!Objects.equals(operation.previousKey(), operation.newKey())) {
+                var user = users.findById(operation.userId())
+                        .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
+                // The bank atomically checks ownership/current state and cancels pending
+                // confirmation or restores the old key. Never infer rollback from a timeout.
+                bank.recoverUserKey(user.getUserToken(), operation.newKey(), operation.previousKey());
+            }
+            operations.mark(operation.id(), FAILED);
+        } catch (RuntimeException e) {
+            log.warn("계좌 연동 복구 미완료 - userId: {}, operationId: {}",
+                    operation.userId(), operation.id());
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
     }
@@ -141,28 +171,8 @@ public class AccountLinkCoordinator {
                 return;
             }
             operations.mark(operation.id(), COMPENSATION_PENDING);
-            compensate(operation);
+            recover(operation);
             throw e;
-        }
-    }
-
-    private void compensate(LinkOperationStore.Operation operation) {
-        try {
-            if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
-                throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
-            }
-            if (!Objects.equals(operation.previousKey(), operation.newKey())) {
-                if (operation.previousKey() == null) {
-                    bank.revokeUserKey(operation.newKey());
-                } else {
-                    bank.restoreUserKey(operation.newKey(), operation.previousKey());
-                }
-            }
-            operations.mark(operation.id(), FAILED);
-        } catch (RuntimeException e) {
-            log.error("계좌 연동 보상 미완료 - userId: {}, operationId: {}",
-                    operation.userId(), operation.id());
-            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
     }
 
