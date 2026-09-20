@@ -10,13 +10,20 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name="linked_bank_account")
+@Table(
+        name = "linked_bank_account",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_user_account",
+                columnNames = {"user_id", "account_id"}
+        )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LinkedBankAccount {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "linked_account_id")
     private Long linkedAccountId;
 
     @Column(name = "user_id", nullable = false)

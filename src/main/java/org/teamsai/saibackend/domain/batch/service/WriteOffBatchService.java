@@ -37,7 +37,7 @@ public class WriteOffBatchService {
                         PaymentStatus.PARTIALLY_PAID
                 ),
                 cutoff
-                );
+        );
         if (candidateIds.isEmpty()) {
             return new WriteOffResult(0, 0);
         }

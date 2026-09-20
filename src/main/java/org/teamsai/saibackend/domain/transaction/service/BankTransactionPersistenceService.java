@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
@@ -21,7 +21,7 @@ import java.util.List;
 public class BankTransactionPersistenceService {
 
     private final BankTransactionRepository bankTransactionRepository;
-    private final LinkedBankAccountMapper linkedBankAccountMapper;
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
 
     @Transactional
     public int saveAndAdvanceCursor(
@@ -54,19 +54,17 @@ public class BankTransactionPersistenceService {
                 .max(Comparator.comparing(
                         BankTransactionResponse::transactionId))
                 .orElseThrow();
-
-        if (latestTransaction.balanceAfter() != null) {
-            linkedBankAccountMapper.updateBalance(
-                    linkedAccountId,
-                    latestTransaction.balanceAfter()
-            );
-        }
-
-        linkedBankAccountMapper.updateLastSyncedTransactionId(
+        int updated = linkedBankAccountRepository.advanceCursorAndBalance(
                 linkedAccountId,
-                latestTransaction.transactionId()
+                latestTransaction.transactionId(),
+                latestTransaction.balanceAfter()
         );
 
+        if (updated == 0
+                && !linkedBankAccountRepository.existsById(linkedAccountId)) {
+            throw AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException();
+        }
+        
         // 신규 INSERT 수가 아니라 중복 거래를 포함한 이번 요청의 처리 대상 수다.
         return transactions.size();
     }
@@ -87,6 +85,9 @@ public class BankTransactionPersistenceService {
 
     private BankTransactionType toTransactionType(Long linkedAccountId, BankTransactionResponse tx) {
         try {
+            if (tx.transactionType() == null) {
+                throw new IllegalArgumentException("Missing transaction type");
+            }
             return switch (tx.transactionType()) {
                 case "DEPOSIT" -> BankTransactionType.DEPOSIT;
                 case "WITHDRAW", "WITHDRAWAL" -> BankTransactionType.WITHDRAWAL;

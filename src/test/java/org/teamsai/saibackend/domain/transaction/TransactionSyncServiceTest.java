@@ -4,24 +4,35 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
-import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
+import org.springframework.web.client.RestClientResponseException;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
 import org.teamsai.saibackend.domain.transaction.service.TransactionSyncService;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.exception.DomainException;
 
+import javax.net.ssl.SSLHandshakeException;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,8 +56,77 @@ import static org.mockito.Mockito.verify;
 @DisplayName("TransactionSyncService 단위 테스트")
 class TransactionSyncServiceTest {
 
+    static Stream<RestClientException> retryableBankFailures() {
+        return Stream.of(
+                new ResourceAccessException("timeout", new SocketTimeoutException()),
+                new ResourceAccessException("connection refused", new ConnectException()),
+                new ResourceAccessException("nested timeout", new IOException(new SocketTimeoutException())),
+                httpFailure(502), httpFailure(503), httpFailure(504)
+        );
+    }
+
+    static Stream<RestClientException> nonRetryableBankFailures() {
+        return Stream.of(
+                httpFailure(401), httpFailure(403), httpFailure(429), httpFailure(500),
+                new RestClientException("response conversion failed"),
+                new ResourceAccessException("TLS failure", new SSLHandshakeException("invalid certificate")),
+                new ResourceAccessException("DNS failure", new UnknownHostException()),
+                new ResourceAccessException("unknown IO failure")
+        );
+    }
+
+    private static RestClientResponseException httpFailure(int status) {
+        return new RestClientResponseException("bank response", status, "bank error", null, null, null);
+    }
+
+    @ParameterizedTest
+    @MethodSource("retryableBankFailures")
+    @DisplayName("일시적 은행 오류는 원인을 보존하는 전용 예외로 변환하고 저장하지 않는다")
+    void classifiesRetryableBankFailure(RestClientException failure) {
+        stubBankFailure(failure);
+
+        assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
+                .isInstanceOf(RetryableBankTransactionFetchException.class)
+                .hasCause(failure)
+                .satisfies(thrown -> assertThat(((DomainException) thrown).getErrorCode())
+                        .isEqualTo(AccountErrorCode.BANK_SERVER_UNAVAILABLE));
+        verify(bankTransactionPersistenceService, never()).saveAndAdvanceCursor(any(), any());
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonRetryableBankFailures")
+    @DisplayName("허용하지 않은 은행 오류는 일반 도메인 예외로 유지하고 저장하지 않는다")
+    void doesNotClassifyOtherBankFailuresAsRetryable(RestClientException failure) {
+        stubBankFailure(failure);
+
+        assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
+                .isExactlyInstanceOf(DomainException.class)
+                .satisfies(thrown -> assertThat(((DomainException) thrown).getErrorCode())
+                        .isEqualTo(AccountErrorCode.BANK_SERVER_UNAVAILABLE));
+        verify(bankTransactionPersistenceService, never()).saveAndAdvanceCursor(any(), any());
+    }
+
+    @Test
+    @DisplayName("은행 클라이언트의 일반 도메인 예외는 재시도 예외로 변환하지 않는다")
+    void propagatesBankClientDomainFailure() {
+        var failure = AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
+        stubBankFailure(failure);
+
+        assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
+                .isSameAs(failure);
+        verify(bankTransactionPersistenceService, never()).saveAndAdvanceCursor(any(), any());
+    }
+
+    private void stubBankFailure(RuntimeException failure) {
+        given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID))
+                .willReturn(Optional.of(createLinkedAccount()));
+        given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
+        given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
+        given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 5L)).willThrow(failure);
+    }
+
     @Mock
-    private LinkedBankAccountMapper linkedBankAccountMapper;
+    private LinkedBankAccountRepository linkedBankAccountRepository;
 
     @Mock
     private MockBankClient mockBankClient;
@@ -66,8 +146,8 @@ class TransactionSyncServiceTest {
     private static final Long BANK_ACCOUNT_ID = 3L;
     private static final String USER_KEY = "mb_rawUserKey1234";
 
-    private LinkedBankAccountDTO createLinkedAccount() {
-        return LinkedBankAccountDTO.builder()
+    private LinkedBankAccount createLinkedAccount() {
+        return LinkedBankAccount.builder()
                 .linkedAccountId(LINKED_ACCOUNT_ID)
                 .userId(USER_ID)
                 .accountId(BANK_ACCOUNT_ID)
@@ -97,15 +177,15 @@ class TransactionSyncServiceTest {
         @Test
         @DisplayName("커서가 없으면(null) 0부터 조회하고, 조회 결과를 저장 서비스에 그대로 위임한다")
         void syncsNewTransactionsWhenNoCursorExists() {
-            LinkedBankAccountDTO linkedAccount = createLinkedAccount();
+            LinkedBankAccount linkedAccount = createLinkedAccount();
             List<BankTransactionResponse> transactions = List.of(
                     createTransactionResponse(6L, "MOCK-TX-0001"),
                     createTransactionResponse(7L, "MOCK-TX-0002")
             );
 
-            given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountMapper.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(null);
+            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(null);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 0L)).willReturn(transactions);
             given(bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions))
                     .willReturn(2);
@@ -119,11 +199,11 @@ class TransactionSyncServiceTest {
         @Test
         @DisplayName("이미 커서가 있으면 그 값 이후로만 조회한다")
         void usesExistingCursorAsAfterTransactionId() {
-            LinkedBankAccountDTO linkedAccount = createLinkedAccount();
+            LinkedBankAccount linkedAccount = createLinkedAccount();
 
-            given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountMapper.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
+            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 5L)).willReturn(List.of());
             given(bankTransactionPersistenceService.saveAndAdvanceCursor(eq(LINKED_ACCOUNT_ID), any()))
                     .willReturn(0);
@@ -136,7 +216,7 @@ class TransactionSyncServiceTest {
         @Test
         @DisplayName("연동계좌를 찾을 수 없으면 LINKED_ACCOUNT_NOT_FOUND 예외를 던지고 이후 로직은 실행되지 않는다")
         void throwsWhenLinkedAccountNotFound() {
-            given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.empty());
+            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
                     .isInstanceOf(DomainException.class)
@@ -151,9 +231,9 @@ class TransactionSyncServiceTest {
         @Test
         @DisplayName("요청자가 연동계좌의 소유자가 아니면 ACCOUNT_ACCESS_DENIED 예외를 던지고 이후 로직은 실행되지 않는다")
         void throwsWhenRequesterIsNotOwner() {
-            LinkedBankAccountDTO linkedAccount = createLinkedAccount(); // userId = USER_ID(10L) 소유
+            LinkedBankAccount linkedAccount = createLinkedAccount(); // userId = USER_ID(10L) 소유
 
-            given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
 
             assertThatThrownBy(() -> transactionSyncService.syncTransactions(OTHER_USER_ID, LINKED_ACCOUNT_ID))
                     .isInstanceOf(DomainException.class)
@@ -168,11 +248,11 @@ class TransactionSyncServiceTest {
         @Test
         @DisplayName("사이은행 통신 실패 시 BANK_SERVER_UNAVAILABLE 예외로 변환하고 저장은 시도하지 않는다")
         void throwsWhenBankServerUnavailable() {
-            LinkedBankAccountDTO linkedAccount = createLinkedAccount();
+            LinkedBankAccount linkedAccount = createLinkedAccount();
 
-            given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountMapper.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(0L);
+            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(0L);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 0L))
                     .willThrow(new RestClientException("연결 실패"));
 
@@ -187,15 +267,15 @@ class TransactionSyncServiceTest {
         @Test
         @DisplayName("저장 단계(BankTransactionPersistenceService)에서 예외가 발생하면 그대로 전파한다")
         void propagatesExceptionWhenPersistenceFails() {
-            LinkedBankAccountDTO linkedAccount = createLinkedAccount();
+            LinkedBankAccount linkedAccount = createLinkedAccount();
             List<BankTransactionResponse> transactions = List.of(
                     createTransactionResponse(6L, "MOCK-TX-0001")
             );
             DomainException persistenceFailure = mock(DomainException.class);
 
-            given(linkedBankAccountMapper.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountMapper.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
+            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 5L)).willReturn(transactions);
             willThrow(persistenceFailure)
                     .given(bankTransactionPersistenceService)
