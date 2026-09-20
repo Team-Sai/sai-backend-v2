@@ -36,4 +36,7 @@ public interface LoanContractRepository extends JpaRepository<LoanContract, Long
             @Param("status") ContractStatus status,
             @Param("relationType") ContractRelationType relationType
     );
+
+    @Query("SELECT c.debtor.userId FROM LoanContract c WHERE c.contractId = :contractId")
+    Optional<Long> findDebtorUserIdByContractId(@Param("contractId") Long contractId);
 }

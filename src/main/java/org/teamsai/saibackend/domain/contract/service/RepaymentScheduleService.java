@@ -194,8 +194,8 @@ public class RepaymentScheduleService {
         };
 
         List<RepaymentScheduleEntity> newEntities = newSchedules.stream()
-                        .map(this::toEntity)
-                        .toList();
+                .map(this::toEntity)
+                .toList();
 
         repaymentScheduleRepository.saveAll(newEntities);
     }
@@ -214,5 +214,22 @@ public class RepaymentScheduleService {
         List<RepaymentScheduleWithRemainingProjection> all = repaymentScheduleRepository.findByContractIds(contractIds);
         return all.stream()
                 .collect(Collectors.groupingBy(RepaymentScheduleWithRemainingProjection::getContractId));
+    }
+
+    public List<Long> findWriteOffCandidateScheduleIds(LocalDate cutoffDate) {
+        return repaymentScheduleRepository.findScheduleIdsByStatusAndDueDateLessThanEqual(
+                RepaymentScheduleStatus.OVERDUE, cutoffDate);
+    }
+
+    @Transactional
+    public int writeOffSchedules(List<Long> scheduleIds) {
+        return repaymentScheduleRepository.updateStatusBulk(
+                scheduleIds, RepaymentScheduleStatus.WRITTEN_OFF, RepaymentScheduleStatus.OVERDUE);
+    }
+
+    @Transactional
+    public int markSchedulesOverdue(LocalDate baseDate) {
+        return repaymentScheduleRepository.markOverdueBulk(
+                RepaymentScheduleStatus.OVERDUE, RepaymentScheduleStatus.PENDING, baseDate);
     }
 }

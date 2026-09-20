@@ -4,7 +4,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
@@ -22,10 +21,15 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.batch.repaymentschedule.config.RepaymentDueReminderJobConfig;
-import org.teamsai.saibackend.domain.contract.mapper.RepaymentScheduleMapper;
+import org.teamsai.saibackend.domain.batch.service.RepaymentDueReminderService;
+import org.teamsai.saibackend.domain.contract.entity.LoanContract;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
+import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.notification.entity.Notification;
 import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -37,9 +41,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = {
         RepaymentDueReminderJobConfig.class,
+        RepaymentDueReminderService.class,
+        org.teamsai.saibackend.domain.batch.service.ReminderNotificationSender.class,
         org.teamsai.saibackend.domain.batch.common.config.BatchInfraConfig.class,
         LoggingJobExecutionListener.class,
-        org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener.class,  // ← 추가
+        org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener.class,
         RepaymentDueReminderJobIntegrationTest.TestSliceConfig.class
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -49,14 +55,20 @@ class RepaymentDueReminderJobIntegrationTest {
 
     @TestConfiguration
     @EnableAutoConfiguration
-    @MapperScan(basePackageClasses = RepaymentScheduleMapper.class)
     @EnableJpaRepositories(
-            basePackageClasses = NotificationRepository.class
+            basePackageClasses = {
+                    NotificationRepository.class,
+                    RepaymentScheduleRepository.class,
+                    LoanContractRepository.class
+            }
     )
     @EntityScan(
             basePackageClasses = {
                     Notification.class,
-                    User.class
+                    User.class,
+                    RepaymentScheduleEntity.class,
+                    LoanContract.class,
+                    LinkedBankAccount.class
             }
     )
     @ComponentScan(basePackages = {
@@ -276,7 +288,7 @@ class RepaymentDueReminderJobIntegrationTest {
         jdbcTemplate.update(
                 """
                 INSERT INTO repayment_schedule (
-                    schedule_id, contract_id, sequence, due_date,
+                    schedule_id, contract_id, `sequence`, due_date,
                     principal_due, interest_due, total_payment_due, remaining_principal,
                     status, created_at
                 )

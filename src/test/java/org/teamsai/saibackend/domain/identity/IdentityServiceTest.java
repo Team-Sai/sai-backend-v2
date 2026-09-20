@@ -622,7 +622,7 @@ class IdentityServiceTest {
 
             assertThat(result.status())
                     .isEqualTo(
-                        IdentityStatus.VERIFIED
+                            IdentityStatus.VERIFIED
                     );
 
             assertThat(

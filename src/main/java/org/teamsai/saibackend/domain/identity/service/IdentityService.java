@@ -96,6 +96,7 @@ public class IdentityService {
         Identity identity = Identity.builder()
                 .identityVerificationId(identityVerificationId)
                 .user(userRepository.getReferenceById(userId))
+
                 .purpose(request.purpose())
                 .status(IdentityStatus.REQUESTED)
                 .requestedAt(requestedAt)

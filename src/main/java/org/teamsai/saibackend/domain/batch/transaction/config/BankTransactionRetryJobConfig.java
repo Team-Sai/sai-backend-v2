@@ -2,9 +2,6 @@ package org.teamsai.saibackend.domain.batch.transaction.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.mybatis.spring.batch.MyBatisCursorItemReader;
-import org.mybatis.spring.batch.builder.MyBatisCursorItemReaderBuilder;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -12,12 +9,14 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.batch.infrastructure.item.ItemWriter;
+import org.springframework.batch.infrastructure.item.database.JpaPagingItemReader;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.teamsai.saibackend.domain.account.dto.LinkedAccountSyncTargetDTO;
 import org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
+import org.teamsai.saibackend.domain.batch.common.reader.LinkedAccountSyncTargetReaderFactory;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionRetryService;
 
 @Slf4j
@@ -27,8 +26,8 @@ public class BankTransactionRetryJobConfig {
 
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
-    private final SqlSessionFactory sqlSessionFactory;
     private final LoggingJobExecutionListener loggingJobExecutionListener;
+    private final LinkedAccountSyncTargetReaderFactory linkedAccountReaderFactory;
 
     @Bean
     public Job bankTransactionRetryJob(Step bankTransactionRetryStep) {
@@ -57,23 +56,27 @@ public class BankTransactionRetryJobConfig {
     }
 
     @Bean
-    public MyBatisCursorItemReader<LinkedAccountSyncTargetDTO> bankTransactionRetryReader() {
-        return new MyBatisCursorItemReaderBuilder<LinkedAccountSyncTargetDTO>()
-                .sqlSessionFactory(sqlSessionFactory)
-                .queryId("org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper.findAllAvailableForSync")
-                .build();
+    public JpaPagingItemReader<LinkedAccountSyncTargetDTO> bankTransactionRetryReader() {
+        return linkedAccountReaderFactory.create("bankTransactionRetryReader");
     }
 
     private ItemProcessor<LinkedAccountSyncTargetDTO, LinkedAccountSyncTargetDTO> processor(
             BankTransactionRetryService bankTransactionRetryService) {
 
         return target -> {
-            bankTransactionRetryService.retryForAccount(target.userId(), target.linkedAccountId());
+            bankTransactionRetryService.retryForAccount(
+                    target.userId(),
+                    target.linkedAccountId()
+            );
+
             return target;
         };
     }
 
     private ItemWriter<LinkedAccountSyncTargetDTO> noOpWriter() {
-        return chunk -> log.info("[bankTransactionRetry] 재시도 처리 완료 계좌 {}건", chunk.size());
+        return chunk -> log.info(
+                "[bankTransactionRetry] 재시도 처리 완료 계좌 {}건",
+                chunk.size()
+        );
     }
 }

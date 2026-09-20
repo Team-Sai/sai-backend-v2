@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
-import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
@@ -18,7 +18,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TransactionSyncService {
 
-    private final LinkedBankAccountMapper linkedBankAccountMapper;
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
     private final MockBankClient mockBankClient;
     private final UserService userService;
     private final BankTransactionPersistenceService bankTransactionPersistenceService;
@@ -29,14 +29,14 @@ public class TransactionSyncService {
     **/
 
     public int syncTransactions(Long userId, Long linkedAccountId) {
-        LinkedBankAccountDTO linkedAccount = linkedBankAccountMapper.findById(linkedAccountId)
+        LinkedBankAccount linkedAccount = linkedBankAccountRepository.findById(linkedAccountId)
                 .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
 
         validateOwnership(userId, linkedAccount);
 
         String userKey = userService.getUserKeyByUserId(linkedAccount.getUserId());
 
-        Long lastSyncedId = linkedBankAccountMapper.
+        Long lastSyncedId = linkedBankAccountRepository.
                             findLastSyncedTransactionIdById(linkedAccountId);
         long afterTransactionId = lastSyncedId == null ? 0L : lastSyncedId;
 
@@ -51,7 +51,7 @@ public class TransactionSyncService {
                 saveAndAdvanceCursor(linkedAccountId, transactions);
     }
 
-    private void validateOwnership(Long userId, LinkedBankAccountDTO linkedAccount) {
+    private void validateOwnership(Long userId, LinkedBankAccount linkedAccount) {
         if (!linkedAccount.getUserId().equals(userId)) {
             log.warn(
                     "[TransactionSyncService] 소유자가 아닌 계좌 동기화 시도 - " +

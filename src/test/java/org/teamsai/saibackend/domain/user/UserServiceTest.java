@@ -16,6 +16,14 @@ import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.function.Supplier;
+import org.teamsai.saibackend.domain.link.service.UserLinkLock;
+import org.teamsai.saibackend.domain.link.service.LinkOperationStore;
+import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +41,12 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserLinkLock userLinkLock;
+
+    @Mock
+    private LinkOperationStore linkOperationStore;
 
     @InjectMocks
     private UserService userService;
@@ -93,9 +107,41 @@ class UserServiceTest {
     @DisplayName("회원 탈퇴")
     class Withdraw {
 
+        void executeLockedAction() {
+            doAnswer(invocation -> {
+                Supplier<?> action = invocation.getArgument(1);
+                return action.get();
+            }).when(userLinkLock).execute(eq(USER_ID), any());
+        }
+
+        @Test
+        void unresolvedOperationPreventsWithdrawal() {
+            executeLockedAction();
+            given(linkOperationStore.hasUnresolved(USER_ID)).willReturn(true);
+
+            assertThatThrownBy(() -> userService.withdraw(USER_ID))
+                    .extracting("errorCode")
+                    .isEqualTo(AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+
+            verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        void lockFailurePreventsWithdrawal() {
+            doThrow(AccountErrorCode.LINK_IN_PROGRESS.toException())
+                    .when(userLinkLock).execute(eq(USER_ID), any());
+
+            assertThatThrownBy(() -> userService.withdraw(USER_ID))
+                    .extracting("errorCode")
+                    .isEqualTo(AccountErrorCode.LINK_IN_PROGRESS);
+
+            verifyNoInteractions(userRepository, linkOperationStore);
+        }
+
         @Test
         @DisplayName("사용자 ID로 회원을 조회한 후 삭제한다")
         void withdrawSuccess() {
+            executeLockedAction();
             User user = createUser();
 
             given(userRepository.findById(USER_ID))
@@ -113,6 +159,7 @@ class UserServiceTest {
         @Test
         @DisplayName("회원이 존재하지 않으면 회원 없음 예외가 발생한다")
         void withdrawFailsWhenUserDoesNotExist() {
+            executeLockedAction();
             given(userRepository.findById(USER_ID))
                     .willReturn(Optional.empty());
 
