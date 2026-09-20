@@ -3,14 +3,19 @@ package org.teamsai.saibackend.domain.transaction.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.util.List;
 
 @Slf4j
@@ -72,10 +77,38 @@ public class TransactionSyncService {
             return mockBankClient.
                     getTransactions(bankAccountId, userKey, afterTransactionId);
         } catch (RestClientException e) {
+            if (isRetryableBankFailure(e)) {
+                throw new RetryableBankTransactionFetchException(e);
+            }
             log.warn("[TransactionSyncService] 거래내역 조회 실패 - linkedAccountId: {}",
                     linkedAccountId, e);
             throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
         }
+    }
+
+    private boolean isRetryableBankFailure(RestClientException exception) {
+        if (exception instanceof RestClientResponseException responseException) {
+            int status = responseException.getStatusCode().value();
+
+            return status == 502
+                    || status == 503
+                    || status == 504;
+        }
+
+        if (exception instanceof ResourceAccessException) {
+            Throwable cause = exception.getCause();
+
+            while (cause != null) {
+                if (cause instanceof SocketTimeoutException
+                        || cause instanceof ConnectException) {
+                    return true;
+                }
+
+                cause = cause.getCause();
+            }
+        }
+
+        return false;
     }
 }
  

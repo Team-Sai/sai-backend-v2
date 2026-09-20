@@ -55,7 +55,7 @@ public class BankTransactionRetryJobConfig {
                 .build();
     }
 
-    @Bean
+    @Bean(destroyMethod = "")
     public JpaPagingItemReader<LinkedAccountSyncTargetDTO> bankTransactionRetryReader() {
         return linkedAccountReaderFactory.create("bankTransactionRetryReader");
     }

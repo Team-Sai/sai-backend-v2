@@ -14,8 +14,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.teamsai.saibackend.domain.account.dto.LinkedAccountSyncTargetDTO;
+import org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.batch.common.reader.LinkedAccountSyncTargetReaderFactory;
+import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.transaction.service.TransactionSyncFacade;
 
 @Slf4j
@@ -38,7 +40,11 @@ public class TransactionSyncJobConfig {
 
     @Bean
     public Step transactionSyncStep(
-            TransactionSyncFacade transactionSyncFacade
+            TransactionSyncFacade transactionSyncFacade,
+            BaseSkipListener<
+                                LinkedAccountSyncTargetDTO,
+                                LinkedAccountSyncTargetDTO
+                                > skipListener
     ) {
         return new StepBuilder("transactionSyncStep", jobRepository)
                 .<LinkedAccountSyncTargetDTO, LinkedAccountSyncTargetDTO>chunk(50)
@@ -46,10 +52,16 @@ public class TransactionSyncJobConfig {
                 .reader(transactionSyncReader())
                 .processor(processor(transactionSyncFacade))
                 .writer(noOpWriter())
+                .faultTolerant()
+                .retry(RetryableBankTransactionFetchException.class)
+                .retryLimit(2)
+                .skip(RetryableBankTransactionFetchException.class)
+                .skipLimit(50)
+                .skipListener(skipListener)
                 .build();
     }
 
-    @Bean
+    @Bean(destroyMethod = "")
     public JpaPagingItemReader<LinkedAccountSyncTargetDTO> transactionSyncReader() {
         return linkedAccountReaderFactory.create("transactionSyncReader");
     }

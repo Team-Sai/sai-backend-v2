@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.account.repository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -11,6 +12,7 @@ import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class LinkedBankAccountRepositoryCustomImpl
@@ -62,6 +64,11 @@ public class LinkedBankAccountRepositoryCustomImpl
             if (existing.isEmpty()) {
                 throw e;
             }
+            log.info(
+                    "이미 연동된 계좌라 저장을 건너뜁니다. userId={}, accountId={}",
+                    account.getUserId(),
+                    account.getAccountId()
+            );
             return null;
         }
 

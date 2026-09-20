@@ -4,24 +4,35 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
 import org.teamsai.saibackend.domain.transaction.service.TransactionSyncService;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.exception.DomainException;
 
+import javax.net.ssl.SSLHandshakeException;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,6 +55,75 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TransactionSyncService 단위 테스트")
 class TransactionSyncServiceTest {
+
+    static Stream<RestClientException> retryableBankFailures() {
+        return Stream.of(
+                new ResourceAccessException("timeout", new SocketTimeoutException()),
+                new ResourceAccessException("connection refused", new ConnectException()),
+                new ResourceAccessException("nested timeout", new IOException(new SocketTimeoutException())),
+                httpFailure(502), httpFailure(503), httpFailure(504)
+        );
+    }
+
+    static Stream<RestClientException> nonRetryableBankFailures() {
+        return Stream.of(
+                httpFailure(401), httpFailure(403), httpFailure(429), httpFailure(500),
+                new RestClientException("response conversion failed"),
+                new ResourceAccessException("TLS failure", new SSLHandshakeException("invalid certificate")),
+                new ResourceAccessException("DNS failure", new UnknownHostException()),
+                new ResourceAccessException("unknown IO failure")
+        );
+    }
+
+    private static RestClientResponseException httpFailure(int status) {
+        return new RestClientResponseException("bank response", status, "bank error", null, null, null);
+    }
+
+    @ParameterizedTest
+    @MethodSource("retryableBankFailures")
+    @DisplayName("일시적 은행 오류는 원인을 보존하는 전용 예외로 변환하고 저장하지 않는다")
+    void classifiesRetryableBankFailure(RestClientException failure) {
+        stubBankFailure(failure);
+
+        assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
+                .isInstanceOf(RetryableBankTransactionFetchException.class)
+                .hasCause(failure)
+                .satisfies(thrown -> assertThat(((DomainException) thrown).getErrorCode())
+                        .isEqualTo(AccountErrorCode.BANK_SERVER_UNAVAILABLE));
+        verify(bankTransactionPersistenceService, never()).saveAndAdvanceCursor(any(), any());
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonRetryableBankFailures")
+    @DisplayName("허용하지 않은 은행 오류는 일반 도메인 예외로 유지하고 저장하지 않는다")
+    void doesNotClassifyOtherBankFailuresAsRetryable(RestClientException failure) {
+        stubBankFailure(failure);
+
+        assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
+                .isExactlyInstanceOf(DomainException.class)
+                .satisfies(thrown -> assertThat(((DomainException) thrown).getErrorCode())
+                        .isEqualTo(AccountErrorCode.BANK_SERVER_UNAVAILABLE));
+        verify(bankTransactionPersistenceService, never()).saveAndAdvanceCursor(any(), any());
+    }
+
+    @Test
+    @DisplayName("은행 클라이언트의 일반 도메인 예외는 재시도 예외로 변환하지 않는다")
+    void propagatesBankClientDomainFailure() {
+        var failure = AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
+        stubBankFailure(failure);
+
+        assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
+                .isSameAs(failure);
+        verify(bankTransactionPersistenceService, never()).saveAndAdvanceCursor(any(), any());
+    }
+
+    private void stubBankFailure(RuntimeException failure) {
+        given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID))
+                .willReturn(Optional.of(createLinkedAccount()));
+        given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
+        given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
+        given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 5L)).willThrow(failure);
+    }
 
     @Mock
     private LinkedBankAccountRepository linkedBankAccountRepository;
