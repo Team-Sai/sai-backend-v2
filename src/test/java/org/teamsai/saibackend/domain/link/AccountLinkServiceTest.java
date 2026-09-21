@@ -7,6 +7,7 @@ import org.teamsai.saibackend.global.exception.DomainException;
 import java.util.List;
 import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.*;
+
 class AccountLinkServiceTest {
     private final UserRepository users = mock(UserRepository.class);
     private final LinkedAccountWriter writer = mock(LinkedAccountWriter.class);

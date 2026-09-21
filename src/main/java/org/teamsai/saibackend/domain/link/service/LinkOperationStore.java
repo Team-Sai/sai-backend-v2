@@ -20,9 +20,9 @@ public class LinkOperationStore {
 
     public Optional<Operation> find(String id) {
         return jdbc.query("SELECT * FROM account_link_operation WHERE operation_id = ?",
-                (rs, row) -> new Operation(rs.getString("operation_id"), rs.getLong("user_id"),
-                        rs.getString("request_hash"), rs.getString("previous_user_key"),
-                        rs.getString("new_user_key"), Status.valueOf(rs.getString("status"))), id)
+                        (rs, row) -> new Operation(rs.getString("operation_id"), rs.getLong("user_id"),
+                                rs.getString("request_hash"), rs.getString("previous_user_key"),
+                                rs.getString("new_user_key"), Status.valueOf(rs.getString("status"))), id)
                 .stream().findFirst();
     }
 

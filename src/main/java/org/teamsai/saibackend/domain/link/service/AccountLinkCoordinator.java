@@ -113,7 +113,6 @@ public class AccountLinkCoordinator {
         });
     }
 
-    /** Access-token authenticated entry point; does not require an unexpired link state. */
     public void recoverUnresolved(Long userId) {
         lock.execute(userId, () -> {
             requireResolved(userId);
@@ -138,8 +137,6 @@ public class AccountLinkCoordinator {
             if (!Objects.equals(operation.previousKey(), operation.newKey())) {
                 var user = users.findById(operation.userId())
                         .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
-                // The bank atomically checks ownership/current state and cancels pending
-                // confirmation or restores the old key. Never infer rollback from a timeout.
                 bank.recoverUserKey(user.getUserToken(), operation.newKey(), operation.previousKey());
             }
             operations.mark(operation.id(), FAILED);

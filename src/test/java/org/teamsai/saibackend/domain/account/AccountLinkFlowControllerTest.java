@@ -25,14 +25,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties={"sai.mock-bank.base-url=http://localhost:8081",
         "sai.backend.base-url=http://localhost:8080","app.frontend.base-url=http://localhost:5173"})
 class AccountLinkFlowControllerTest {
-    @Autowired MockMvc mvc;
-    @MockitoBean JwtTokenProvider jwtTokenProvider;
-    @MockitoBean LinkedBankAccountService linkedBankAccountService;
-    @MockitoBean AccountLinkCoordinator coordinator;
-    @MockitoBean UserService userService;
-    @MockitoBean IdentityValidator identityValidator;
-    @MockitoBean JwtAuthenticationFilter jwtAuthenticationFilter;
-    @MockitoBean JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    @Autowired
+    MockMvc mvc;
+
+    @MockitoBean
+    JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    LinkedBankAccountService linkedBankAccountService;
+
+    @MockitoBean
+    AccountLinkCoordinator coordinator;
+
+    @MockitoBean
+    UserService userService;
+
+    @MockitoBean
+    IdentityValidator identityValidator;
+
+    @MockitoBean
+    JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     @Test void startRecoversBeforeIssuingNewState() {
         var user = org.teamsai.saibackend.domain.user.entity.User.builder()
                 .userId(1L).name("name").birthDate(java.time.LocalDate.of(2000, 1, 1)).build();
@@ -60,7 +75,7 @@ class AccountLinkFlowControllerTest {
                 coordinator, userService, identityValidator);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.startLink(
-                new org.teamsai.saibackend.global.security.CustomUserDetails(user)))
+                        new org.teamsai.saibackend.global.security.CustomUserDetails(user)))
                 .extracting("errorCode").isEqualTo(AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
         verifyNoInteractions(jwtTokenProvider);
     }
