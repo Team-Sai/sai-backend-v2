@@ -141,7 +141,7 @@ public class AccountLinkCoordinator {
             }
             operations.mark(operation.id(), FAILED);
         } catch (RuntimeException e) {
-            log.warn("계좌 연동 복구 미완료 - userId: {}, operationId: {}",
+            log.error("계좌 연동 복구 미완료 - userId: {}, operationId: {}",
                     operation.userId(), operation.id());
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
