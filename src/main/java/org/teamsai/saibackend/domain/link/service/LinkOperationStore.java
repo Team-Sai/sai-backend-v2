@@ -33,6 +33,8 @@ public class LinkOperationStore {
                 """, Long.class, userId) > 0;
     }
 
+    // confirm 여부가 불명확한 작업도 포함합니다.
+    // 복구 정책은 AccountLinkCoordinator.recover()에서 적용합니다.
     public List<Operation> findUnresolved(Long userId) {
         return jdbc.query("""
                 SELECT * FROM account_link_operation

@@ -129,6 +129,21 @@ public class AccountLinkCoordinator {
         }
     }
 
+    /**
+     * 미완료 연동 작업을 이전 키 상태로 되돌립니다.
+     *
+     * PROCESSING은 confirm 호출 전 중단뿐 아니라 confirm 성공 후
+     * 후속 처리 전에 중단된 경우에도 남을 수 있으므로,
+     * 로컬 작업 상태만으로 은행의 confirm 여부를 판단하지 않습니다.
+     *
+     * PROCESSING, CONFIRM_UNKNOWN, COMPENSATION_PENDING 모두
+     * 은행 recover API를 통해 이전 키 상태로 수렴시킵니다.
+     * 해당 API는 pending 취소, confirm된 신규 키 복원,
+     * 이미 복구된 요청의 재시도를 처리하며 다른 키와 충돌하면 거부합니다.
+     *
+     * TODO: 은행 측 작업 ID 및 복구 기한 검증 도입 시,
+     *       오래된 미완료 작업과 기한 초과 작업의 정합성 회복 정책도 함께 보강할 예정입니다.
+     */
     private void recover(LinkOperationStore.Operation operation) {
         try {
             if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
