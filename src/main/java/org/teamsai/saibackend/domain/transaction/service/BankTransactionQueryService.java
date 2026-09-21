@@ -18,6 +18,8 @@ import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepos
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,22 @@ public class BankTransactionQueryService {
     private final BankTransactionRepository bankTransactionRepository;
 
     private final LinkedBankAccountRepository linkedBankAccountRepository;
+
+    @Transactional(readOnly = true)
+    public PageResponse<IntegratedBankTransactionResponse> getIntegratedTransactions(
+            Long userId, Long linkedAccountId, BankTransactionSearchCondition condition
+    ) {
+        if (linkedAccountId != null) {
+            validateOwnership(userId, linkedAccountId);
+        }
+        Page<IntegratedBankTransactionResponse> result = bankTransactionRepository.searchIntegrated(
+                userId, ConnectionStatus.AVAILABLE, linkedAccountId,
+                condition.processingStatus(), condition.transactionType(), condition.keyword(),
+                condition.fromDate() == null ? null : condition.fromDate().atStartOfDay(),
+                condition.toDate() == null ? null : condition.toDate().plusDays(1).atStartOfDay(),
+                PageRequest.of(Math.toIntExact(condition.page()), Math.toIntExact(condition.size())));
+        return PageResponse.of(result.getContent(), condition.page(), condition.size(), result.getTotalElements());
+    }
 
     @Transactional(readOnly = true)
     public PageResponse<BankTransactionListItemResponse> getTransactions(

@@ -1,6 +1,8 @@
 package org.teamsai.saibackend.domain.transaction.repository;
 
 import jakarta.persistence.LockModeType;
+import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,6 +22,45 @@ import java.util.Optional;
 public interface BankTransactionRepository
         extends JpaRepository<BankTransactionEntity, Long> {
 
+    @Query(value = """
+            SELECT new org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse(
+                bt, account.bankCode, account.accountNumber)
+
+            FROM BankTransactionEntity bt
+            JOIN LinkedBankAccount account ON account.linkedAccountId = bt.linkedAccountId
+            WHERE account.userId = :userId AND account.connectionStatus = :connectionStatus
+              AND (:linkedAccountId IS NULL OR bt.linkedAccountId = :linkedAccountId)
+              AND (:processingStatus IS NULL OR bt.processingStatus = :processingStatus)
+              AND (:transactionType IS NULL OR bt.transactionType = :transactionType)
+              AND (:keyword IS NULL OR bt.counterpartyName LIKE CONCAT('%', :keyword, '%')
+                   OR bt.memo LIKE CONCAT('%', :keyword, '%'))
+              AND (:fromDateTime IS NULL OR bt.transactionAt >= :fromDateTime)
+              AND (:toDateTimeExclusive IS NULL OR bt.transactionAt < :toDateTimeExclusive)
+            ORDER BY bt.transactionAt DESC, bt.bankTransactionId DESC
+            """, countQuery = """
+            SELECT COUNT(bt)
+
+            FROM BankTransactionEntity bt
+            JOIN LinkedBankAccount account ON account.linkedAccountId = bt.linkedAccountId
+            WHERE account.userId = :userId AND account.connectionStatus = :connectionStatus
+              AND (:linkedAccountId IS NULL OR bt.linkedAccountId = :linkedAccountId)
+              AND (:processingStatus IS NULL OR bt.processingStatus = :processingStatus)
+              AND (:transactionType IS NULL OR bt.transactionType = :transactionType)
+              AND (:keyword IS NULL OR bt.counterpartyName LIKE CONCAT('%', :keyword, '%')
+                   OR bt.memo LIKE CONCAT('%', :keyword, '%'))
+              AND (:fromDateTime IS NULL OR bt.transactionAt >= :fromDateTime)
+              AND (:toDateTimeExclusive IS NULL OR bt.transactionAt < :toDateTimeExclusive)
+            """)
+    Page<IntegratedBankTransactionResponse> searchIntegrated(
+            @Param("userId") Long userId,
+            @Param("connectionStatus") ConnectionStatus connectionStatus,
+            @Param("linkedAccountId") Long linkedAccountId,
+            @Param("processingStatus") BankTransactionProcessingStatus processingStatus,
+            @Param("transactionType") BankTransactionType transactionType,
+            @Param("keyword") String keyword,
+            @Param("fromDateTime") LocalDateTime fromDateTime,
+            @Param("toDateTimeExclusive") LocalDateTime toDateTimeExclusive,
+            Pageable pageable);
     @Modifying(flushAutomatically = true)
     @Query(value = """
             INSERT INTO bank_transaction (
