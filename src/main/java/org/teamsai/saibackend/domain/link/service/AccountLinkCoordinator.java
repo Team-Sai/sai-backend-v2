@@ -64,12 +64,11 @@ public class AccountLinkCoordinator {
                 if (operation.status() == COMPLETED) {
                     return null;
                 }
-                if (operation.status() == COMPENSATION_PENDING) {
-                    compensate(operation);
+                if (operation.status() != FAILED) {
+                    recover(operation);
                     throw AccountErrorCode.LINK_REQUEST_CONFLICT.toException();
                 }
-                throw (operation.status() == FAILED ? AccountErrorCode.LINK_REQUEST_CONFLICT
-                        : AccountErrorCode.LINK_RECONCILIATION_REQUIRED).toException();
+                throw AccountErrorCode.LINK_REQUEST_CONFLICT.toException();
             }
             requireResolved(userId);
             users.findById(userId).orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
@@ -114,8 +113,51 @@ public class AccountLinkCoordinator {
         });
     }
 
+    public void recoverUnresolved(Long userId) {
+        lock.execute(userId, () -> {
+            requireResolved(userId);
+            return null;
+        });
+    }
+
     private void requireResolved(Long userId) {
+        for (var operation : operations.findUnresolved(userId)) {
+            recover(operation);
+        }
         if (operations.hasUnresolved(userId)) {
+            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+        }
+    }
+
+    /**
+     * 미완료 연동 작업을 이전 키 상태로 되돌립니다.
+     *
+     * PROCESSING은 confirm 호출 전 중단뿐 아니라 confirm 성공 후
+     * 후속 처리 전에 중단된 경우에도 남을 수 있으므로,
+     * 로컬 작업 상태만으로 은행의 confirm 여부를 판단하지 않습니다.
+     *
+     * PROCESSING, CONFIRM_UNKNOWN, COMPENSATION_PENDING 모두
+     * 은행 recover API를 통해 이전 키 상태로 수렴시킵니다.
+     * 해당 API는 pending 취소, confirm된 신규 키 복원,
+     * 이미 복구된 요청의 재시도를 처리하며 다른 키와 충돌하면 거부합니다.
+     *
+     * TODO: 은행 측 작업 ID 및 복구 기한 검증 도입 시,
+     *       오래된 미완료 작업과 기한 초과 작업의 정합성 회복 정책도 함께 보강할 예정입니다.
+     */
+    private void recover(LinkOperationStore.Operation operation) {
+        try {
+            if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
+                throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+            }
+            if (!Objects.equals(operation.previousKey(), operation.newKey())) {
+                var user = users.findById(operation.userId())
+                        .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
+                bank.recoverUserKey(user.getUserToken(), operation.newKey(), operation.previousKey());
+            }
+            operations.mark(operation.id(), FAILED);
+        } catch (RuntimeException e) {
+            log.error("계좌 연동 복구 미완료 - userId: {}, operationId: {}",
+                    operation.userId(), operation.id());
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
     }
@@ -141,28 +183,8 @@ public class AccountLinkCoordinator {
                 return;
             }
             operations.mark(operation.id(), COMPENSATION_PENDING);
-            compensate(operation);
+            recover(operation);
             throw e;
-        }
-    }
-
-    private void compensate(LinkOperationStore.Operation operation) {
-        try {
-            if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
-                throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
-            }
-            if (!Objects.equals(operation.previousKey(), operation.newKey())) {
-                if (operation.previousKey() == null) {
-                    bank.revokeUserKey(operation.newKey());
-                } else {
-                    bank.restoreUserKey(operation.newKey(), operation.previousKey());
-                }
-            }
-            operations.mark(operation.id(), FAILED);
-        } catch (RuntimeException e) {
-            log.error("계좌 연동 보상 미완료 - userId: {}, operationId: {}",
-                    operation.userId(), operation.id());
-            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
     }
 

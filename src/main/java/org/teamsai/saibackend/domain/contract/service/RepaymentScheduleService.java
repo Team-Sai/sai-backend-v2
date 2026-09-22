@@ -194,8 +194,8 @@ public class RepaymentScheduleService {
         };
 
         List<RepaymentScheduleEntity> newEntities = newSchedules.stream()
-                        .map(this::toEntity)
-                        .toList();
+                .map(this::toEntity)
+                .toList();
 
         repaymentScheduleRepository.saveAll(newEntities);
     }

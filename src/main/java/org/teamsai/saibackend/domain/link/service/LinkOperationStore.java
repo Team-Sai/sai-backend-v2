@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -19,9 +20,9 @@ public class LinkOperationStore {
 
     public Optional<Operation> find(String id) {
         return jdbc.query("SELECT * FROM account_link_operation WHERE operation_id = ?",
-                (rs, row) -> new Operation(rs.getString("operation_id"), rs.getLong("user_id"),
-                        rs.getString("request_hash"), rs.getString("previous_user_key"),
-                        rs.getString("new_user_key"), Status.valueOf(rs.getString("status"))), id)
+                        (rs, row) -> new Operation(rs.getString("operation_id"), rs.getLong("user_id"),
+                                rs.getString("request_hash"), rs.getString("previous_user_key"),
+                                rs.getString("new_user_key"), Status.valueOf(rs.getString("status"))), id)
                 .stream().findFirst();
     }
 
@@ -30,6 +31,18 @@ public class LinkOperationStore {
                 SELECT COUNT(*) FROM account_link_operation
                 WHERE user_id = ? AND status NOT IN ('COMPLETED', 'FAILED')
                 """, Long.class, userId) > 0;
+    }
+
+    // confirm 여부가 불명확한 작업도 포함합니다.
+    // 복구 정책은 AccountLinkCoordinator.recover()에서 적용합니다.
+    public List<Operation> findUnresolved(Long userId) {
+        return jdbc.query("""
+                SELECT * FROM account_link_operation
+                WHERE user_id = ? AND status NOT IN ('COMPLETED', 'FAILED')
+                ORDER BY created_at, operation_id
+                """, (rs, row) -> new Operation(rs.getString("operation_id"), rs.getLong("user_id"),
+                rs.getString("request_hash"), rs.getString("previous_user_key"),
+                rs.getString("new_user_key"), Status.valueOf(rs.getString("status"))), userId);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

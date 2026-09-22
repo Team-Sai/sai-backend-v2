@@ -41,6 +41,28 @@ class MockBankClientTest {
     }
 
     @Test
+    void recoverySendsOwnershipAndKeysWithInternalAuthentication() {
+        mockServer.expect(requestTo(BASE_URL + "/api/link/recover-key"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(header("X-Internal-Api-Key", API_KEY))
+                .andExpect(jsonPath("$.userToken").value("token"))
+                .andExpect(jsonPath("$.currentUserKey").value("new"))
+                .andExpect(jsonPath("$.previousUserKey").value("old"))
+                .andRespond(withNoContent());
+        mockBankClient.recoverUserKey("token", "new", "old");
+        mockServer.verify();
+    }
+
+    @Test
+    void recoveryConflictIsNotTreatedAsSuccess() {
+        mockServer.expect(requestTo(BASE_URL + "/api/link/recover-key"))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+        assertThatThrownBy(() -> mockBankClient.recoverUserKey("token", "new", null))
+                .isInstanceOf(org.springframework.web.client.RestClientException.class);
+        mockServer.verify();
+    }
+
+    @Test
     @DisplayName("requestUserKey - 성공 시 userKey를 반환한다")
     void requestUserKey_성공() {
         mockServer.expect(requestTo(BASE_URL + "/api/mock-bank/link"))

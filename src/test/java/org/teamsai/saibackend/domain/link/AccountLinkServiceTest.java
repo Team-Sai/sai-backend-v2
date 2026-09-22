@@ -7,6 +7,7 @@ import org.teamsai.saibackend.global.exception.DomainException;
 import java.util.List;
 import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.*;
+
 class AccountLinkServiceTest {
     private final UserRepository users = mock(UserRepository.class);
     private final LinkedAccountWriter writer = mock(LinkedAccountWriter.class);
@@ -23,14 +24,14 @@ class AccountLinkServiceTest {
     }
     @Test void conflictDoesNotSaveAccountsOrReceipt() {
         assertThatThrownBy(()->service.completeLink(1L,"new","old",List.of(),"request"))
-            .isInstanceOf(DomainException.class);
+                .isInstanceOf(DomainException.class);
         verifyNoInteractions(writer,operations);
     }
     @Test void failedAccountWriteDoesNotCompleteReceipt() {
         when(users.updateUserKeyByUserId(1L,"new",null)).thenReturn(1);
         when(writer.insertAll(List.of())).thenThrow(new IllegalStateException("db"));
         assertThatThrownBy(()->service.completeLink(1L,"new",null,List.of(),"request"))
-            .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(operations);
     }
 }
