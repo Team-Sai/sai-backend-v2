@@ -7,9 +7,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.teamsai.saibackend.domain.contract.assembler.ContractChangeAssembler;
 import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.event.ContractCompletedEvent;
@@ -38,6 +38,7 @@ import java.util.Objects;
 public class ContractChangeService {
 
     private final LoanContractService loanContractService;
+    private final LoanChangeService loanChangeService;
     private final RepaymentScheduleService repaymentScheduleService;
     private final NotificationService notificationService;
     private final UserService userService;
@@ -45,25 +46,6 @@ public class ContractChangeService {
     private final IdentityService identityService;
     private final ApplicationEventPublisher eventPublisher;
     private final ContractChangeRepository contractChangeRepository;
-
-    private LoanContractChangeDTO toDTO(LoanContractChangeRequestEntity entity) {
-        return LoanContractChangeDTO.builder()
-                .changeRequestId(entity.getChangeRequestId())
-                .contractId(entity.getContractId())
-                .userId(entity.getUserId())
-                .changeReason(entity.getChangeReason())
-                .newMaturityDate(entity.getNewMaturityDate())
-                .newInterestRate(entity.getNewInterestRate())
-                .newRepaymentType(entity.getNewRepaymentType())
-                .newRepaymentDate(entity.getNewRepaymentDate())
-                .newTerms(entity.getNewTerms())
-                .status(entity.getStatus())
-                .returnReason(entity.getReturnReason())
-                .requesterSignature(entity.getRequesterSignature())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .build();
-    }
 
     public LoanContractChangeRequestEntity getChangeRequestForUpdate(Long changeRequestId) {
         return contractChangeRepository.findByIdForUpdate(changeRequestId)
@@ -87,7 +69,7 @@ public class ContractChangeService {
     }
 
     private LoanContractResponse getPendingChangedContract(Long contractId) {
-        return loanContractService.findPendingContractByPreviousId(contractId)
+        return loanChangeService.findPendingContractByPreviousId(contractId)
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
     }
 
@@ -105,8 +87,8 @@ public class ContractChangeService {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
 
-        boolean isCreditor = Objects.equals(contract.getCreditorId(), userId);
-        boolean isDebtor = Objects.equals(contract.getDebtorId(), userId);
+        boolean isCreditor = contract.isCreditor(userId);
+        boolean isDebtor = contract.isDebtor(userId);
 
         if (!isCreditor && !isDebtor) {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
@@ -161,32 +143,14 @@ public class ContractChangeService {
             throw ContractChangeErrorCode.DUPLICATE_PENDING_REQUEST.toException();
         }
 
-        ChangeLoanContractResponse newContractDTO = ChangeLoanContractResponse.builder()
-                .previousContractId(contractId)
-                .creditorId(contract.getCreditorId())
-                .debtorId(contract.getDebtorId())
-                .relationType(contract.getRelationType())
-                .principalAmount(contract.getPrincipalAmount())
-                .interestRate(request.getNewInterestRate() != null ? request.getNewInterestRate() : contract.getInterestRate())
-                .repaymentType(request.getNewRepaymentType() != null ? RepaymentMethod.valueOf(request.getNewRepaymentType()) : contract.getRepaymentType())
-                .startDate(contract.getStartDate())
-                .maturityDate(request.getNewMaturityDate() != null ? request.getNewMaturityDate() : contract.getMaturityDate())
-                .repaymentDay(request.getNewRepaymentDate() != null ? request.getNewRepaymentDate() : contract.getRepaymentDay())
-                .creditorAddress(contract.getCreditorAddress())
-                .debtorAddress(contract.getDebtorAddress())
-                .contractAlias(contract.getContractAlias())
-                .terms(request.getNewTerms() != null ? request.getNewTerms() : contract.getTerms())
-                .status(ContractStatus.PENDING)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        ChangeLoanContractResponse newContractDTO = ContractChangeAssembler.toChangedContract(contract, request, contractId, now);
 
-        loanContractService.insertChangedContract(newContractDTO);
+        loanChangeService.insertChangedContract(newContractDTO);
 
         log.info("계약 변경 요청 생성 및 차용증 재저장 완료: contractId={}, userId={}",
                 contractId, userId);
 
-        return toDTO(savedEntity);
+        return LoanContractChangeDTO.from(savedEntity);
     }
 
     @Transactional
@@ -231,11 +195,11 @@ public class ContractChangeService {
 
         LoanContractResponse v2 = getPendingChangedContract(contractId);
 
-        loanContractService.rejectChangedContract(v2.getContractId());
+        loanChangeService.rejectChangedContract(v2.getContractId());
 
         log.info("계약 변경 요청 반려 처리 완료: contractId={}, changeRequestId={}", contractId, changeRequestId);
 
-        return toDTO(changeRequest);
+        return LoanContractChangeDTO.from(changeRequest);
 
     }
 
@@ -244,8 +208,8 @@ public class ContractChangeService {
 
         LoanContractResponse contract = loanContractService.getContractForInternalUse(contractId);
 
-        boolean isCreditor = Objects.equals(contract.getCreditorId(), userId);
-        boolean isDebtor = Objects.equals(contract.getDebtorId(), userId);
+        boolean isCreditor = contract.isCreditor(userId);
+        boolean isDebtor = contract.isDebtor(userId);
 
         if (!isCreditor && !isDebtor) {
             throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
@@ -284,22 +248,22 @@ public class ContractChangeService {
         String savedPath = fileService.saveSignatureFile(contractId, signature);
 
         if (isCreditor) {
-            loanContractService.updateCreditorSignatureOnly(contractId, savedPath);
+            loanChangeService.updateCreditorSignatureOnly(contractId, savedPath);
         } else {
-            loanContractService.updateDebtorSignatureOnly(contractId, savedPath);
+            loanChangeService.updateDebtorSignatureOnly(contractId, savedPath);
         }
 
         changeRequest.approve();
         contractChangeRepository.save(changeRequest);
 
-        loanContractService.supersedeContract(v1ContractId);
+        loanChangeService.supersedeContract(v1ContractId);
 
         repaymentScheduleService.generateChangedSchedule(v1ContractId, contractId);
 
         log.info("계약 변경 승인 처리 완료: v1ContractId={}, v2ContractId={}, changeRequestId={}",
                 v1ContractId, contractId, changeRequest.getChangeRequestId());
 
-        LoanContractResponse completedContract = loanContractService.buildCompletedSnapshot(contract, isCreditor, savedPath);
+        LoanContractResponse completedContract = loanChangeService.buildCompletedSnapshot(contract, isCreditor, savedPath);
         eventPublisher.publishEvent(new ContractCompletedEvent(completedContract));
 
         try {
@@ -350,7 +314,7 @@ public class ContractChangeService {
         contractChangeRepository.save(changeRequest);
 
         LoanContractResponse v2 = getPendingChangedContract(contractId);
-        loanContractService.rejectChangedContract(v2.getContractId());
+        loanChangeService.rejectChangedContract(v2.getContractId());
 
         log.info("계약 변경 요청 취소 처리 완료: contractId={}, changeRequestId={}, userId={}",
                 contractId, changeRequestId, userId);
@@ -395,7 +359,7 @@ public class ContractChangeService {
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         UserResponse requesterInfo = userService.getMyInfo(userId);
 
-        boolean isCreditor = Objects.equals(contract.getCreditorId(), userId);
+        boolean isCreditor = contract.isCreditor(userId);
         Long recipientId = isCreditor ? contract.getDebtorId() : contract.getCreditorId();
 
         if(recipientId != null) {
@@ -412,6 +376,6 @@ public class ContractChangeService {
             contractId, changeRequestId);
         }
 
-        return toDTO(changeRequest);
+        return LoanContractChangeDTO.from(changeRequest);
     }
 }
