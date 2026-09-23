@@ -13,7 +13,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionRetryService;
 import org.teamsai.saibackend.domain.matching.type.RetryPolicy;
