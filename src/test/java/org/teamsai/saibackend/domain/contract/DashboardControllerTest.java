@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.contract.controller.DashboardController;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 class DashboardControllerTest {
 
     @Mock
-    private DashboardService dashboardService;
+    private DashboardQueryService dashboardService;
 
     @InjectMocks
     private DashboardController dashboardController;

@@ -14,10 +14,10 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class SettlementSummaryService {
+public class SettlementSummaryQueryService {
 
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
+    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @Transactional(readOnly = true)
     public SettlementSummaryResponse getSummary(Long userId) {

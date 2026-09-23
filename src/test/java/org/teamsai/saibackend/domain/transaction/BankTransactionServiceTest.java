@@ -10,6 +10,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
+import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
@@ -25,6 +28,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("BankTransactionService 단위 테스트")
@@ -32,6 +36,9 @@ class BankTransactionServiceTest {
 
     @Mock
     private BankTransactionRepository bankTransactionRepository;
+
+    @Mock
+    private LinkedBankAccountRepository linkedBankAccountRepository;
 
     @Mock
     private EntityManager entityManager;
@@ -42,6 +49,48 @@ class BankTransactionServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(bankTransactionService, "entityManager", entityManager);
+    }
+
+    @Test
+    @DisplayName("본인 계좌의 거래를 잠금 조회해 상세 응답을 반환한다")
+    void getsOwnedTransactionDetailForUpdate() {
+        LinkedBankAccount account = LinkedBankAccount.builder().userId(7L).build();
+        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
+        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.of(account));
+        given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(101L, 1L))
+                .willReturn(Optional.of(transaction));
+
+        var result = bankTransactionService.getOwnedTransactionDetailForUpdate(7L, 1L, 101L);
+
+        assertThat(result.linkedAccountId()).isEqualTo(1L);
+        assertThat(result.amount()).isEqualByComparingTo("1");
+        assertThat(result.processingStatus()).isEqualTo(BankTransactionProcessingStatus.NEEDS_CHECK);
+        verify(entityManager).refresh(transaction, LockModeType.PESSIMISTIC_WRITE);
+    }
+
+    @Test
+    @DisplayName("타인 계좌의 거래는 잠금 조회하지 않는다")
+    void rejectsOtherUsersTransactionForUpdate() {
+        LinkedBankAccount account = LinkedBankAccount.builder().userId(8L).build();
+        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> bankTransactionService.getOwnedTransactionDetailForUpdate(7L, 1L, 101L))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(AccountErrorCode.ACCOUNT_ACCESS_DENIED));
+        verifyNoInteractions(bankTransactionRepository);
+    }
+
+    @Test
+    @DisplayName("연결 계좌가 없으면 거래를 조회하지 않는다")
+    void rejectsMissingAccountForUpdate() {
+        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bankTransactionService.getOwnedTransactionDetailForUpdate(7L, 1L, 101L))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND));
+        verifyNoInteractions(bankTransactionRepository);
     }
 
     @Test

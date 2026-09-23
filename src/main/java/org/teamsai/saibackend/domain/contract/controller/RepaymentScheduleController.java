@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleQueryService;
 
 @Tag(
         name = "차용증 API",
@@ -23,7 +23,7 @@ import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 @RequiredArgsConstructor
 public class RepaymentScheduleController {
 
-    private final RepaymentScheduleService repaymentScheduleService;
+    private final RepaymentScheduleQueryService repaymentScheduleQueryService;
 
     @Hidden
     @GetMapping("/contracts/{contractId}/schedule")
@@ -54,6 +54,6 @@ public class RepaymentScheduleController {
             @PathVariable Long contractId,
             @AuthenticationPrincipal(expression = "userId") Long userID
     ) {
-        return repaymentScheduleService.getScheduleSummary(contractId, userID);
+        return repaymentScheduleQueryService.getScheduleSummary(contractId, userID);
     }
 }
