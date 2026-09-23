@@ -18,9 +18,9 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class SettlementPaymentHistoryService {
+public class SettlementPaymentHistoryQueryService {
 
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
+    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
     private final PaymentRecordService paymentRecordService;
     private final BankTransactionService bankTransactionService;
 

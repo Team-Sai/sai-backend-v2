@@ -10,8 +10,8 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHi
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryQueryService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
@@ -21,14 +21,14 @@ import java.util.Optional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SettlementArchiveService {
+public class SettlementArchiveQueryService {
 
     private static final String DOCUMENT_VERSION = "v1";
     private static final String SETTLEMENT_DISPLAY_ID_PREFIX = "ST-";
 
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
-    private final SettlementPaymentHistoryService settlementPaymentHistoryService;
+    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
+    private final SettlementPaymentHistoryQueryService settlementPaymentHistoryService;
     private final SettlementAccountService settlementAccountService;
 
     public SettlementArchivePreviewResponse getArchivePreview(Long settlementId, Long userId) {
