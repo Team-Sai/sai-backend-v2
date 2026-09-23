@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
-import org.teamsai.saibackend.domain.contract.controller.ContractDetailController;
+import org.teamsai.saibackend.domain.contract.controller.ContractDetailQueryController;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
@@ -20,8 +20,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ContractDetailController 서명 조회 단위 테스트")
-class ContractDetailControllerTest {
+@DisplayName("ContractDetailQueryController 서명 조회 단위 테스트")
+class ContractDetailQueryControllerTest {
 
     private static final Long CONTRACT_ID = 1L;
     private static final Long USER_ID = 10L;
@@ -33,7 +33,7 @@ class ContractDetailControllerTest {
     private ArchiveService archiveService;
 
     @InjectMocks
-    private ContractDetailController contractDetailController;
+    private ContractDetailQueryController contractDetailQueryController;
 
     private ContractDetailResponse detailWith(String creditorSignature, String debtorSignature) {
         LoanContractResponse contract = LoanContractResponse.builder()
@@ -58,7 +58,7 @@ class ContractDetailControllerTest {
         given(archiveService.loadSignatureDataUri("creditor.png")).willReturn("data:image/png;base64,creditor");
         given(archiveService.loadSignatureDataUri("debtor.png")).willReturn("data:image/png;base64,debtor");
 
-        Map<String, String> result = contractDetailController.getSignatures(CONTRACT_ID, USER_ID);
+        Map<String, String> result = contractDetailQueryController.getSignatures(CONTRACT_ID, USER_ID);
 
         assertThat(result.get("creditorSignatureDataUri")).isEqualTo("data:image/png;base64,creditor");
         assertThat(result.get("debtorSignatureDataUri")).isEqualTo("data:image/png;base64,debtor");
@@ -72,7 +72,7 @@ class ContractDetailControllerTest {
         given(archiveService.loadSignatureDataUri("creditor.png")).willReturn("data:image/png;base64,creditor");
         given(archiveService.loadSignatureDataUri(null)).willReturn(null);
 
-        Map<String, String> result = contractDetailController.getSignatures(CONTRACT_ID, USER_ID);
+        Map<String, String> result = contractDetailQueryController.getSignatures(CONTRACT_ID, USER_ID);
 
         assertThat(result.get("creditorSignatureDataUri")).isEqualTo("data:image/png;base64,creditor");
         assertThat(result.get("debtorSignatureDataUri")).isNull();
@@ -84,7 +84,7 @@ class ContractDetailControllerTest {
         given(contractDetailService.getCheck(CONTRACT_ID, USER_ID))
                 .willThrow(LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException());
 
-        assertThatThrownBy(() -> contractDetailController.getSignatures(CONTRACT_ID, USER_ID))
+        assertThatThrownBy(() -> contractDetailQueryController.getSignatures(CONTRACT_ID, USER_ID))
                 .isInstanceOf(RuntimeException.class);
     }
 }

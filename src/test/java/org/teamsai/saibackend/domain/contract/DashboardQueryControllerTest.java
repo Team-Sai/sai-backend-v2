@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.contract.controller.DashboardController;
+import org.teamsai.saibackend.domain.contract.controller.DashboardQueryController;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.service.DashboardService;
 
@@ -15,13 +15,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class DashboardControllerTest {
+class DashboardQueryControllerTest {
 
     @Mock
     private DashboardService dashboardService;
 
     @InjectMocks
-    private DashboardController dashboardController;
+    private DashboardQueryController dashboardQueryController;
 
     @Test
     @DisplayName("전달받은 파라미터를 그대로 Service에 넘기고 결과를 반환한다")
@@ -43,7 +43,7 @@ class DashboardControllerTest {
         when(dashboardService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page))
                 .thenReturn(expected);
 
-        DashboardResponse actual = dashboardController.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
+        DashboardResponse actual = dashboardQueryController.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
 
         assertThat(actual).isEqualTo(expected);
         verify(dashboardService).getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
@@ -57,7 +57,7 @@ class DashboardControllerTest {
         when(dashboardService.getDashboard(userId, null, null, null, null, 1))
                 .thenReturn(DashboardResponse.builder().currentPage(1).build());
 
-        DashboardResponse actual = dashboardController.getDashboard(userId, null, null, null, null, 1);
+        DashboardResponse actual = dashboardQueryController.getDashboard(userId, null, null, null, null, 1);
 
         assertThat(actual.getCurrentPage()).isEqualTo(1);
     }
