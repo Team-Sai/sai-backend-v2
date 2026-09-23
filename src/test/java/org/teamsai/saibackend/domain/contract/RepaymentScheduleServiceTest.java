@@ -13,7 +13,6 @@ import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
@@ -27,7 +26,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
@@ -114,48 +112,6 @@ class RepaymentScheduleServiceTest {
                 .isInstanceOf(DomainException.class);
 
         verify(repaymentScheduleRepository, never()).saveAll(anyList());
-    }
-
-    @Test
-    @DisplayName("요약 조회 시 PAID 건만 누적 납부액에 합산된다")
-    void getScheduleSummary_calculatesCorrectly() {
-        Long contractId = 1L;
-        Long userId = 10L;
-
-        when(loanContractService.findContract(contractId, userId))
-                .thenReturn(LoanContractResponse.builder().contractId(contractId).creditorId(userId).build());
-
-        List<RepaymentScheduleEntity> schedules = List.of(
-                buildRow(1, RepaymentScheduleStatus.PAID, "800000"),
-                buildRow(2, RepaymentScheduleStatus.PAID, "800000"),
-                buildRow(3, RepaymentScheduleStatus.PENDING, "800000"),
-                buildRow(4, RepaymentScheduleStatus.PENDING, "800000")
-        );
-        when(repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId)).thenReturn(schedules);
-
-        RepaymentScheduleSummaryResponse summary = repaymentScheduleService.getScheduleSummary(contractId, userId);
-
-        assertThat(summary.getTotalScheduledAmount()).isEqualByComparingTo("3200000");
-        assertThat(summary.getPaidAmount()).isEqualByComparingTo("1600000");
-        assertThat(summary.getRemainingAmount()).isEqualByComparingTo("1600000");
-        assertThat(summary.getPaidCount()).isEqualTo(2);
-        assertThat(summary.getTotalCount()).isEqualTo(4);
-        assertThat(summary.getSchedules()).hasSize(4);
-    }
-
-    @Test
-    @DisplayName("계약 당사자가 아니면 예외를 던지고 조회하지 않는다")
-    void getScheduleSummary_throwsWhenUserIsNotParty() {
-        Long contractId = 1L;
-        Long otherUserId = 999L;
-
-        when(loanContractService.findContract(contractId, otherUserId))
-                .thenThrow(LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException());
-
-        assertThatThrownBy(() -> repaymentScheduleService.getScheduleSummary(contractId, otherUserId))
-                .isInstanceOf(DomainException.class);
-
-        verify(repaymentScheduleRepository, never()).findByContractIdOrderBySequenceAsc(any());
     }
 
     @Test

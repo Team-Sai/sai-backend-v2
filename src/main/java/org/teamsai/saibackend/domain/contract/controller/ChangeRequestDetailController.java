@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.teamsai.saibackend.domain.contract.dto.ChangeRequestDetailDTO;
-import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailService;
+import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailQueryService;
 
 @Tag(
         name = "차용증 API",
@@ -24,7 +24,7 @@ import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailService
 @RequiredArgsConstructor
 public class ChangeRequestDetailController {
 
-    private final ChangeRequestDetailService changeRequestDetailService;
+    private final ChangeRequestDetailQueryService changeRequestDetailService;
 
     @Hidden
     @GetMapping("/contracts/{contractId}/change-requests/{changeRequestId}")

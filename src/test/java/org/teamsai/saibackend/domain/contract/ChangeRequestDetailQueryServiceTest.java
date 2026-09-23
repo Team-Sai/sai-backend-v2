@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.dto.ChangeRequestDetailDTO;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
-import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailService;
+import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
@@ -28,8 +28,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ChangeRequestDetailService 단위 테스트")
-class ChangeRequestDetailServiceTest {
+@DisplayName("ChangeRequestDetailQueryService 단위 테스트")
+class ChangeRequestDetailQueryServiceTest {
 
     private static final Long CONTRACT_ID = 1L;
     private static final Long CHANGE_REQUEST_ID = 5L;
@@ -40,7 +40,7 @@ class ChangeRequestDetailServiceTest {
     private ContractChangeService contractChangeService;
 
     @InjectMocks
-    private ChangeRequestDetailService changeRequestDetailService;
+    private ChangeRequestDetailQueryService changeRequestDetailService;
 
     private LoanContractChangeRequestEntity buildChangeRequest(
             Long changeRequestId,

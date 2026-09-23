@@ -15,7 +15,6 @@ import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.service.LoanPaymentService;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
-import org.teamsai.saibackend.domain.transaction.service.BankTransactionQueryService;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -24,7 +23,6 @@ import org.teamsai.saibackend.global.exception.DomainException;
 @RequiredArgsConstructor
 public class BankTransactionMatchingReviewService {
 
-    private final BankTransactionQueryService bankTransactionQueryService;
     private final BankTransactionMatchCandidateService candidateService;
     private final SettlementPaymentService settlementPaymentService;
     private final LoanPaymentService loanPaymentService;
@@ -109,7 +107,7 @@ public class BankTransactionMatchingReviewService {
             Long bankTransactionId
     ) {
         BankTransactionDetailResponse transaction =
-                bankTransactionQueryService.getTransactionDetailForUpdate(
+                bankTransactionService.getOwnedTransactionDetailForUpdate(
                         userId,
                         linkedAccountId,
                         bankTransactionId

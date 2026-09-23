@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.service.ContractDetailService;
+import org.teamsai.saibackend.domain.contract.service.ContractDetailQueryService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +29,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ContractDetailController {
 
-    private final ContractDetailService contractDetailService;
+    private final ContractDetailQueryService contractDetailService;
     private final ArchiveService archiveService;
 
     @Hidden
@@ -89,4 +89,3 @@ public class ContractDetailController {
     }
 
 }
-

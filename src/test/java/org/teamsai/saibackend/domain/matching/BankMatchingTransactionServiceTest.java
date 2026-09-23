@@ -24,7 +24,7 @@ import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateReposi
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
@@ -59,7 +59,7 @@ class BankMatchingTransactionServiceTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private SettlementPaymentStatusService settlementPaymentStatusService;
+    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
     @InjectMocks
     private BankMatchingTransactionService transactionService;
     @Test

@@ -7,7 +7,7 @@ import org.teamsai.saibackend.domain.calendar.response.DashboardCalendarItemResp
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.dto.response.*;
@@ -17,7 +17,7 @@ import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.math.BigDecimal;
@@ -31,20 +31,20 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class IntegrationDashboardService {
+public class IntegrationDashboardQueryService {
 
-    private final DashboardService contractDashboardService;
+    private final DashboardQueryService contractDashboardQueryService;
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
+    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     public IntegrationDashboardResponse getDashboard(
             Long userId,
             YearMonth yearMonth
     ) {
-        DashboardService.IntegrationDashboardData loanData =
-                contractDashboardService.getIntegrationDashboardData(userId);
+        DashboardQueryService.IntegrationDashboardData loanData =
+                contractDashboardQueryService.getIntegrationDashboardData(userId);
         DashboardResponse contractDashboard = loanData.dashboard();
-        List<DashboardService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
+        List<DashboardQueryService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
         List<SettlementContext> settlements = getSettlements(userId);
 
         return IntegrationDashboardResponse.builder()
@@ -209,7 +209,7 @@ public class IntegrationDashboardService {
     }
 
     private List<DashboardCalendarDayResponse> getLoanCalendarDays(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             YearMonth yearMonth,
             Long userId
     ) {
@@ -241,7 +241,7 @@ public class IntegrationDashboardService {
     }
 
     private List<DashboardCalendarDayResponse> getCalendarDays(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             YearMonth yearMonth,
             Long userId
@@ -276,7 +276,7 @@ public class IntegrationDashboardService {
     }
 
     private List<DashboardCalendarItemResponse> getLoanCalendarItems(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             LocalDate date,
             Long userId
     ) {
@@ -352,9 +352,9 @@ public class IntegrationDashboardService {
     }
 
     public List<DashboardCalendarItemResponse> getCalendarDayDetail(Long userId, LocalDate date) {
-        DashboardService.IntegrationDashboardData loanData =
-                contractDashboardService.getIntegrationDashboardData(userId);
-        List<DashboardService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
+        DashboardQueryService.IntegrationDashboardData loanData =
+                contractDashboardQueryService.getIntegrationDashboardData(userId);
+        List<DashboardQueryService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
         List<SettlementContext> settlements = getSettlements(userId);
 
         List<DashboardCalendarItemResponse> items = new ArrayList<>();
@@ -366,7 +366,7 @@ public class IntegrationDashboardService {
     }
 
     private List<DashboardAttentionItemResponse> getUpcomingLoanAttentionItems(
-            List<DashboardService.LoanScheduleContext> loanSchedules
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules
     ) {
         LocalDate today = LocalDate.now();
         LocalDate attentionLimit = today.plusDays(3);
@@ -395,7 +395,7 @@ public class IntegrationDashboardService {
     }
 
     private List<DashboardAttentionItemResponse> getAttentionItems(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements
     ) {
         LocalDate today = LocalDate.now();
@@ -423,11 +423,11 @@ public class IntegrationDashboardService {
     }
 
     private DashboardMonthlySummaryResponse getMonthlySummary(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             YearMonth yearMonth
     ) {
-        List<DashboardService.LoanScheduleContext> monthlySchedules = loanSchedules.stream()
+        List<DashboardQueryService.LoanScheduleContext> monthlySchedules = loanSchedules.stream()
                 .filter(context -> YearMonth.from(context.schedule().getDueDate()).equals(yearMonth))
                 .toList();
 

@@ -12,10 +12,10 @@ import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
 import org.teamsai.saibackend.domain.integration.dto.response.IntegrationDashboardResponse;
-import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardService;
+import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardQueryService;
 import org.teamsai.saibackend.domain.integration.type.DashboardAttentionType;
 import org.teamsai.saibackend.domain.integration.type.DashboardTransactionStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
@@ -23,7 +23,7 @@ import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.math.BigDecimal;
@@ -39,19 +39,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class IntegrationDashboardServiceTest {
+class IntegrationDashboardQueryServiceTest {
 
     @Mock
-    private DashboardService contractDashboardService;
+    private DashboardQueryService contractDashboardQueryService;
 
     @Mock
     private SettlementQueryService settlementQueryService;
 
     @Mock
-    private SettlementPaymentStatusService settlementPaymentStatusService;
+    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @InjectMocks
-    private IntegrationDashboardService integrationDashboardService;
+    private IntegrationDashboardQueryService integrationDashboardQueryService;
 
     @Test
     void includesLoanReceivableAndPayableAmounts() {
@@ -61,14 +61,14 @@ class IntegrationDashboardServiceTest {
                 .totalBorrowedAmount(BigDecimal.valueOf(1_000_000))
                 .build();
 
-        when(contractDashboardService.getIntegrationDashboardData(userId))
+        when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(
                         DashboardResponse.builder().summary(loanSummary).build(),
                         null,
                         List.of()
                 ));
 
-        IntegrationDashboardResponse response = integrationDashboardService.getDashboard(
+        IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId,
                 YearMonth.of(2026, 8)
         );
@@ -98,7 +98,7 @@ class IntegrationDashboardServiceTest {
                 .contractStatus(DashboardContractStatus.ONGOING)
                 .build();
 
-        when(contractDashboardService.getIntegrationDashboardData(userId))
+        when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(DashboardResponse.builder()
                         .summary(DashboardSummaryResponse.builder()
                                 .totalLentAmount(BigDecimal.ZERO)
@@ -107,7 +107,7 @@ class IntegrationDashboardServiceTest {
                         .contracts(List.of(contract))
                         .build(), null, List.of()));
 
-        IntegrationDashboardResponse response = integrationDashboardService.getDashboard(
+        IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId,
                 YearMonth.of(2026, 8)
         );
@@ -151,12 +151,12 @@ class IntegrationDashboardServiceTest {
         lenient().when(pendingSchedule.getDueDate()).thenReturn(upcomingDueDate);
         lenient().when(pendingSchedule.getStatus()).thenReturn(RepaymentScheduleStatus.PENDING);
 
-        when(contractDashboardService.getIntegrationDashboardData(userId))
+        when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(
                         emptyContractDashboard(), contract, List.of(paidSchedule, pendingSchedule)
                 ));
 
-        IntegrationDashboardResponse response = integrationDashboardService.getDashboard(
+        IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId,
                 requestedMonth
         );
@@ -197,7 +197,7 @@ class IntegrationDashboardServiceTest {
         RepaymentScheduleWithRemainingProjection dueToday = schedule(100L, today, RepaymentScheduleStatus.PENDING);
         RepaymentScheduleWithRemainingProjection overdue = schedule(99L, today.minusDays(1), RepaymentScheduleStatus.PENDING);
 
-        when(contractDashboardService.getIntegrationDashboardData(userId))
+        when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), contract, List.of(
                         dueInFourDays,
                         paidToday,
@@ -206,7 +206,7 @@ class IntegrationDashboardServiceTest {
                         overdue
                 )));
 
-        IntegrationDashboardResponse response = integrationDashboardService.getDashboard(
+        IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId,
                 YearMonth.from(today)
         );
@@ -250,12 +250,12 @@ class IntegrationDashboardServiceTest {
                 obligation(11L, 2L, BigDecimal.valueOf(7000))
         );
 
-        when(contractDashboardService.getIntegrationDashboardData(userId))
+        when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), null, List.of()));
         when(settlementQueryService.getSettlementList(userId)).thenReturn(List.of(settlement));
         when(settlementPaymentStatusService.getPaymentStatus(30L, userId)).thenReturn(paymentStatus);
 
-        IntegrationDashboardResponse response = integrationDashboardService.getDashboard(
+        IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.from(dueDate)
         );
 
@@ -303,12 +303,12 @@ class IntegrationDashboardServiceTest {
                 obligation(13L, 2L, BigDecimal.valueOf(5000))
         );
 
-        when(contractDashboardService.getIntegrationDashboardData(userId))
+        when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), null, List.of()));
         when(settlementQueryService.getSettlementList(userId)).thenReturn(List.of(settlement));
         when(settlementPaymentStatusService.getPaymentStatus(31L, userId)).thenReturn(paymentStatus);
 
-        IntegrationDashboardResponse response = integrationDashboardService.getDashboard(
+        IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.from(dueDate)
         );
 
@@ -344,7 +344,7 @@ class IntegrationDashboardServiceTest {
                 ))
                 .toList();
 
-        when(contractDashboardService.getIntegrationDashboardData(userId))
+        when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(DashboardResponse.builder()
                         .summary(DashboardSummaryResponse.builder()
                                 .totalLentAmount(BigDecimal.ZERO)
@@ -362,7 +362,7 @@ class IntegrationDashboardServiceTest {
                 obligation(settlement.settlementId(), 2L, BigDecimal.valueOf(10_000))
         )));
 
-        IntegrationDashboardResponse response = integrationDashboardService.getDashboard(
+        IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.of(2026, 8)
         );
 
@@ -437,16 +437,16 @@ class IntegrationDashboardServiceTest {
                 .build();
     }
 
-    private DashboardService.IntegrationDashboardData loanData(
+    private DashboardQueryService.IntegrationDashboardData loanData(
             DashboardResponse dashboard,
             LoanContractResponse contract,
             List<RepaymentScheduleWithRemainingProjection> schedules
     ) {
-        List<DashboardService.LoanScheduleContext> contexts = contract == null
+        List<DashboardQueryService.LoanScheduleContext> contexts = contract == null
                 ? List.of()
                 : schedules.stream()
-                .map(schedule -> new DashboardService.LoanScheduleContext(contract, schedule))
+                .map(schedule -> new DashboardQueryService.LoanScheduleContext(contract, schedule))
                 .toList();
-        return new DashboardService.IntegrationDashboardData(dashboard, contexts);
+        return new DashboardQueryService.IntegrationDashboardData(dashboard, contexts);
     }
 }

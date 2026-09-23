@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.teamsai.saibackend.domain.notification.dto.response.NotificationResponse;
-import org.teamsai.saibackend.domain.notification.service.NotificationService;
+import org.teamsai.saibackend.domain.notification.service.NotificationQueryService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
 import java.util.List;
@@ -20,7 +20,7 @@ import java.util.List;
 @RequestMapping("/api/notifications")
 public class NotificationController {
 
-    private final NotificationService notificationService;
+    private final NotificationQueryService notificationQueryService;
 
     @Operation(
             summary = "내 알림 목록 조회",
@@ -46,7 +46,7 @@ public class NotificationController {
             CustomUserDetails userDetails
     ) {
         List<NotificationResponse> notifications =
-                notificationService.getNotifications(
+                notificationQueryService.getNotifications(
                         userDetails.getUserId()
                 );
 

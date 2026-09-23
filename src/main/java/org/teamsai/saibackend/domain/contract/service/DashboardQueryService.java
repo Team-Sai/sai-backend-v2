@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
@@ -15,7 +14,6 @@ import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
 import org.teamsai.saibackend.domain.contract.type.DashboardPaymentStatus;
 import org.teamsai.saibackend.domain.contract.type.TransactionCategory;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
 import java.math.BigDecimal;
@@ -28,7 +26,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class DashboardService {
+public class DashboardQueryService {
 
     private final LoanContractService loanContractService;
     private final RepaymentScheduleService repaymentScheduleService;
@@ -359,15 +357,13 @@ public class DashboardService {
                 .min(Comparator.comparing(RepaymentScheduleWithRemainingProjection::getDueDate));
     }
 
-    public DashboardResponse getDashboard(Long userId, String keyword, String roleFilter, String statusFilter, String sortType, int page) {
+    public DashboardResponse getDashboard(
+            Long userId, String keyword, String roleFilter,
+            String statusFilter, String sortType, int page
+    ) {
         return buildDashboard(
                 getContractScheduleContexts(userId),
-                userId,
-                keyword,
-                roleFilter,
-                statusFilter,
-                sortType,
-                page
+                userId, keyword, roleFilter, statusFilter, sortType, page
         );
     }
 

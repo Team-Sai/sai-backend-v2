@@ -111,26 +111,6 @@ public class BankTransactionQueryService {
         return BankTransactionDetailResponse.from(transaction);
     }
 
-    @Transactional
-    public BankTransactionDetailResponse getTransactionDetailForUpdate(
-            Long userId,
-            Long linkedAccountId,
-            Long bankTransactionId
-    ) {
-        validateOwnership(userId, linkedAccountId);
-
-        BankTransactionEntity transaction = bankTransactionRepository
-                .findLockedByBankTransactionIdAndLinkedAccountId(
-                        bankTransactionId,
-                        linkedAccountId
-                )
-                .orElseThrow(
-                        BankTransactionErrorCode
-                                .BANK_TRANSACTION_NOT_FOUND::toException
-                );
-
-        return BankTransactionDetailResponse.from(transaction);
-    }
 
     private void validateOwnership(
             Long userId,
