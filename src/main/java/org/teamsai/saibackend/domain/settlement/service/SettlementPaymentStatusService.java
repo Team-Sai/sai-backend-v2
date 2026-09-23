@@ -9,9 +9,9 @@ import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
+import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementObligationStatusResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
@@ -23,8 +23,6 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -34,9 +32,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SettlementPaymentStatusService {
 
-    private static final BigDecimal HUNDRED =
-            BigDecimal.valueOf(100);
-    private static final int RATE_SCALE = 2;
     private final SettlementRepository settlementRepository;
     private final SettlementParticipantRepository settlementParticipantRepository;
     private final PaymentObligationRepository paymentObligationRepository;
@@ -60,67 +55,8 @@ public class SettlementPaymentStatusService {
                 buildPaymentObligationResponses(
                         settlement.getSettlementId()
                 );
-        BigDecimal totalExpectedAmount = obligations.stream()
-                .map(SettlementPaymentObligationResponse::getExpectedAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalPaidAmount = obligations.stream()
-                .map(SettlementPaymentObligationResponse::getPaidAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalRemainingAmount = obligations.stream()
-                .map(SettlementPaymentObligationResponse::getRemainingAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalResolvedAmount = obligations.stream()
-                .map(o -> o.getObligationStatus() == ObligationStatus.WRITTEN_OFF
-                        ? o.getExpectedAmount()  // 상각분은 기대액 전체를 "해결됨"으로 카운트
-                        : o.getPaidAmount())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal progressRate =
-                calculateProgressRate(
-                        totalExpectedAmount,
-                        totalResolvedAmount
-                );
-        if(progressRate.compareTo(HUNDRED) > 0){
-            progressRate = HUNDRED;
-        }
-        boolean closable = isFullyResolved(obligations);
-
-        Map<PaymentStatus, Long> countByStatus = obligations.stream()
-                .collect(Collectors.groupingBy(
-                        SettlementPaymentObligationResponse::getPaymentStatus,
-                        Collectors.counting()
-                ));
-
-        return SettlementPaymentStatusResponse.builder()
-                .settlementId(settlement.getSettlementId())
-                .obligations(obligations)
-                .totalExpectedAmount(totalExpectedAmount)
-                .totalPaidAmount(totalPaidAmount)
-                .totalRemainingAmount(totalRemainingAmount)
-                .paidCount(countByStatus.getOrDefault(PaymentStatus.PAID, 0L))
-                .partiallyPaidCount(countByStatus.getOrDefault(PaymentStatus.PARTIALLY_PAID, 0L))
-                .unpaidCount(countByStatus.getOrDefault(PaymentStatus.UNPAID, 0L))
-                .progressRate(progressRate)
-                .closable(closable)
-                .build();
-    }
-
-    private BigDecimal calculateProgressRate(
-            BigDecimal totalExpectedAmount,
-            BigDecimal totalPaidAmount
-    ) {
-        if (totalExpectedAmount.compareTo(BigDecimal.ZERO) == 0) {
-            return BigDecimal.ZERO;
-        }
-
-        return totalPaidAmount
-                .multiply(HUNDRED)
-                .divide(
-                        totalExpectedAmount,
-                        RATE_SCALE,
-                        RoundingMode.HALF_UP
-                );
+        return SettlementAssembler.toPaymentStatusResponse(settlement, obligations);
     }
 
     @Transactional(readOnly = true)
@@ -187,50 +123,11 @@ public class SettlementPaymentStatusService {
                 ));
 
         return obligations.stream()
-                .map(obligation -> {
-                    SettlementParticipant participant =
-                            participantMap.get(obligation.getParticipantId());
-
-                    List<PaymentRecordEntity> records =
-                            paymentRecordMap.getOrDefault(
-                                    obligation.getPaymentObligationId(),
-                                    List.of()
-                            );
-
-                    BigDecimal paidAmount = records.stream()
-                            .map(PaymentRecordEntity::getAmount)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-                    LocalDateTime latestPaymentAt = records.stream()
-                            .map(PaymentRecordEntity::getRecordedAt)
-                            .max(LocalDateTime::compareTo)
-                            .orElse(null);
-
-                    BigDecimal remainingAmount =
-                            obligation.getExpectedAmount()
-                                    .subtract(paidAmount)
-                                    .max(BigDecimal.ZERO);
-
-                    PaymentStatus paymentStatus =
-                            calculatePaymentStatus(
-                                    obligation.getExpectedAmount(),
-                                    paidAmount
-                            );
-
-                    return SettlementPaymentObligationResponse.builder()
-                            .paymentObligationId(obligation.getPaymentObligationId())
-                            .participantId(obligation.getParticipantId())
-                            .userId(participant.getUser().getUserId())
-                            .participantName(participant.getUser().getName())
-                            .expectedAmount(obligation.getExpectedAmount())
-                            .paidAmount(paidAmount)
-                            .remainingAmount(remainingAmount)
-                            .latestPaymentAt(latestPaymentAt)
-                            .paymentStatus(paymentStatus)
-                            .obligationStatus(obligation.getObligationStatus())
-                            .overdueSince(obligation.getOverdueSince())
-                            .build();
-                })
+                .map(obligation -> SettlementAssembler.toObligationResponse(
+                        obligation,
+                        participantMap.get(obligation.getParticipantId()),
+                        paymentRecordMap.getOrDefault(obligation.getPaymentObligationId(), List.of())
+                ))
                 .toList();
     }
 
@@ -284,46 +181,16 @@ public class SettlementPaymentStatusService {
                 ));
 
         return obligations.stream()
-                .map(obligation ->
-                        new SettlementObligationStatusResponse(
-                                obligation.getPaymentObligationId(),
-                                obligation.getObligationStatus(),
-                                obligation.getExpectedAmount(),
-                                paidAmountMap.getOrDefault(
-                                        obligation.getPaymentObligationId(),
-                                        BigDecimal.ZERO
-                                )
-                        )
-                )
+                .map(obligation -> SettlementAssembler.toObligationStatusResponse(
+                        obligation,
+                        paidAmountMap.getOrDefault(obligation.getPaymentObligationId(), BigDecimal.ZERO)
+                ))
                 .toList();
-    }
-
-    private PaymentStatus calculatePaymentStatus(
-            BigDecimal expectedAmount,
-            BigDecimal paidAmount
-    ) {
-        if (paidAmount.compareTo(BigDecimal.ZERO) == 0) {
-            return PaymentStatus.UNPAID;
-        }
-
-        if (paidAmount.compareTo(expectedAmount) < 0) {
-            return PaymentStatus.PARTIALLY_PAID;
-        }
-
-        return PaymentStatus.PAID;
     }
 
     private boolean isResolved(ObligationStatus status) {
         return status == ObligationStatus.WRITTEN_OFF
                 || status == ObligationStatus.EXCLUDED
                 || status == ObligationStatus.CANCELLED;
-    }
-
-    private boolean isFullyResolved(List<SettlementPaymentObligationResponse> obligations) {
-        return !obligations.isEmpty()
-                && obligations.stream().allMatch(o ->
-                o.getObligationStatus() == ObligationStatus.WRITTEN_OFF
-                        || o.getPaidAmount().compareTo(o.getExpectedAmount()) == 0
-        );
     }
 }

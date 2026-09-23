@@ -3,11 +3,10 @@ package org.teamsai.saibackend.domain.matching.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.matching.assembler.MatchingAssembler;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
-import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchCandidateResponse;
 import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchingReviewResponse;
 import org.teamsai.saibackend.domain.matching.service.MatchingReviewValidator;
-import org.teamsai.saibackend.domain.matching.type.MatchingReviewChannel;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionQueryService;
@@ -42,18 +41,6 @@ public class BankTransactionMatchingReviewQueryService {
                         bankTransactionId
                 );
 
-        return new BankTransactionMatchingReviewResponse(
-                transaction,
-                determineReviewChannel(candidates),
-                candidates.stream()
-                        .map(BankTransactionMatchCandidateResponse::from)
-                        .toList()
-        );
-    }
-
-    private MatchingReviewChannel determineReviewChannel(
-            List<BankTransactionMatchCandidateQueryDTO> candidates
-    ) {
-        return MatchingReviewChannel.TRANSACTION_HISTORY;
+        return MatchingAssembler.toReviewResponse(transaction, candidates);
     }
 }

@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.archive.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.teamsai.saibackend.domain.archive.assembler.SettlementArchiveAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
@@ -23,9 +24,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SettlementArchiveService {
 
-    private static final String DOCUMENT_VERSION = "v1";
-    private static final String SETTLEMENT_DISPLAY_ID_PREFIX = "ST-";
-
     private final SettlementQueryService settlementQueryService;
     private final SettlementPaymentStatusService settlementPaymentStatusService;
     private final SettlementPaymentHistoryService settlementPaymentHistoryService;
@@ -33,51 +31,12 @@ public class SettlementArchiveService {
 
     public SettlementArchivePreviewResponse getArchivePreview(Long settlementId, Long userId) {
         SettlementDetailResponse detail = settlementQueryService.getSettlementDetail(settlementId, userId);
-        return buildPreview(settlementId, userId, detail);
-    }
 
-    private SettlementArchivePreviewResponse buildPreview(Long settlementId, Long userId, SettlementDetailResponse detail) {
-        ArchiveData data = gatherArchiveData(settlementId, userId, detail);
-
-        return SettlementArchivePreviewResponse.builder()
-                .settlementId(detail.settlementId())
-                .settlementDisplayId(data.settlementDisplayId())
-                .title(detail.title())
-                .ownerName(data.archiveDetail().ownerName())
-                .settlementType(detail.settlementType())
-                .settlementCategory(detail.settlementCategory())
-                .settlementStatus(detail.settlementStatus())
-                .splitType(detail.splitType())
-                .dueDate(detail.dueDate())
-                .createdAt(detail.createdAt())
-                .paymentStatus(data.paymentStatus())
-                .paymentHistory(data.paymentHistory())
-                .settlementAccount(data.settlementAccount().orElse(null))
-                .documentVersion(DOCUMENT_VERSION)
-                .build();
-    }
-
-    private ArchiveData gatherArchiveData(Long settlementId, Long userId, SettlementDetailResponse archiveDetail) {
         SettlementPaymentStatusResponse paymentStatus = settlementPaymentStatusService.getPaymentStatus(settlementId, userId);
         List<SettlementPaymentHistoryResponse> paymentHistory = settlementPaymentHistoryService.getPaymentHistory(settlementId, userId);
-        Optional<SettlementAccountResponse> settlementAccount = findSettlementAccountIfExists(settlementId, userId);
+        SettlementAccountResponse settlementAccount = findSettlementAccountIfExists(settlementId, userId).orElse(null);
 
-        return new ArchiveData(
-                archiveDetail,
-                paymentStatus,
-                paymentHistory,
-                settlementAccount,
-                SETTLEMENT_DISPLAY_ID_PREFIX + settlementId
-        );
-    }
-
-    private record ArchiveData(
-            SettlementDetailResponse archiveDetail,
-            SettlementPaymentStatusResponse paymentStatus,
-            List<SettlementPaymentHistoryResponse> paymentHistory,
-            Optional<SettlementAccountResponse> settlementAccount,
-            String settlementDisplayId
-    ) {
+        return SettlementArchiveAssembler.toPreviewResponse(detail, paymentStatus, paymentHistory, settlementAccount);
     }
 
     private Optional<SettlementAccountResponse> findSettlementAccountIfExists(Long settlementId, Long userId) {

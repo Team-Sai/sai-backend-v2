@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.entity.File;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 
 import javax.imageio.ImageIO;
@@ -38,16 +38,16 @@ public class ArchiveService {
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    public List<File> findFilesByReference(ArchiveStatus domainType, Long referenceId) {
+    public List<ArchiveFile> findFilesByReference(ArchiveStatus domainType, Long referenceId) {
         return archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(domainType, referenceId);
     }
 
-    public List<File> findAllFilesByUserId(Long userId) {
+    public List<ArchiveFile> findAllFilesByUserId(Long userId) {
         return archiveRepository.findAllByUserId(userId);
     }
 
     @Transactional
-    public File saveFile(String domainType, Long referenceId, MultipartFile file) {
+    public ArchiveFile saveFile(String domainType, Long referenceId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 존재하지 않습니다.");
         }
@@ -62,7 +62,7 @@ public class ArchiveService {
     }
 
     @Transactional
-    public File saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
+    public ArchiveFile saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
                              InputStream content, long fileSize) {
         try {
             Path dirPath = Paths.get(uploadDir);
@@ -80,7 +80,7 @@ public class ArchiveService {
             Path savePath = dirPath.resolve(savedFilename);
             Files.copy(content, savePath, StandardCopyOption.REPLACE_EXISTING);
 
-            File file = File.builder()
+            ArchiveFile file = ArchiveFile.builder()
                         .domainType(ArchiveStatus.valueOf(domainType))
                         .referenceId(referenceId)
                         .originalFilename(originalFilename)
@@ -91,7 +91,7 @@ public class ArchiveService {
 
             archiveRepository.save(file);
 
-            log.info("[File Saved] Domain: {}, RefId: {}, Original: {} -> Saved: {}",
+            log.info("[ArchiveFile Saved] Domain: {}, RefId: {}, Original: {} -> Saved: {}",
                     domainType, referenceId, originalFilename, savedFilename);
 
             return file;
@@ -155,7 +155,7 @@ public class ArchiveService {
         return 255 - brightness;
     }
 
-    public File getFileById(Long fileId) {
+    public ArchiveFile getFileById(Long fileId) {
         return archiveRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 파일입니다. fileId=" + fileId));
     }
