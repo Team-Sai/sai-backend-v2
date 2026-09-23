@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.matching.model.EvaluatedMatchingCandidate;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
 import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
