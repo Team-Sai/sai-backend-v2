@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.teamsai.saibackend.domain.matching.model.EvaluatedMatchingCandidate;
+import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateQueryRepository;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -12,8 +14,7 @@ import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandida
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateRepository;
-import org.teamsai.saibackend.domain.matching.service.EvaluatedMatchingCandidate;
-import org.teamsai.saibackend.domain.matching.service.MatchingCandidate;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateValidationQueryRepository;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateInvalidationReason;
@@ -41,13 +42,17 @@ class BankTransactionMatchCandidateServiceTest {
     @Mock
     private BankTransactionMatchCandidateQueryRepository candidateQueryRepository;
 
+    @Mock
+    private BankTransactionMatchCandidateValidationQueryRepository candidateValidationQueryRepository;
+
     private BankTransactionMatchCandidateService candidateService;
 
     @BeforeEach
     void setUp() {
         candidateService = new BankTransactionMatchCandidateService(
                 candidateRepository,
-                candidateQueryRepository
+                candidateQueryRepository,
+                candidateValidationQueryRepository
         );
     }
 
@@ -261,7 +266,7 @@ class BankTransactionMatchCandidateServiceTest {
     void returnsCandidateBelongingToBankTransaction() {
         BankTransactionMatchCandidateEntity candidate = dto(1L, 100L);
 
-        when(candidateRepository.findByIdAndBankTransactionId(1L, 100L))
+        when(candidateValidationQueryRepository.findByIdAndBankTransactionId(1L, 100L))
                 .thenReturn(Optional.of(candidate));
 
         BankTransactionMatchCandidateEntity result =
@@ -272,7 +277,7 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void failsWhenCandidateDoesNotBelongToBankTransaction() {
-        when(candidateRepository.findByIdAndBankTransactionId(1L, 100L))
+        when(candidateValidationQueryRepository.findByIdAndBankTransactionId(1L, 100L))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->

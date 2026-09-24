@@ -80,12 +80,6 @@ public class SharedSettlementService {
                 request.getLinkedAccountId()
         );
 
-        return CreateSharedSettlementResponse.builder()
-                .settlementId(savedSettlement.getSettlementId())
-                .settlementType(savedSettlement.getSettlementType())
-                .settlementStatus(savedSettlement.getSettlementStatus())
-                .title(savedSettlement.getTitle())
-                .createdAt(savedSettlement.getCreatedAt())
-                .build();
+        return CreateSharedSettlementResponse.from(savedSettlement);
     }
 }

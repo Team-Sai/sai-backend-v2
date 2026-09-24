@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.service.ContractDetailService;
+import org.teamsai.saibackend.domain.contract.service.ContractDetailQueryService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,7 +26,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ContractDetailQueryController {
 
-    private final ContractDetailService contractDetailService;
+    private final ContractDetailQueryService contractDetailQueryService;
+    ;
     private final ArchiveService archiveService;
 
     @Operation(
@@ -46,7 +47,7 @@ public class ContractDetailQueryController {
             @PathVariable Long contractId,
             @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
-        return contractDetailService.getCheck(contractId, userId);
+        return contractDetailQueryService.getCheck(contractId, userId);
     }
 
     @Operation(
@@ -65,7 +66,7 @@ public class ContractDetailQueryController {
             @PathVariable Long contractId,
             @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
-        LoanContractResponse contract = contractDetailService.getCheck(contractId, userId).getContract();
+        LoanContractResponse contract = contractDetailQueryService.getCheck(contractId, userId).getContract();
 
         Map<String, String> signatures = new HashMap<>();
         signatures.put("creditorSignatureDataUri", archiveService.loadSignatureDataUri(contract.getCreditorSignature()));

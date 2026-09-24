@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 
 @Tag(
         name = "차용증 API",
@@ -21,7 +21,7 @@ import org.teamsai.saibackend.domain.contract.service.DashboardService;
 @RequiredArgsConstructor
 public class DashboardQueryController {
 
-    private final DashboardService dashboardService;
+    private final DashboardQueryService dashboardQueryService;
 
     @Operation(
             summary = "계약 대시보드 조회",
@@ -50,7 +50,7 @@ public class DashboardQueryController {
             @Parameter(description = "페이지 번호 (1부터 시작)", example = "1")
             @RequestParam(defaultValue = "1") int page
     ) {
-        return dashboardService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
+        return dashboardQueryService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
     }
 
 }

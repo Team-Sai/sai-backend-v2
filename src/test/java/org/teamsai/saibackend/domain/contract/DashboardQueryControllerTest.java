@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.contract.controller.DashboardQueryController;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 class DashboardQueryControllerTest {
 
     @Mock
-    private DashboardService dashboardService;
+    private DashboardQueryService dashboardQueryService;
 
     @InjectMocks
     private DashboardQueryController dashboardQueryController;
@@ -40,13 +40,13 @@ class DashboardQueryControllerTest {
                 .pageSize(5)
                 .build();
 
-        when(dashboardService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page))
+        when(dashboardQueryService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page))
                 .thenReturn(expected);
 
         DashboardResponse actual = dashboardQueryController.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
 
         assertThat(actual).isEqualTo(expected);
-        verify(dashboardService).getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
+        verify(dashboardQueryService).getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
     }
 
     @Test
@@ -54,7 +54,7 @@ class DashboardQueryControllerTest {
     void getDashboard_defaultPageIsOne() {
         Long userId = 1L;
 
-        when(dashboardService.getDashboard(userId, null, null, null, null, 1))
+        when(dashboardQueryService.getDashboard(userId, null, null, null, null, 1))
                 .thenReturn(DashboardResponse.builder().currentPage(1).build());
 
         DashboardResponse actual = dashboardQueryController.getDashboard(userId, null, null, null, null, 1);

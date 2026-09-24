@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.teamsai.saibackend.domain.contract.dto.ChangeRequestDetailDTO;
-import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailService;
+import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailQueryService;
 
 @Tag(
         name = "차용증 API",
@@ -20,7 +20,7 @@ import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailService
 @RequiredArgsConstructor
 public class ChangeRequestDetailQueryController {
 
-    private final ChangeRequestDetailService changeRequestDetailService;
+    private final ChangeRequestDetailQueryService changeRequestDetailQueryService;
 
     @Operation(
             summary = "계약 변경 요청 상세 조회",
@@ -41,7 +41,7 @@ public class ChangeRequestDetailQueryController {
             @PathVariable Long changeRequestId,
             @AuthenticationPrincipal(expression = "userId") Long userId
     ){
-        return changeRequestDetailService.getDetail(contractId, changeRequestId, userId);
+        return changeRequestDetailQueryService.getDetail(contractId, changeRequestId, userId);
     }
 
 }

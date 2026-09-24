@@ -22,9 +22,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.entity.File;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
-import org.teamsai.saibackend.domain.archive.service.SettlementArchiveService;
+import org.teamsai.saibackend.domain.archive.service.SettlementArchiveQueryService;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
 
 import java.net.URLEncoder;
@@ -40,7 +40,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SettlementArchiveController {
 
-    private final SettlementArchiveService settlementArchiveService;
+    private final SettlementArchiveQueryService settlementArchiveService;
     private final ArchiveService archiveService;
 
     @Hidden
@@ -97,12 +97,12 @@ public class SettlementArchiveController {
     ) {
         settlementArchiveService.getArchivePreview(settlementId, userId);
 
-        List<File> savedFiles = archiveService.findFilesByReference(ArchiveStatus.SETTLEMENT, settlementId);
+        List<ArchiveFile> savedFiles = archiveService.findFilesByReference(ArchiveStatus.SETTLEMENT, settlementId);
         if (savedFiles.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        File latestFile = savedFiles.get(0);
+        ArchiveFile latestFile = savedFiles.get(0);
         Resource resource = archiveService.loadFileAsResource(latestFile.getSavedFilename());
 
         return pdfResponse(resource, latestFile.getOriginalFilename());

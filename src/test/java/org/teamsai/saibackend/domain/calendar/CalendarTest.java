@@ -11,15 +11,15 @@ import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
-import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardService;
+import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardQueryService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.math.BigDecimal;
@@ -36,16 +36,16 @@ import static org.mockito.Mockito.when;
 public class CalendarTest {
 
     @Mock
-    private DashboardService contractDashboardService;
+    private DashboardQueryService contractDashboardQueryService;
 
     @Mock
     private SettlementQueryService settlementQueryService;
 
     @Mock
-    private SettlementPaymentStatusService settlementPaymentStatusService;
+    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @InjectMocks
-    private IntegrationDashboardService integrationDashboardService;
+    private IntegrationDashboardQueryService integrationDashboardQueryService;
 
     private static final Long USER_ID = 1L;
     private static final LocalDate TARGET_DATE = LocalDate.of(2026, 8, 14);
@@ -55,12 +55,12 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(10L, USER_ID, 2L, "생활비 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -76,12 +76,12 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(11L, 2L, USER_ID, "차량구입 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 350_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSubLabel()).isEqualTo("납부예정");
@@ -94,12 +94,12 @@ public class CalendarTest {
                 TARGET_DATE.plusDays(1), RepaymentScheduleStatus.PENDING, 600_000
         );
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
@@ -109,19 +109,19 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(13L, USER_ID, 2L, "생활비 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PAID, 600_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
 
     @Test
     void 정산_참여자는_낼_돈으로_표시된다() {
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(null, List.of()));
 
         SettlementListResponse settlement = settlement(
@@ -137,7 +137,7 @@ public class CalendarTest {
                 ));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -149,7 +149,7 @@ public class CalendarTest {
 
     @Test
     void 마감된_정산은_결과에서_제외된다() {
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(null, List.of()));
 
         SettlementListResponse settlement = settlement(
@@ -160,7 +160,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(101L, BigDecimal.ZERO, BigDecimal.ZERO));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
@@ -169,7 +169,7 @@ public class CalendarTest {
     void 대여와_정산_항목이_함께_반환된다() {
         LoanContractResponse contract = buildContract(14L, USER_ID, 2L, "생활비 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
 
         SettlementListResponse settlement = settlement(
@@ -184,7 +184,7 @@ public class CalendarTest {
                 ));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting(DashboardCalendarItemResponse::getType)
@@ -199,7 +199,7 @@ public class CalendarTest {
     void 결과는_제목_가나다순으로_정렬된다() {
         LoanContractResponse contract = buildContract(15L, USER_ID, 2L, "차용증 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 100_000);
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
 
         SettlementListResponse settlement = settlement(
@@ -210,7 +210,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(103L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).extracting(DashboardCalendarItemResponse::getTitle)
                 .containsExactly("가나다 정산", "차용증 대출");
@@ -221,12 +221,12 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(16L, USER_ID, 2L, "생활비 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(null, RepaymentScheduleStatus.PENDING, 600_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
@@ -274,7 +274,7 @@ public class CalendarTest {
         return schedule;
     }
 
-    private DashboardService.IntegrationDashboardData loanData(
+    private DashboardQueryService.IntegrationDashboardData loanData(
             LoanContractResponse contract, List<RepaymentScheduleWithRemainingProjection> schedules
     ) {
 
@@ -286,13 +286,13 @@ public class CalendarTest {
                 .contracts(List.of())
                 .build();
 
-        List<DashboardService.LoanScheduleContext> contexts = contract == null
+        List<DashboardQueryService.LoanScheduleContext> contexts = contract == null
                 ? List.of()
                 : schedules.stream()
-                .map(schedule -> new DashboardService.LoanScheduleContext(contract, schedule))
+                .map(schedule -> new DashboardQueryService.LoanScheduleContext(contract, schedule))
                 .toList();
 
-        return new DashboardService.IntegrationDashboardData(dashboard, contexts);
+        return new DashboardQueryService.IntegrationDashboardData(dashboard, contexts);
 
     }
 
@@ -326,7 +326,7 @@ public class CalendarTest {
         return new SettlementListResponse(id, title, role, "ETC", "ONE_TIME", "EQUAL", status, BigDecimal.ZERO, dueDate, null, null, null, createdAt);
     }
 
-    private DashboardService.IntegrationDashboardData loanData(
+    private DashboardQueryService.IntegrationDashboardData loanData(
             LoanContractResponse contract, RepaymentScheduleWithRemainingProjection schedule
     ) {
         DashboardResponse dashboard = DashboardResponse.builder()
@@ -337,11 +337,11 @@ public class CalendarTest {
                 .contracts(List.of())
                 .build();
 
-        List<DashboardService.LoanScheduleContext> contexts = contract == null
+        List<DashboardQueryService.LoanScheduleContext> contexts = contract == null
                 ? List.of()
-                : List.of(new DashboardService.LoanScheduleContext(contract, schedule));
+                : List.of(new DashboardQueryService.LoanScheduleContext(contract, schedule));
 
-        return new DashboardService.IntegrationDashboardData(dashboard, contexts);
+        return new DashboardQueryService.IntegrationDashboardData(dashboard, contexts);
     }
 
     @Test
@@ -349,12 +349,12 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(20L, USER_ID, 2L, "생활비 대출", "김채권", "이채무");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -369,12 +369,12 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(21L, 2L, USER_ID, "차량구입 대출", "김채권", "이채무");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 350_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getCounterpartyName()).isEqualTo("김채권");
@@ -387,12 +387,12 @@ public class CalendarTest {
         RepaymentScheduleWithRemainingProjection schedule2 = buildSchedule(TARGET_DATE, RepaymentScheduleStatus.PENDING, 600_000, 2);
         RepaymentScheduleWithRemainingProjection schedule3 = buildSchedule(TARGET_DATE.plusMonths(1), RepaymentScheduleStatus.PENDING, 600_000, 3);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, List.of(schedule1, schedule2, schedule3)));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getInstallmentInfo()).isEqualTo("2/3회차");
@@ -404,12 +404,12 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(23L, USER_ID, 2L, "생활비 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(pastDate, RepaymentScheduleStatus.PENDING, 600_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, pastDate);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, pastDate);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).isOverdue()).isTrue();
@@ -421,12 +421,12 @@ public class CalendarTest {
         LoanContractResponse contract = buildContract(24L, USER_ID, 2L, "생활비 대출");
         RepaymentScheduleWithRemainingProjection schedule = buildSchedule(futureDate, RepaymentScheduleStatus.PENDING, 600_000);
 
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, futureDate);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, futureDate);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).isOverdue()).isFalse();
@@ -434,7 +434,7 @@ public class CalendarTest {
 
     @Test
     void 정산_항목의_구분_라벨은_settlementCategory_값을_그대로_사용하고_회차와_상대방은_없다() {
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(null, List.of()));
 
         SettlementListResponse settlement = settlement(
@@ -445,7 +445,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(105L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -456,7 +456,7 @@ public class CalendarTest {
 
     @Test
     void 정산_항목에는_유형과_정산방식과_기간이_채워진다() {
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(null, List.of()));
 
         SettlementListResponse settlement = new SettlementListResponse(
@@ -470,7 +470,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(106L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -482,7 +482,7 @@ public class CalendarTest {
 
     @Test
     void 정산_항목의_유형과_정산방식_기본값은_공동정산과_균등이다() {
-        when(contractDashboardService.getIntegrationDashboardData(USER_ID))
+        when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(null, List.of()));
 
         SettlementListResponse settlement = settlement(
@@ -493,7 +493,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(107L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);

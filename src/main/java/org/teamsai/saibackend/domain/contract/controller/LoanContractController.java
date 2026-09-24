@@ -194,13 +194,13 @@ public class LoanContractController {
     ) {
         contractService.findContract(contractId, userDetails.getUserId());
 
-        List<org.teamsai.saibackend.domain.archive.entity.File> savedFiles =
+        List<org.teamsai.saibackend.domain.archive.entity.ArchiveFile> savedFiles =
                 archiveService.findFilesByReference(ArchiveStatus.CONTRACT, contractId);
         if (savedFiles.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        org.teamsai.saibackend.domain.archive.entity.File latestFile = savedFiles.get(0);
+        org.teamsai.saibackend.domain.archive.entity.ArchiveFile latestFile = savedFiles.get(0);
         Resource resource = archiveService.loadFileAsResource(latestFile.getSavedFilename());
 
         String encodedFilename = URLEncoder.encode(latestFile.getOriginalFilename(), StandardCharsets.UTF_8).replace("+", "%20");

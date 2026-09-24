@@ -15,7 +15,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.entity.File;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
 
@@ -82,7 +82,7 @@ class ArchiveServiceTest {
                     "file", "contract.pdf", "application/pdf", "file-bytes".getBytes()
             );
 
-            File result = archiveService.saveFile(DOMAIN_TYPE, REFERENCE_ID, file);
+            ArchiveFile result = archiveService.saveFile(DOMAIN_TYPE, REFERENCE_ID, file);
             savedPath = Path.of(archiveService.getUploadDir()).resolve(result.getSavedFilename());
 
             assertThat(savedPath).exists();
@@ -128,11 +128,11 @@ class ArchiveServiceTest {
         @Test
         @DisplayName("도메인 타입과 참조 ID로 파일 목록을 조회한다")
         void findFilesByReferenceSuccess() {
-            List<File> files = List.of(createFile());
+            List<ArchiveFile> files = List.of(createFile());
             given(archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(ArchiveStatus.CONTRACT, REFERENCE_ID))
                     .willReturn(files);
 
-            List<File> result = archiveService.findFilesByReference(ArchiveStatus.CONTRACT, REFERENCE_ID);
+            List<ArchiveFile> result = archiveService.findFilesByReference(ArchiveStatus.CONTRACT, REFERENCE_ID);
 
             assertThat(result).isEqualTo(files);
         }
@@ -140,10 +140,10 @@ class ArchiveServiceTest {
         @Test
         @DisplayName("사용자 ID로 파일 목록을 조회한다")
         void findAllFilesByUserIdSuccess() {
-            List<File> files = List.of(createFile());
+            List<ArchiveFile> files = List.of(createFile());
             given(archiveRepository.findAllByUserId(REFERENCE_ID)).willReturn(files);
 
-            List<File> result = archiveService.findAllFilesByUserId(REFERENCE_ID);
+            List<ArchiveFile> result = archiveService.findAllFilesByUserId(REFERENCE_ID);
 
             assertThat(result).isEqualTo(files);
         }
@@ -151,10 +151,10 @@ class ArchiveServiceTest {
         @Test
         @DisplayName("파일 ID로 조회해 파일 엔티티를 반환한다")
         void getFileByIdSuccess() {
-            File file = createFile();
+            ArchiveFile file = createFile();
             given(archiveRepository.findById(FILE_ID)).willReturn(Optional.of(file));
 
-            File result = archiveService.getFileById(FILE_ID);
+            ArchiveFile result = archiveService.getFileById(FILE_ID);
 
             assertThat(result).isEqualTo(file);
         }
@@ -273,8 +273,8 @@ class ArchiveServiceTest {
         }
     }
 
-    private File createFile() {
-        return File.builder()
+    private ArchiveFile createFile() {
+        return ArchiveFile.builder()
                 .domainType(ArchiveStatus.CONTRACT)
                 .referenceId(REFERENCE_ID)
                 .originalFilename("contract.pdf")

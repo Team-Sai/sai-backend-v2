@@ -5,7 +5,7 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 import org.springframework.stereotype.Repository;
-import org.teamsai.saibackend.domain.matching.service.MatchingCandidate;
+import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 
 import java.math.BigDecimal;

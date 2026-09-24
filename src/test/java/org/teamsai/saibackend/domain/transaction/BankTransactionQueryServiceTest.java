@@ -19,6 +19,7 @@ import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDet
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQueryRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionQueryService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -44,6 +45,9 @@ class BankTransactionQueryServiceTest {
 
     @Mock
     private BankTransactionRepository bankTransactionRepository;
+
+    @Mock
+    private BankTransactionQueryRepository bankTransactionQueryRepository;
 
     @Mock
     private LinkedBankAccountRepository linkedBankAccountRepository;
@@ -94,7 +98,7 @@ class BankTransactionQueryServiceTest {
             );
 
             given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
+            given(bankTransactionQueryRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
                     condition.keyword(), null, null,
                     PageRequest.of(Math.toIntExact(condition.page()), Math.toIntExact(condition.size())))).willReturn(new PageImpl<>(transactions));
 
@@ -113,7 +117,7 @@ class BankTransactionQueryServiceTest {
             BankTransactionSearchCondition condition = defaultCondition();
 
             given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
+            given(bankTransactionQueryRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
                     condition.keyword(), null, null,
                     PageRequest.of(Math.toIntExact(condition.page()), Math.toIntExact(condition.size())))).willReturn(new PageImpl<>(List.of()));
 
@@ -137,7 +141,7 @@ class BankTransactionQueryServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND);
 
-            verify(bankTransactionRepository, never()).search(any(), any(), any(), any(), any(), any(), any());
+            verify(bankTransactionQueryRepository, never()).search(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -155,7 +159,7 @@ class BankTransactionQueryServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.ACCOUNT_ACCESS_DENIED);
 
-            verify(bankTransactionRepository, never()).search(any(), any(), any(), any(), any(), any(), any());
+            verify(bankTransactionQueryRepository, never()).search(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -173,13 +177,13 @@ class BankTransactionQueryServiceTest {
             );
 
             given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
-            given(bankTransactionRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
+            given(bankTransactionQueryRepository.search(LINKED_ACCOUNT_ID, condition.processingStatus(), condition.transactionType(),
                     condition.keyword(), null, null,
                     PageRequest.of(Math.toIntExact(condition.page()), Math.toIntExact(condition.size())))).willReturn(new PageImpl<>(List.of()));
 
             bankTransactionQueryService.getTransactions(USER_ID, LINKED_ACCOUNT_ID, condition);
 
-            verify(bankTransactionRepository).search(
+            verify(bankTransactionQueryRepository).search(
                     eq(LINKED_ACCOUNT_ID), eq(BankTransactionProcessingStatus.APPLIED),
                     eq(BankTransactionType.DEPOSIT), eq("홍길동"), eq(null), eq(null),
                     eq(PageRequest.of(1, 10))

@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.settlement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
 import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
@@ -95,16 +96,6 @@ public class RecurringSettlementService {
         settlementAccountService.selectAccount(
                 ownerId, savedFirstSettlement.getSettlementId(), request.getLinkedAccountId());
 
-        return CreateRecurringSettlementResponse.builder()
-                .recurringSettlementId(savedRecurringSettlement.getRecurringSettlementId())
-                .firstSettlementId(savedFirstSettlement.getSettlementId())
-                .settlementType(savedFirstSettlement.getSettlementType())
-                .title(savedFirstSettlement.getTitle())
-                .cycleRule(savedRecurringSettlement.getCycleRule())
-                .startDate(savedRecurringSettlement.getStartDate())
-                .endDate(savedRecurringSettlement.getEndDate())
-                .createdAt(savedRecurringSettlement.getCreatedAt())
-                .build();
-
+        return SettlementAssembler.toCreateRecurringSettlementResponse(savedRecurringSettlement, savedFirstSettlement);
     }
 }

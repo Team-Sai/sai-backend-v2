@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
-import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardService;
+import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardQueryService;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CalendarQueryController {
 
-    private final IntegrationDashboardService integrationDashboardService;
+    private final IntegrationDashboardQueryService integrationDashboardQueryService;
 
     @Operation(
             summary = "날짜별 캘린더 상세 조회",
@@ -42,7 +42,7 @@ public class CalendarQueryController {
 
             @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
-        return integrationDashboardService.getCalendarDayDetail(userId, date);
+        return integrationDashboardQueryService.getCalendarDayDetail(userId, date);
     }
 
 }

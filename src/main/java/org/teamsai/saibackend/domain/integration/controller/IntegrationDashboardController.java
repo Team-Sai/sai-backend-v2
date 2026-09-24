@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.teamsai.saibackend.domain.integration.dto.response.IntegrationDashboardResponse;
-import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardService;
+import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardQueryService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
 import java.time.YearMonth;
@@ -27,7 +27,7 @@ import java.time.YearMonth;
 @RequiredArgsConstructor
 public class IntegrationDashboardController {
 
-    private final IntegrationDashboardService integrationDashboardService;
+    private final IntegrationDashboardQueryService integrationDashboardQueryService;
 
     @Operation(
             summary = "통합 대시보드 조회",
@@ -56,7 +56,7 @@ public class IntegrationDashboardController {
                 : yearMonth;
 
         IntegrationDashboardResponse response =
-                integrationDashboardService.getDashboard(
+                integrationDashboardQueryService.getDashboard(
                         userDetails.getUserId(),
                         requestedMonth
                 );
