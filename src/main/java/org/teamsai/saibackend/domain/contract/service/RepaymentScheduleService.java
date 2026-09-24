@@ -5,6 +5,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.event.ContractCreatedEvent;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
@@ -91,8 +92,9 @@ public class RepaymentScheduleService {
         repaymentScheduleRepository.saveAll(newSchedules);
     }
 
-    public RepaymentScheduleEntity getScheduleByScheduleId(Long scheduleId) {
+    public RepaymentScheduleResponse getScheduleByScheduleId(Long scheduleId) {
         return repaymentScheduleRepository.findById(scheduleId)
+                .map(RepaymentScheduleResponse::from)
                 .orElseThrow(() -> RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND.toException());
     }
 

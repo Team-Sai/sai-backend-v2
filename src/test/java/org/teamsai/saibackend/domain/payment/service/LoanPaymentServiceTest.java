@@ -8,8 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleResponse;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
@@ -240,11 +239,11 @@ class LoanPaymentServiceTest {
         }
     }
 
-    private RepaymentScheduleEntity schedule(RepaymentScheduleStatus status, BigDecimal totalPaymentDue) {
-        RepaymentScheduleEntity schedule = new RepaymentScheduleEntity(
-                null, null, null, null, null, totalPaymentDue, null, status, null
-        );
-        ReflectionTestUtils.setField(schedule, "scheduleId", SCHEDULE_ID);
-        return schedule;
+    private RepaymentScheduleResponse schedule(RepaymentScheduleStatus status, BigDecimal totalPaymentDue) {
+        return RepaymentScheduleResponse.builder()
+                .scheduleId(SCHEDULE_ID)
+                .totalPaymentDue(totalPaymentDue)
+                .status(status)
+                .build();
     }
 }
