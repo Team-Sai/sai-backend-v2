@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
@@ -58,7 +58,7 @@ public class LoanPaymentService {
             boolean limitToRemainingAmount
     ) {
 
-        RepaymentScheduleDTO schedule = repaymentScheduleService.getScheduleByScheduleId(targetId);
+        RepaymentScheduleEntity schedule = repaymentScheduleService.getScheduleByScheduleId(targetId);
 
         if (!schedule.getStatus().isUnresolved()) {
             log.warn("[LoanPaymentService] 처리 불가능한 스케줄 상태 - scheduleId: {}, status: {}", targetId, schedule.getStatus());

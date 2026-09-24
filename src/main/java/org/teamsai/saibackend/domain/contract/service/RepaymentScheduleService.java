@@ -9,7 +9,6 @@ import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.event.ContractCreatedEvent;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.util.ScheduleGenerator;
@@ -38,36 +37,6 @@ public class RepaymentScheduleService {
         generateSchedule(event.contractId());
     }
 
-    private RepaymentScheduleEntity toEntity(RepaymentScheduleDTO dto) {
-        return new RepaymentScheduleEntity(
-                dto.getContractId(),
-                dto.getSequence(),
-                dto.getDueDate(),
-                dto.getPrincipalDue(),
-                dto.getInterestDue(),
-                dto.getTotalPaymentDue(),
-                dto.getRemainingPrincipal(),
-                dto.getStatus(),
-                dto.getCreatedAt()
-        );
-    }
-
-    private RepaymentScheduleDTO toDTO(RepaymentScheduleEntity entity) {
-        return RepaymentScheduleDTO.builder()
-                .scheduleId(entity.getScheduleId())
-                .contractId(entity.getContractId())
-                .sequence(entity.getSequence())
-                .dueDate(entity.getDueDate())
-                .principalDue(entity.getPrincipalDue())
-                .interestDue(entity.getInterestDue())
-                .totalPaymentDue(entity.getTotalPaymentDue())
-                .remainingPrincipal(entity.getRemainingPrincipal())
-                .status(entity.getStatus())
-                .paidAt(entity.getPaidAt())
-                .createdAt(entity.getCreatedAt())
-                .build();
-    }
-
     @Transactional
     public void generateSchedule(Long contractId) {
         LoanContractResponse contract = loanContractService.getContractForInternalUse(contractId);
@@ -79,7 +48,7 @@ public class RepaymentScheduleService {
             throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
         }
 
-        List<RepaymentScheduleDTO> schedules = switch (contract.getRepaymentType()) {
+        List<RepaymentScheduleEntity> schedules = switch (contract.getRepaymentType()) {
             case EQUAL_PRINCIPAL_AND_INTEREST -> ScheduleGenerator.generateEqualPrincipalAndInterest(
                     contractId, contract.getPrincipalAmount(), contract.getInterestRate(), months, contract.getStartDate());
             case EQUAL_PRINCIPAL -> ScheduleGenerator.generateEqualPrincipal(
@@ -88,10 +57,7 @@ public class RepaymentScheduleService {
                     contractId, contract.getPrincipalAmount(), contract.getInterestRate(), months, contract.getStartDate());
         };
 
-        List<RepaymentScheduleEntity> entities = schedules.stream()
-                .map(this::toEntity)
-                .toList();
-        repaymentScheduleRepository.saveAll(entities);
+        repaymentScheduleRepository.saveAll(schedules);
     }
 
     public List<RepaymentScheduleEntity> getSchedule(Long contractId) {
@@ -138,7 +104,7 @@ public class RepaymentScheduleService {
             throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
         }
 
-        List<RepaymentScheduleDTO> newSchedules = switch (v2.getRepaymentType()) {
+        List<RepaymentScheduleEntity> newSchedules = switch (v2.getRepaymentType()) {
             case EQUAL_PRINCIPAL_AND_INTEREST -> ScheduleGenerator.generateEqualPrincipalAndInterest(
                     v2ContractId, openingPrincipal, v2.getInterestRate(), months, baseDate);
             case EQUAL_PRINCIPAL -> ScheduleGenerator.generateEqualPrincipal(
@@ -147,17 +113,12 @@ public class RepaymentScheduleService {
                     v2ContractId, openingPrincipal, v2.getInterestRate(), months, baseDate);
         };
 
-        List<RepaymentScheduleEntity> newEntities = newSchedules.stream()
-                .map(this::toEntity)
-                .toList();
-
-        repaymentScheduleRepository.saveAll(newEntities);
+        repaymentScheduleRepository.saveAll(newSchedules);
     }
 
-    public RepaymentScheduleDTO getScheduleByScheduleId(Long scheduleId) {
-        RepaymentScheduleEntity entity = repaymentScheduleRepository.findById(scheduleId)
+    public RepaymentScheduleEntity getScheduleByScheduleId(Long scheduleId) {
+        return repaymentScheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND.toException());
-        return toDTO(entity);
     }
 
     public Map<Long, List<RepaymentScheduleWithRemainingProjection>> getSchedulesByContractIds(List<Long> contractIds) {

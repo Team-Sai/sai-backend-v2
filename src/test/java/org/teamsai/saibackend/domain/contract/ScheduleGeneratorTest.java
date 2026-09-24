@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.contract;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.util.ScheduleGenerator;
 
@@ -23,7 +23,7 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("원리금균등 - 회차 수는 개월 수와 같다")
     void equalPrincipalAndInterest_rowCount() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipalAndInterest(contractId, principal, annualInterestRate, months, startDate);
 
         assertThat(schedules).hasSize(12);
@@ -32,10 +32,10 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("원리금균등 - 1회차 원금/이자/합계가 정확하다")
     void equalPrincipalAndInterest_firstRound() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipalAndInterest(contractId, principal, annualInterestRate, months, startDate);
 
-        RepaymentScheduleDTO first = schedules.get(0);
+        RepaymentScheduleEntity first = schedules.get(0);
         assertThat(first.getInterestDue()).isEqualByComparingTo("100000");
         assertThat(first.getPrincipalDue()).isEqualByComparingTo("788487");
         assertThat(first.getTotalPaymentDue()).isEqualByComparingTo("888487");
@@ -45,7 +45,7 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("원리금균등 - 매달 총 상환액(원금+이자)은 항상 동일하다")
     void equalPrincipalAndInterest_totalPaymentIsConstant() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipalAndInterest(contractId, principal, annualInterestRate, months, startDate);
 
         // 마지막 회차는 반올림 보정 때문에 살짝 다를 수 있어 제외
@@ -58,21 +58,21 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("원리금균등 - 마지막 회차 후 잔액은 0원이다")
     void equalPrincipalAndInterest_lastRoundClearsBalance() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipalAndInterest(contractId, principal, annualInterestRate, months, startDate);
 
-        RepaymentScheduleDTO last = schedules.get(schedules.size() - 1);
+        RepaymentScheduleEntity last = schedules.get(schedules.size() - 1);
         assertThat(last.getRemainingPrincipal()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
     @DisplayName("원금균등 - 매달 원금은 고정, 이자는 잔액에 따라 감소한다")
     void equalPrincipal_firstAndSecondRound() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipal(contractId, principal, annualInterestRate, months, startDate);
 
-        RepaymentScheduleDTO first = schedules.get(0);
-        RepaymentScheduleDTO second = schedules.get(1);
+        RepaymentScheduleEntity first = schedules.get(0);
+        RepaymentScheduleEntity second = schedules.get(1);
 
         assertThat(first.getPrincipalDue()).isEqualByComparingTo("833333");
         assertThat(first.getInterestDue()).isEqualByComparingTo("100000");
@@ -86,7 +86,7 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("원금균등 - 마지막 회차 후 잔액은 0원이다")
     void equalPrincipal_lastRoundClearsBalance() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipal(contractId, principal, annualInterestRate, months, startDate);
 
         assertThat(schedules.get(schedules.size() - 1).getRemainingPrincipal())
@@ -96,11 +96,11 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("만기일시 - 마지막 회차 전까지는 원금이 0이고 이자만 낸다")
     void bulletRepayment_middleRoundsInterestOnly() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateBulletRepayment(contractId, principal, annualInterestRate, months, startDate);
 
         for (int i = 0; i < schedules.size() - 1; i++) {
-            RepaymentScheduleDTO row = schedules.get(i);
+            RepaymentScheduleEntity row = schedules.get(i);
             assertThat(row.getPrincipalDue()).isEqualByComparingTo(BigDecimal.ZERO);
             assertThat(row.getInterestDue()).isEqualByComparingTo("100000.00");
             assertThat(row.getRemainingPrincipal()).isEqualByComparingTo(principal);
@@ -110,10 +110,10 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("만기일시 - 마지막 회차에 원금 전액 + 이자를 낸다")
     void bulletRepayment_lastRoundPaysFullPrincipal() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateBulletRepayment(contractId, principal, annualInterestRate, months, startDate);
 
-        RepaymentScheduleDTO last = schedules.get(schedules.size() - 1);
+        RepaymentScheduleEntity last = schedules.get(schedules.size() - 1);
         assertThat(last.getPrincipalDue()).isEqualByComparingTo(principal);
         assertThat(last.getTotalPaymentDue()).isEqualByComparingTo("10100000.00");
         assertThat(last.getRemainingPrincipal()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -122,7 +122,7 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("무이자 100만원을 3회 상환하면 마지막 회차가 원금 나머지를 부담한다")
     void zeroInterest_lastRoundAbsorbsPrincipalRemainder() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipalAndInterest(
                         contractId,
                         new BigDecimal("1000000"),
@@ -132,14 +132,14 @@ class ScheduleGeneratorTest {
                 );
 
         assertThat(schedules)
-                .extracting(RepaymentScheduleDTO::getPrincipalDue)
+                .extracting(RepaymentScheduleEntity::getPrincipalDue)
                 .containsExactly(
                         new BigDecimal("333333"),
                         new BigDecimal("333333"),
                         new BigDecimal("333334")
                 );
         assertThat(schedules)
-                .extracting(RepaymentScheduleDTO::getTotalPaymentDue)
+                .extracting(RepaymentScheduleEntity::getTotalPaymentDue)
                 .containsExactly(
                         new BigDecimal("333333"),
                         new BigDecimal("333333"),
@@ -150,7 +150,7 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("만기일시 0.5% 이자의 정수 나머지는 마지막 회차에 추가한다")
     void bulletRepayment_lastRoundAbsorbsInterestRemainder() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateBulletRepayment(
                         contractId,
                         new BigDecimal("100000"),
@@ -160,11 +160,11 @@ class ScheduleGeneratorTest {
                 );
 
         assertThat(schedules.subList(0, 11))
-                .extracting(RepaymentScheduleDTO::getInterestDue)
+                .extracting(RepaymentScheduleEntity::getInterestDue)
                 .containsOnly(new BigDecimal("41"));
         assertThat(schedules.get(11).getInterestDue()).isEqualByComparingTo("49");
         assertThat(schedules.stream()
-                .map(RepaymentScheduleDTO::getInterestDue)
+                .map(RepaymentScheduleEntity::getInterestDue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add))
                 .isEqualByComparingTo("500");
     }
@@ -175,7 +175,7 @@ class ScheduleGeneratorTest {
         BigDecimal testPrincipal = new BigDecimal("1000000");
         BigDecimal testRate = new BigDecimal("0.5");
 
-        List<List<RepaymentScheduleDTO>> schedulesByMethod = List.of(
+        List<List<RepaymentScheduleEntity>> schedulesByMethod = List.of(
                 ScheduleGenerator.generateEqualPrincipalAndInterest(
                         contractId, testPrincipal, testRate, 12, startDate),
                 ScheduleGenerator.generateEqualPrincipal(
@@ -184,9 +184,9 @@ class ScheduleGeneratorTest {
                         contractId, testPrincipal, testRate, 12, startDate)
         );
 
-        for (List<RepaymentScheduleDTO> schedules : schedulesByMethod) {
+        for (List<RepaymentScheduleEntity> schedules : schedulesByMethod) {
             assertThat(schedules.stream()
-                    .map(RepaymentScheduleDTO::getPrincipalDue)
+                    .map(RepaymentScheduleEntity::getPrincipalDue)
                     .reduce(BigDecimal.ZERO, BigDecimal::add))
                     .isEqualByComparingTo(testPrincipal);
 
@@ -207,7 +207,7 @@ class ScheduleGeneratorTest {
     @Test
     @DisplayName("세 방식 모두 회차별 contractId와 sequence가 정확하다")
     void allMethods_haveCorrectContractIdAndSequence() {
-        List<RepaymentScheduleDTO> schedules =
+        List<RepaymentScheduleEntity> schedules =
                 ScheduleGenerator.generateEqualPrincipal(contractId, principal, annualInterestRate, months, startDate);
 
         for (int i = 0; i < schedules.size(); i++) {
