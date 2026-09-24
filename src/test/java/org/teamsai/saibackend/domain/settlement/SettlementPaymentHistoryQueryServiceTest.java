@@ -16,8 +16,8 @@ import org.teamsai.saibackend.domain.payment.type.SourceType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryQueryService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
@@ -33,14 +33,14 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("SettlementPaymentHistoryService 단위 테스트")
-class SettlementPaymentHistoryServiceTest {
+@DisplayName("SettlementPaymentHistoryQueryService 단위 테스트")
+class SettlementPaymentHistoryQueryServiceTest {
 
     private static final Long SETTLEMENT_ID = 1L;
     private static final Long USER_ID = 10L;
 
     @Mock
-    private SettlementPaymentStatusService settlementPaymentStatusService;
+    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @Mock
     private PaymentRecordService paymentRecordService;
@@ -49,7 +49,7 @@ class SettlementPaymentHistoryServiceTest {
     private BankTransactionService bankTransactionService;
 
     @InjectMocks
-    private SettlementPaymentHistoryService settlementPaymentHistoryService;
+    private SettlementPaymentHistoryQueryService settlementPaymentHistoryService;
 
     @Test
     @DisplayName("납부의무-참여자 이름과 연결된 거래정보를 조합해 납부 내역을 만든다")

@@ -6,14 +6,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.assembler.DashboardAssembler;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
 import org.teamsai.saibackend.domain.contract.exception.DashboardErrorCode;
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -22,7 +20,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class DashboardService {
+public class DashboardQueryService {
 
     private final LoanContractService loanContractService;
     private final RepaymentScheduleService repaymentScheduleService;
@@ -168,15 +166,13 @@ public class DashboardService {
                 .build();
     }
 
-    public DashboardResponse getDashboard(Long userId, String keyword, String roleFilter, String statusFilter, String sortType, int page) {
+    public DashboardResponse getDashboard(
+            Long userId, String keyword, String roleFilter,
+            String statusFilter, String sortType, int page
+    ) {
         return buildDashboard(
                 getContractScheduleContexts(userId),
-                userId,
-                keyword,
-                roleFilter,
-                statusFilter,
-                sortType,
-                page
+                userId, keyword, roleFilter, statusFilter, sortType, page
         );
     }
 

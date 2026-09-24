@@ -11,7 +11,7 @@ import org.teamsai.saibackend.domain.contract.controller.ContractDetailControlle
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
-import org.teamsai.saibackend.domain.contract.service.ContractDetailService;
+import org.teamsai.saibackend.domain.contract.service.ContractDetailQueryService;
 
 import java.util.Map;
 
@@ -27,7 +27,7 @@ class ContractDetailControllerTest {
     private static final Long USER_ID = 10L;
 
     @Mock
-    private ContractDetailService contractDetailService;
+    private ContractDetailQueryService contractDetailService;
 
     @Mock
     private ArchiveService archiveService;

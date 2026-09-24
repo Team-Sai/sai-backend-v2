@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.archive.service.SettlementArchiveService;
+import org.teamsai.saibackend.domain.archive.service.SettlementArchiveQueryService;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
@@ -17,8 +17,8 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentOb
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryQueryService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
@@ -34,8 +34,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("SettlementArchiveService 단위 테스트")
-class SettlementArchiveServiceTest {
+@DisplayName("SettlementArchiveQueryService 단위 테스트")
+class SettlementArchiveQueryServiceTest {
 
     private static final Long SETTLEMENT_ID = 1L;
     private static final Long USER_ID = 10L;
@@ -44,19 +44,19 @@ class SettlementArchiveServiceTest {
     private SettlementQueryService settlementQueryService;
 
     @Mock
-    private SettlementPaymentStatusService settlementPaymentStatusService;
+    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @Mock
-    private SettlementPaymentHistoryService settlementPaymentHistoryService;
+    private SettlementPaymentHistoryQueryService settlementPaymentHistoryService;
 
     @Mock
     private SettlementAccountService settlementAccountService;
 
-    private SettlementArchiveService settlementArchiveService;
+    private SettlementArchiveQueryService settlementArchiveService;
 
     @BeforeEach
     void setUp() {
-        settlementArchiveService = new SettlementArchiveService(
+        settlementArchiveService = new SettlementArchiveQueryService(
                 settlementQueryService,
                 settlementPaymentStatusService,
                 settlementPaymentHistoryService,

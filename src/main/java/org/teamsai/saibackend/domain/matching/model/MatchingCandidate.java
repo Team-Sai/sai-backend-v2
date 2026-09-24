@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.matching.service;
+package org.teamsai.saibackend.domain.matching.model;
 
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;

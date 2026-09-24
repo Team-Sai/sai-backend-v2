@@ -5,13 +5,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.calendar.response.DashboardCalendarItemResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardAssembler;
 import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardAssembler.SettlementContext;
 import org.teamsai.saibackend.domain.integration.dto.response.IntegrationDashboardResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.time.LocalDate;
@@ -21,20 +21,20 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class IntegrationDashboardService {
+public class IntegrationDashboardQueryService {
 
-    private final DashboardService contractDashboardService;
+    private final DashboardQueryService contractDashboardQueryService;
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
+    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     public IntegrationDashboardResponse getDashboard(
             Long userId,
             YearMonth yearMonth
     ) {
-        DashboardService.IntegrationDashboardData loanData =
-                contractDashboardService.getIntegrationDashboardData(userId);
+        DashboardQueryService.IntegrationDashboardData loanData =
+                contractDashboardQueryService.getIntegrationDashboardData(userId);
         DashboardResponse contractDashboard = loanData.dashboard();
-        List<DashboardService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
+        List<DashboardQueryService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
         List<SettlementContext> settlements = getSettlements(userId);
 
         return IntegrationDashboardResponse.builder()
@@ -48,9 +48,9 @@ public class IntegrationDashboardService {
     }
 
     public List<DashboardCalendarItemResponse> getCalendarDayDetail(Long userId, LocalDate date) {
-        DashboardService.IntegrationDashboardData loanData =
-                contractDashboardService.getIntegrationDashboardData(userId);
-        List<DashboardService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
+        DashboardQueryService.IntegrationDashboardData loanData =
+                contractDashboardQueryService.getIntegrationDashboardData(userId);
+        List<DashboardQueryService.LoanScheduleContext> loanSchedules = loanData.loanSchedules();
         List<SettlementContext> settlements = getSettlements(userId);
 
         return IntegrationDashboardAssembler.toCalendarDayDetail(loanSchedules, settlements, date, userId);

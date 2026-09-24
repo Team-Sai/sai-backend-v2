@@ -19,7 +19,7 @@ import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -36,8 +36,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("SettlementPaymentStatusService 단위 테스트")
-class SettlementPaymentStatusServiceTest {
+@DisplayName("SettlementPaymentStatusQueryService 단위 테스트")
+class SettlementPaymentStatusQueryServiceTest {
 
     private static final Long SETTLEMENT_ID = 1L;
     private static final Long OWNER_ID = 10L;
@@ -60,7 +60,7 @@ class SettlementPaymentStatusServiceTest {
     private SettlementValidator settlementValidator;
 
     @InjectMocks
-    private SettlementPaymentStatusService paymentStatusService;
+    private SettlementPaymentStatusQueryService paymentStatusService;
 
     @Test
     @DisplayName("납부의무별 금액을 합산하고 진행률을 계산한다")

@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.matching.service;
+package org.teamsai.saibackend.domain.matching;
 
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;

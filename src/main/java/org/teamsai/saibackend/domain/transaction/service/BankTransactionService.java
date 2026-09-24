@@ -6,6 +6,10 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
+import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
+import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
@@ -21,7 +25,7 @@ import java.util.Optional;
 public class BankTransactionService {
 
     private final BankTransactionRepository bankTransactionRepository;
-
+    private final LinkedBankAccountRepository linkedBankAccountRepository;
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -153,6 +157,24 @@ public class BankTransactionService {
         return 1;
     }
 
+    @Transactional
+    public BankTransactionDetailResponse getOwnedTransactionDetailForUpdate(
+            Long userId,
+            Long linkedAccountId,
+            Long bankTransactionId
+    ) {
+        LinkedBankAccount account = linkedBankAccountRepository.findById(linkedAccountId)
+                .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
+
+        if (!account.getUserId().equals(userId)) {
+            throw AccountErrorCode.ACCOUNT_ACCESS_DENIED.toException();
+        }
+
+        BankTransactionEntity transaction =
+                findByIdAndLinkedAccountIdForUpdate(bankTransactionId, linkedAccountId);
+
+        return BankTransactionDetailResponse.from(transaction);
+    }
     private void validateNewBankTransaction(
             BankTransactionEntity bankTransaction
     ) {
