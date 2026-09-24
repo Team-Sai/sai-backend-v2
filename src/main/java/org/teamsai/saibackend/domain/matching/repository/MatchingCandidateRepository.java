@@ -81,10 +81,6 @@ public class MatchingCandidateRepository {
                 AND pr.record_status = 'CONFIRMED'
             WHERE ca.linked_account_id = :linkedAccountId
                 AND ca.selected_at <= :transactionAt
-                AND (
-                    ca.ended_at IS NULL
-                    OR ca.ended_at > :transactionAt
-                )
                 AND ca.account_status = 'ACTIVE'
                 AND lc.status = 'COMPLETED'
                 AND lc.created_at <= :transactionAt

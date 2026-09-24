@@ -31,9 +31,6 @@ public class ContractAccount {
     @Column(name = "selected_at", nullable = false, updatable = false)
     private LocalDateTime selectedAt;
 
-    @Column(name = "ended_at")
-    private LocalDateTime endedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id", nullable = false)
     private LoanContract loanContract;
