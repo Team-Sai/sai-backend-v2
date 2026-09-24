@@ -10,11 +10,7 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.Objects;
 
-/**
- * 대출계약(LoanContractResponse) + 변경요청(LoanContractChangeRequestEntity) + 예상 월 상환액을
- * 조합해서 변경요청 상세 응답 DTO를 만드는 조립 전담 클래스.
- * 조회/검증/월 상환액 계산 같은 흐름 제어는 ChangeRequestDetailQueryService에 남아있다.
- */
+
 public final class ChangeRequestDetailAssembler {
 
     private ChangeRequestDetailAssembler() {

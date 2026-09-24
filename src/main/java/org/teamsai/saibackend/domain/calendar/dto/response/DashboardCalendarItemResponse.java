@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.calendar.response;
+package org.teamsai.saibackend.domain.calendar.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;

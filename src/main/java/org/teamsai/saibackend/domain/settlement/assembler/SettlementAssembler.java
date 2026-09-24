@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Settlement Entity + 연관 도메인(payment/transaction) 데이터를 조합해서
- * 정산 관련 Response DTO를 만드는 조립 전담 클래스.
- * 실제 조회(Repository 호출)는 각 Service가 하고, 이미 조회된 데이터를 조합하는
- * 부분만 여기서 담당한다.
- */
 public final class SettlementAssembler {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
