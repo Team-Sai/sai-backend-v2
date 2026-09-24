@@ -10,6 +10,7 @@ import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandida
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateQueryRepository;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateRepository;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateValidationQueryRepository;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateInvalidationReason;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateStatus;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
@@ -25,6 +26,7 @@ public class BankTransactionMatchCandidateService {
 
     private final BankTransactionMatchCandidateRepository candidateRepository;
     private final BankTransactionMatchCandidateQueryRepository candidateQueryRepository;
+    private final BankTransactionMatchCandidateValidationQueryRepository candidateValidationQueryRepository;
 
     @Transactional
     public void saveAll(
@@ -104,7 +106,7 @@ public class BankTransactionMatchCandidateService {
         validateMatchCandidateId(matchCandidateId);
         validateBankTransactionId(bankTransactionId);
 
-        return candidateRepository.findByIdAndBankTransactionId(
+        return candidateValidationQueryRepository.findByIdAndBankTransactionId(
                         matchCandidateId,
                         bankTransactionId
                 )
