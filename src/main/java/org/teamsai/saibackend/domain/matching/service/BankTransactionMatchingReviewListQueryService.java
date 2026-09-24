@@ -3,14 +3,12 @@ package org.teamsai.saibackend.domain.matching.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.matching.assembler.MatchingAssembler;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
 import org.teamsai.saibackend.domain.matching.dto.request.MatchingReviewSearchCondition;
-import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchCandidateResponse;
 import org.teamsai.saibackend.domain.matching.dto.response.BankTransactionMatchingReviewResponse;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchingReviewQueryRepository;
-import org.teamsai.saibackend.domain.matching.type.MatchingReviewChannel;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionReviewQueryDTO;
-import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
 
 import java.util.List;
@@ -57,7 +55,7 @@ public class BankTransactionMatchingReviewListQueryService {
                         ));
 
         List<BankTransactionMatchingReviewResponse> content = transactions.stream()
-                .map(transaction -> toResponse(
+                .map(transaction -> MatchingAssembler.toReviewResponse(
                         transaction,
                         candidatesByTransaction.getOrDefault(
                                 transaction.bankTransactionId(),
@@ -72,34 +70,5 @@ public class BankTransactionMatchingReviewListQueryService {
                 condition.size(),
                 totalCount
         );
-    }
-
-    private BankTransactionMatchingReviewResponse toResponse(
-            BankTransactionReviewQueryDTO transaction,
-            List<BankTransactionMatchCandidateQueryDTO> candidates
-    ) {
-        return new BankTransactionMatchingReviewResponse(
-                new BankTransactionDetailResponse(
-                        transaction.bankTransactionId(),
-                        transaction.linkedAccountId(),
-                        transaction.amount(),
-                        transaction.transactionType(),
-                        transaction.processingStatus(),
-                        transaction.transactionAt(),
-                        transaction.counterpartyName(),
-                        transaction.memo(),
-                        transaction.syncedAt()
-                ),
-                determineReviewChannel(candidates),
-                candidates.stream()
-                        .map(BankTransactionMatchCandidateResponse::from)
-                        .toList()
-        );
-    }
-
-    private MatchingReviewChannel determineReviewChannel(
-            List<BankTransactionMatchCandidateQueryDTO> candidates
-    ) {
-        return MatchingReviewChannel.TRANSACTION_HISTORY;
     }
 }

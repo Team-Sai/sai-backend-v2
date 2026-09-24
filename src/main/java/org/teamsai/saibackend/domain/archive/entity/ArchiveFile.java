@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "archive_file")
-public class File {
+public class ArchiveFile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,7 +43,7 @@ public class File {
     private LocalDateTime createdAt;
 
     @Builder
-    public File(
+    public ArchiveFile(
             ArchiveStatus domainType,
             Long referenceId,
             String originalFilename,

@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
+import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
@@ -53,15 +54,8 @@ public class SettlementPaymentHistoryQueryService {
                 .findById(record.getBankTransactionId())
                 .orElse(null);
 
-        return SettlementPaymentHistoryResponse.builder()
-                .paymentRecordId(record.getPaymentRecordId())
-                .recordedAt(record.getRecordedAt())
-                .payerName(payerNameByObligationId.get(record.getTargetId()))
-                .amount(record.getAmount())
-                .sourceType(record.getSourceType())
-                .bankTransactionId(record.getBankTransactionId())
-                .counterpartyName(transaction != null ? transaction.getCounterpartyName() : null)
-                .externalTransactionId(transaction != null ? transaction.getExternalTransactionId() : null)
-                .build();
+        return SettlementAssembler.toPaymentHistoryResponse(
+                record, transaction, payerNameByObligationId.get(record.getTargetId())
+        );
     }
 }
