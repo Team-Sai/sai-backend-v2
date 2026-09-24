@@ -1,7 +1,6 @@
-package org.teamsai.saibackend.domain.contract.util;
+package org.teamsai.saibackend.domain.contract.service;
 
-
-
+import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
 
 import java.math.BigDecimal;
@@ -9,8 +8,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.Period;
 
-public class RepaymentCalculator {
-    public static BigDecimal calculate(
+@Component
+public class MonthlyPaymentEstimator {
+    public BigDecimal estimate(
                 BigDecimal principal,
                 BigDecimal annualInterestRate,
                 String repaymentType,
