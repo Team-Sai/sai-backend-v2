@@ -13,6 +13,7 @@ import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDet
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQueryRepository;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
@@ -25,6 +26,7 @@ import java.util.Optional;
 public class BankTransactionService {
 
     private final BankTransactionRepository bankTransactionRepository;
+    private final BankTransactionQueryRepository bankTransactionQueryRepository;
     private final LinkedBankAccountRepository linkedBankAccountRepository;
     @PersistenceContext
     private EntityManager entityManager;
@@ -126,7 +128,7 @@ public class BankTransactionService {
     public List<BankTransactionEntity> findRetryCandidates(
             Long linkedAccountId
     ) {
-        return bankTransactionRepository.findRetryCandidates(linkedAccountId);
+        return bankTransactionQueryRepository.findRetryCandidates(linkedAccountId);
     }
 
     @Transactional
