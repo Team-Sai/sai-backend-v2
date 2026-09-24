@@ -9,10 +9,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingTransactionResult;
-import org.teamsai.saibackend.domain.matching.service.MatchingCandidate;
-import org.teamsai.saibackend.domain.matching.service.MatchingTransaction;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
+import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
+import org.teamsai.saibackend.domain.matching.model.MatchingTransaction;
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingTransactionService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
@@ -24,7 +24,7 @@ import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateReposi
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
@@ -59,7 +59,7 @@ class BankMatchingTransactionServiceTest {
     @Mock
     private NotificationService notificationService;
     @Mock
-    private SettlementPaymentStatusService settlementPaymentStatusService;
+    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
     @InjectMocks
     private BankMatchingTransactionService transactionService;
     @Test

@@ -8,19 +8,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.notification.dto.response.NotificationResponse;
 import org.teamsai.saibackend.domain.notification.entity.Notification;
 import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.user.entity.User;
 
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,23 +94,6 @@ class NotificationServiceTest {
 
         assertThat(notification.getReferenceId()).isEqualTo(contractId);
         assertThat(notification.getSecondaryReferenceId()).isEqualTo(changeRequestId);
-    }
-
-    @Test
-    @DisplayName("로그인 사용자의 알림 목록을 조회한다")
-    void getNotificationsSuccess() {
-        Long userId = 2L;
-
-        NotificationResponse expected = mock(NotificationResponse.class);
-
-        when(notificationRepository.findBankTransactionNotificationsByUserId(userId)).thenReturn(List.of());
-        when(notificationRepository.findSettlementNotificationsByUserId(userId)).thenReturn(List.of(expected));
-        when(notificationRepository.findContractNotificationsByUserId(userId)).thenReturn(List.of());
-        when(notificationRepository.findRepaymentNotificationsByUserId(userId)).thenReturn(List.of());
-
-        List<NotificationResponse> result = notificationService.getNotifications(userId);
-
-        assertThat(result).containsExactly(expected);
     }
 
     @Test

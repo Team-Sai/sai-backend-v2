@@ -3,15 +3,13 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDetailResponse;
 
 import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
-public class ContractDetailService {
+public class ContractDetailQueryService {
 
     private final LoanContractService loanContractService;
     private final ContractChangeService contractChangeService;

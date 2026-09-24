@@ -10,7 +10,6 @@ import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCo
 import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
 import org.teamsai.saibackend.domain.matching.dto.response.MatchingReviewProcessResponse;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.service.MatchingReviewValidator;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchingReviewService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
@@ -22,7 +21,6 @@ import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.service.LoanPaymentService;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
-import org.teamsai.saibackend.domain.transaction.service.BankTransactionQueryService;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -48,9 +46,6 @@ class BankTransactionMatchingReviewServiceTest {
     private static final Long MATCH_CANDIDATE_ID = 4L;
 
     @Mock
-    private BankTransactionQueryService bankTransactionQueryService;
-
-    @Mock
     private BankTransactionMatchCandidateService candidateService;
 
     @Mock
@@ -67,7 +62,6 @@ class BankTransactionMatchingReviewServiceTest {
     @BeforeEach
     void setUp() {
         matchingReviewService = new BankTransactionMatchingReviewService(
-                bankTransactionQueryService,
                 candidateService,
                 settlementPaymentService,
                 loanPaymentService,
@@ -337,7 +331,7 @@ class BankTransactionMatchingReviewServiceTest {
     @Test
     @DisplayName("확인 필요 상태가 아닌 거래는 선택 처리하지 않는다")
     void rejectsTransactionThatDoesNotNeedReview() {
-        given(bankTransactionQueryService.getTransactionDetailForUpdate(
+        given(bankTransactionService.getOwnedTransactionDetailForUpdate(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
                 BANK_TRANSACTION_ID
@@ -364,7 +358,7 @@ class BankTransactionMatchingReviewServiceTest {
     }
 
     private void givenReviewableTransaction() {
-        given(bankTransactionQueryService.getTransactionDetailForUpdate(
+        given(bankTransactionService.getOwnedTransactionDetailForUpdate(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
                 BANK_TRANSACTION_ID

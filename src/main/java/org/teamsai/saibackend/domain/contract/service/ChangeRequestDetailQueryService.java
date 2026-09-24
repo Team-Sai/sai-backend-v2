@@ -16,7 +16,7 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
-public class ChangeRequestDetailService {
+public class ChangeRequestDetailQueryService {
 
     private String translateRepaymentType(String repaymentType) {
                 return switch(repaymentType) {

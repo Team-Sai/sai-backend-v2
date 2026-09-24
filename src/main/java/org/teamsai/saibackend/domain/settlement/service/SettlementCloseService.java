@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class SettlementCloseService {
     private final SettlementRepository settlementRepository;
-    private final SettlementPaymentStatusService paymentStatusService;
+    private final SettlementPaymentStatusQueryService paymentStatusService;
     private final SettlementValidator settlementValidator;
     @Transactional
     public SettlementCloseResponse close(Long settlementId, Long userId){
