@@ -45,9 +45,4 @@ public class ContractAccount {
         this.accountStatus = (accountStatus != null) ? accountStatus : ContractAccountStatus.ACTIVE;
         this.loanContract = loanContract;
     }
-
-    public void deactivate(ContractAccountStatus accountStatus) {
-        this.accountStatus = accountStatus;
-        this.endedAt = LocalDateTime.now();
-    }
 }
