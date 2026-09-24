@@ -1,6 +1,8 @@
-package org.teamsai.saibackend.domain.contract.util;
+package org.teamsai.saibackend.domain.contract.service;
 
+import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
+import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
@@ -8,17 +10,40 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ScheduleGenerator {
+@Component
+public class RepaymentScheduleGenerator {
 
     private static final int CALCULATION_SCALE = 20;
     private static final int WON_SCALE = 0;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal MONTHS_PER_YEAR = BigDecimal.valueOf(12);
 
-    public static List<RepaymentScheduleDTO> generateEqualPrincipalAndInterest(
+    public List<RepaymentScheduleDTO> generate(
+            Long contractId, RepaymentMethod repaymentType, BigDecimal principal,
+            BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate
+    ) {
+        Period period = Period.between(startDate, maturityDate);
+        int months = period.getYears() * 12 + period.getMonths();
+
+        if (months <= 0) {
+            throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
+        }
+
+        return switch (repaymentType) {
+            case EQUAL_PRINCIPAL_AND_INTEREST -> generateEqualPrincipalAndInterest(
+                    contractId, principal, annualInterestRate, months, startDate);
+            case EQUAL_PRINCIPAL -> generateEqualPrincipal(
+                    contractId, principal, annualInterestRate, months, startDate);
+            case BULLET_REPAYMENT -> generateBulletRepayment(
+                    contractId, principal, annualInterestRate, months, startDate);
+        };
+    }
+
+    public List<RepaymentScheduleDTO> generateEqualPrincipalAndInterest(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
             int months, LocalDate startDate
     ) {
@@ -83,7 +108,7 @@ public class ScheduleGenerator {
         return schedules;
     }
 
-    public static List<RepaymentScheduleDTO> generateEqualPrincipal(
+    public List<RepaymentScheduleDTO> generateEqualPrincipal(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
             int months, LocalDate startDate
     ) {
@@ -128,7 +153,7 @@ public class ScheduleGenerator {
         return schedules;
     }
 
-    public static List<RepaymentScheduleDTO> generateBulletRepayment(
+    public List<RepaymentScheduleDTO> generateBulletRepayment(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
             int months, LocalDate startDate
     ) {

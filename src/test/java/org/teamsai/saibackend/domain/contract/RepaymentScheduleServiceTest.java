@@ -5,12 +5,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
@@ -38,6 +40,9 @@ class RepaymentScheduleServiceTest {
 
     @Mock
     private LoanContractService loanContractService;
+
+    @Spy
+    private RepaymentScheduleGenerator repaymentScheduleGenerator = new RepaymentScheduleGenerator();
 
     @InjectMocks
     private RepaymentScheduleService repaymentScheduleService;
