@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 
 @Tag(
         name = "차용증 API",
@@ -23,7 +23,7 @@ import org.teamsai.saibackend.domain.contract.service.DashboardService;
 @RequiredArgsConstructor
 public class DashboardController  {
 
-    private final DashboardService dashboardService;
+    private final DashboardQueryService dashboardService;
 
     @Hidden
     @GetMapping("/contract")

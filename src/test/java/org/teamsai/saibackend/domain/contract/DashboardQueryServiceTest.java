@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
@@ -26,10 +26,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
-class DashboardServiceTest {
+class DashboardQueryServiceTest {
 
     @Mock
     private LoanContractService loanContractService;
@@ -38,7 +37,7 @@ class DashboardServiceTest {
     private RepaymentScheduleService repaymentScheduleService;
 
     @InjectMocks
-    private DashboardService dashboardService;
+    private DashboardQueryService dashboardService;
 
     private static final Long USER_ID = 1L;
 
@@ -245,7 +244,7 @@ class DashboardServiceTest {
         when(repaymentScheduleService.getSchedulesByContractIds(List.of(62L)))
                 .thenReturn(Map.of(62L, List.of(schedule)));
 
-        DashboardService.IntegrationDashboardData result =
+        DashboardQueryService.IntegrationDashboardData result =
                 dashboardService.getIntegrationDashboardData(USER_ID);
 
         assertThat(result.dashboard().getContracts()).hasSize(1);

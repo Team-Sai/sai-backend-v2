@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SettlementPaymentStatusService {
+public class SettlementPaymentStatusQueryService {
 
     private final SettlementRepository settlementRepository;
     private final SettlementParticipantRepository settlementParticipantRepository;

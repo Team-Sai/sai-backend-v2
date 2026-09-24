@@ -11,14 +11,14 @@ import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDetailResponse;
-import org.teamsai.saibackend.domain.contract.service.ContractDetailService;
+import org.teamsai.saibackend.domain.contract.service.ContractDetailQueryService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ContractDetailService 단위 테스트")
-class ContractDetailServiceTest {
+@DisplayName("ContractDetailQueryService 단위 테스트")
+class ContractDetailQueryServiceTest {
 
     private static final Long CONTRACT_ID = 1L;
     private static final Long CREDITOR_ID = 10L;
@@ -31,7 +31,7 @@ class ContractDetailServiceTest {
     private ContractChangeService contractChangeService;
 
     @InjectMocks
-    private ContractDetailService contractDetailService;
+    private ContractDetailQueryService contractDetailService;
 
     private LoanContractResponse contract() {
         return LoanContractResponse.builder()

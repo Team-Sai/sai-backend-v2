@@ -9,9 +9,7 @@ import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.event.ContractCreatedEvent;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.assembler.RepaymentScheduleAssembler;
 import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.util.ScheduleGenerator;
@@ -113,19 +111,6 @@ public class RepaymentScheduleService {
         schedule.fullPayment(paidAt);
         repaymentScheduleRepository.save(schedule);
 
-    }
-
-    public RepaymentScheduleSummaryResponse getScheduleSummary(Long contractId, Long userId) {
-
-        LoanContractResponse contract = loanContractService.findContract(contractId, userId);
-
-        List<RepaymentScheduleEntity> schedules = repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId);
-
-        LocalDate nextDueDate = findNextPendingSchedule(contractId)
-                .map(RepaymentScheduleEntity::getDueDate)
-                .orElse(null);
-
-        return RepaymentScheduleAssembler.toSummary(contract, schedules, nextDueDate);
     }
 
     @Transactional

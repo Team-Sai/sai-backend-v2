@@ -5,15 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.notification.dto.response.NotificationResponse;
 import org.teamsai.saibackend.domain.notification.entity.Notification;
 import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.user.entity.User;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -78,21 +74,4 @@ public class NotificationService {
         createIfAbsent(userId, type, title, content, referenceId, secondaryReferenceId);
     }
 
-    @Transactional(readOnly = true)
-    public List<NotificationResponse> getNotifications(Long userId) {
-        List<NotificationResponse> notifications = new ArrayList<>();
-
-        notifications.addAll(notificationRepository.findBankTransactionNotificationsByUserId(userId));
-        notifications.addAll(notificationRepository.findSettlementNotificationsByUserId(userId));
-        notifications.addAll(notificationRepository.findContractNotificationsByUserId(userId));
-        notifications.addAll(notificationRepository.findRepaymentNotificationsByUserId(userId));
-
-        notifications.sort(
-                Comparator.comparing(NotificationResponse::getCreatedAt)
-                        .thenComparing(NotificationResponse::getNotificationId)
-                        .reversed()
-        );
-
-        return notifications;
-    }
 }

@@ -2,6 +2,8 @@ package org.teamsai.saibackend.domain.matching.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;

@@ -24,7 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
-import org.teamsai.saibackend.domain.archive.service.SettlementArchiveService;
+import org.teamsai.saibackend.domain.archive.service.SettlementArchiveQueryService;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
 
 import java.net.URLEncoder;
@@ -40,7 +40,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SettlementArchiveController {
 
-    private final SettlementArchiveService settlementArchiveService;
+    private final SettlementArchiveQueryService settlementArchiveService;
     private final ArchiveService archiveService;
 
     @Hidden

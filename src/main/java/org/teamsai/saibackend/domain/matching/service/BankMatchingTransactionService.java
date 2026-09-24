@@ -2,6 +2,10 @@ package org.teamsai.saibackend.domain.matching.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
+import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
+import org.teamsai.saibackend.domain.matching.model.MatchingTransaction;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
 import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateRepository;
@@ -11,7 +15,7 @@ import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
@@ -27,7 +31,7 @@ public class BankMatchingTransactionService {
     private final BankTransactionService bankTransactionService;
     private final BankTransactionMatchCandidateService candidateService;
     private final NotificationService notificationService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
+    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
     @Transactional
     public AutoMatchingTransactionResult process(
             Long userId,

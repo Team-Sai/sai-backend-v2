@@ -4,7 +4,7 @@ import org.teamsai.saibackend.domain.calendar.response.DashboardCalendarItemResp
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.dto.response.DashboardAmountSummaryResponse;
@@ -162,7 +162,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static List<DashboardCalendarDayResponse> toCalendarDays(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             YearMonth yearMonth,
             Long userId
@@ -197,7 +197,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     private static List<DashboardCalendarDayResponse> loanCalendarDays(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             YearMonth yearMonth,
             Long userId
     ) {
@@ -229,7 +229,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static List<DashboardCalendarItemResponse> toCalendarDayDetail(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             LocalDate date,
             Long userId
@@ -243,7 +243,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     private static List<DashboardCalendarItemResponse> loanCalendarItems(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             LocalDate date,
             Long userId
     ) {
@@ -311,7 +311,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static List<DashboardAttentionItemResponse> toAttentionItems(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements
     ) {
         LocalDate today = LocalDate.now();
@@ -339,7 +339,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     private static List<DashboardAttentionItemResponse> upcomingLoanAttentionItems(
-            List<DashboardService.LoanScheduleContext> loanSchedules
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules
     ) {
         LocalDate today = LocalDate.now();
         LocalDate attentionLimit = today.plusDays(3);
@@ -368,11 +368,11 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static DashboardMonthlySummaryResponse toMonthlySummary(
-            List<DashboardService.LoanScheduleContext> loanSchedules,
+            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             YearMonth yearMonth
     ) {
-        List<DashboardService.LoanScheduleContext> monthlySchedules = loanSchedules.stream()
+        List<DashboardQueryService.LoanScheduleContext> monthlySchedules = loanSchedules.stream()
                 .filter(context -> YearMonth.from(context.schedule().getDueDate()).equals(yearMonth))
                 .toList();
 

@@ -10,7 +10,7 @@ import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.service.DashboardService;
+import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardAssembler;
@@ -261,7 +261,7 @@ class IntegrationDashboardAssemblerTest {
             YearMonth yearMonth = YearMonth.from(dueDate);
 
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardService.LoanScheduleContext(
+            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, dueDate, RepaymentScheduleStatus.PENDING)
             ));
             List<SettlementContext> settlements = List.of(new SettlementContext(
@@ -308,7 +308,7 @@ class IntegrationDashboardAssemblerTest {
         void mergesLoanAndSettlementItemsSortedByTitle() {
             LocalDate date = LocalDate.of(2026, 8, 15);
             LoanContractResponse contract = loanContract(1L, USER_ID, OTHER_USER_ID);
-            var loanSchedules = List.of(new DashboardService.LoanScheduleContext(
+            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, date, RepaymentScheduleStatus.PENDING)
             ));
             SettlementContext settlementContext = new SettlementContext(
@@ -333,7 +333,7 @@ class IntegrationDashboardAssemblerTest {
         void showsPayableLabelForDebtor() {
             LocalDate date = LocalDate.of(2026, 8, 15);
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardService.LoanScheduleContext(
+            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, date, RepaymentScheduleStatus.PENDING)
             ));
 
@@ -352,7 +352,7 @@ class IntegrationDashboardAssemblerTest {
             LocalDate date = LocalDate.of(2026, 8, 15);
             LocalDate otherDate = LocalDate.of(2026, 8, 16);
             LoanContractResponse contract = loanContract(1L, USER_ID, OTHER_USER_ID);
-            var loanSchedules = List.of(new DashboardService.LoanScheduleContext(
+            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, otherDate, RepaymentScheduleStatus.PENDING)
             ));
 
@@ -373,7 +373,7 @@ class IntegrationDashboardAssemblerTest {
         void sortsByRemainingDays() {
             LocalDate today = LocalDate.now();
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardService.LoanScheduleContext(
+            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, today.plusDays(2), RepaymentScheduleStatus.PENDING)
             ));
             SettlementContext settlementContext = new SettlementContext(
@@ -396,7 +396,7 @@ class IntegrationDashboardAssemblerTest {
         void excludesItemsBeyondThreeDays() {
             LocalDate today = LocalDate.now();
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardService.LoanScheduleContext(
+            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, today.plusDays(4), RepaymentScheduleStatus.PENDING)
             ));
 
@@ -417,8 +417,8 @@ class IntegrationDashboardAssemblerTest {
             YearMonth yearMonth = YearMonth.of(2026, 8);
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
             var loanSchedules = List.of(
-                    new DashboardService.LoanScheduleContext(contract, schedule(1L, yearMonth.atDay(1), RepaymentScheduleStatus.PAID)),
-                    new DashboardService.LoanScheduleContext(contract, schedule(2L, yearMonth.atDay(2), RepaymentScheduleStatus.PENDING))
+                    new DashboardQueryService.LoanScheduleContext(contract, schedule(1L, yearMonth.atDay(1), RepaymentScheduleStatus.PAID)),
+                    new DashboardQueryService.LoanScheduleContext(contract, schedule(2L, yearMonth.atDay(2), RepaymentScheduleStatus.PENDING))
             );
             SettlementContext closedSettlement = new SettlementContext(
                     settlement(2L, "정산", "OWNER", "CLOSED", yearMonth.atDay(3), LocalDateTime.now()),
@@ -449,7 +449,7 @@ class IntegrationDashboardAssemblerTest {
         void excludesOtherMonths() {
             YearMonth yearMonth = YearMonth.of(2026, 8);
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardService.LoanScheduleContext(
+            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
                     contract, schedule(1L, YearMonth.of(2026, 9).atDay(1), RepaymentScheduleStatus.PENDING)
             ));
 
