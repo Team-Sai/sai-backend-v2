@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.integration.assembler;
 
-import org.teamsai.saibackend.domain.calendar.response.DashboardCalendarItemResponse;
+import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;

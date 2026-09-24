@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.integration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.calendar.response.DashboardCalendarItemResponse;
+import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
