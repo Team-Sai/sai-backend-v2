@@ -7,7 +7,6 @@ import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountRespo
 import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
@@ -64,51 +63,7 @@ public class ContractAccountService {
                 .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
 
         validateSelectable(userId, linkedAccountId);
-
-        try {
-            retireActiveAccount(contractId, ContractAccountStatus.REPLACED);
-        } catch (RuntimeException e) {
-        }
-
         insertActiveAccount(contractId, linkedAccountId);
-    }
-
-    @Transactional
-    public void changeContractAccount(Long contractId, Long userId, Long newLinkedAccountId) {
-        loanContractRepository.findWithLockByContractId(contractId)
-                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
-
-        validateContractOwner(contractId, userId);
-        validateSelectable(userId, newLinkedAccountId);
-
-        retireActiveAccount(contractId, ContractAccountStatus.REPLACED);
-        insertActiveAccount(contractId, newLinkedAccountId);
-    }
-
-    @Transactional
-    public void deactivateContractAccount(Long contractId, Long userId) {
-        loanContractRepository.findWithLockByContractId(contractId)
-                .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
-
-        validateContractOwner(contractId, userId);
-        retireActiveAccount(contractId, ContractAccountStatus.DISABLED);
-    }
-
-    private void retireActiveAccount(Long contractId, ContractAccountStatus status) {
-        ContractAccount activeAccount = contractAccountRepository
-                .findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
-                .orElseThrow(LoanContractErrorCode.CONTRACT_ACCOUNT_NOT_FOUND::toException);
-
-        activeAccount.deactivate(status);
-    }
-
-    private void validateContractOwner(Long contractId, Long userId) {
-        LoanContract contract = findContract(contractId);
-        validateCreditor(contract, userId);
-
-        if (contract.getStatus() != ContractStatus.DRAFT && contract.getStatus() != ContractStatus.PENDING) {
-            throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
-        }
     }
 
     private LoanContract findContract(Long contractId) {
