@@ -21,6 +21,7 @@ import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractChangeRepository;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
+import org.teamsai.saibackend.domain.contract.service.LoanChangeService;
 import org.teamsai.saibackend.domain.contract.service.LoanContractFileService;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
@@ -57,6 +58,9 @@ class ContractChangeServiceTest {
 
     @Mock
     private LoanContractService loanContractService;
+
+    @Mock
+    private LoanChangeService loanChangeService;
 
     @Mock
     private NotificationService notificationService;
@@ -195,7 +199,7 @@ class ContractChangeServiceTest {
 
             ArgumentCaptor<ChangeLoanContractResponse> captor =
                     ArgumentCaptor.forClass(ChangeLoanContractResponse.class);
-            verify(loanContractService).insertChangedContract(captor.capture());
+            verify(loanChangeService).insertChangedContract(captor.capture());
 
             ChangeLoanContractResponse changedContract = captor.getValue();
             assertThat(changedContract.getPreviousContractId()).isEqualTo(CONTRACT_ID);
@@ -276,7 +280,7 @@ class ContractChangeServiceTest {
             contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID);
 
             verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequestEntity.class));
-            verify(loanContractService).insertChangedContract(any());
+            verify(loanChangeService).insertChangedContract(any());
         }
     }
 
@@ -320,7 +324,7 @@ class ContractChangeServiceTest {
                     .willReturn(Optional.of(changeRequest));
             given(fileService.saveSignatureFile(V2_CONTRACT_ID, signature))
                     .willReturn(SAVED_PATH);
-            given(loanContractService.buildCompletedSnapshot(any(), eq(false), eq(SAVED_PATH)))
+            given(loanChangeService.buildCompletedSnapshot(any(), eq(false), eq(SAVED_PATH)))
                     .willReturn(pendingV2Contract());
             given(userService.getMyInfo(DEBTOR_ID))
                     .willReturn(UserResponse.builder().name("채무자").build());
@@ -328,10 +332,10 @@ class ContractChangeServiceTest {
             // 요청자(USER_ID)가 채권자이므로, 승인자는 채무자(DEBTOR_ID)
             contractChangeService.approveChange(V2_CONTRACT_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID);
 
-            verify(loanContractService).updateDebtorSignatureOnly(V2_CONTRACT_ID, SAVED_PATH);
+            verify(loanChangeService).updateDebtorSignatureOnly(V2_CONTRACT_ID, SAVED_PATH);
             verify(contractChangeRepository).save(changeRequest);
             assertThat(changeRequest.getStatus()).isEqualTo(ChangeRequestStatus.APPROVED);
-            verify(loanContractService).supersedeContract(V1_CONTRACT_ID);
+            verify(loanChangeService).supersedeContract(V1_CONTRACT_ID);
             verify(repaymentScheduleService).generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
         }
 
@@ -362,7 +366,7 @@ class ContractChangeServiceTest {
                                     .isEqualTo(ContractChangeErrorCode.ALREADY_BEING_REQUEST)
                     );
 
-            verify(loanContractService, never()).supersedeContract(any());
+            verify(loanChangeService, never()).supersedeContract(any());
             verify(repaymentScheduleService, never()).generateChangedSchedule(any(), any());
             verify(contractChangeRepository, never()).save(any());
         }
@@ -395,7 +399,7 @@ class ContractChangeServiceTest {
                     .willReturn(createContract(ContractStatus.COMPLETED));
             given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(pendingChangeRequest(DEBTOR_ID)));
-            given(loanContractService.findPendingContractByPreviousId(CONTRACT_ID))
+            given(loanChangeService.findPendingContractByPreviousId(CONTRACT_ID))
                     .willReturn(Optional.of(pendingV2()));
             given(userService.getMyInfo(USER_ID))
                     .willReturn(UserResponse.builder().name("채권자").build());
@@ -414,7 +418,7 @@ class ContractChangeServiceTest {
                     .willReturn(createContract(ContractStatus.COMPLETED));
             given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
-            given(loanContractService.findPendingContractByPreviousId(CONTRACT_ID))
+            given(loanChangeService.findPendingContractByPreviousId(CONTRACT_ID))
                     .willReturn(Optional.of(pendingV2()));
             given(userService.getMyInfo(DEBTOR_ID))
                     .willReturn(UserResponse.builder().name("채무자").build());
@@ -424,7 +428,7 @@ class ContractChangeServiceTest {
             verify(contractChangeRepository).save(changeRequest);
             assertThat(changeRequest.getStatus()).isEqualTo(ChangeRequestStatus.REJECTED);
             assertThat(changeRequest.getReturnReason()).isEqualTo(RETURN_REASON);
-            verify(loanContractService).rejectChangedContract(V2_CONTRACT_ID);
+            verify(loanChangeService).rejectChangedContract(V2_CONTRACT_ID);
         }
 
         @Test
@@ -444,7 +448,7 @@ class ContractChangeServiceTest {
                     );
 
             verify(contractChangeRepository, never()).save(any());
-            verify(loanContractService, never()).rejectChangedContract(any());
+            verify(loanChangeService, never()).rejectChangedContract(any());
         }
 
         @Test
@@ -683,14 +687,14 @@ class ContractChangeServiceTest {
 
             given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
-            given(loanContractService.findPendingContractByPreviousId(CONTRACT_ID))
+            given(loanChangeService.findPendingContractByPreviousId(CONTRACT_ID))
                     .willReturn(Optional.of(pendingV2()));
 
             contractChangeService.cancelChangeRequest(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
             verify(contractChangeRepository).save(changeRequest);
             assertThat(changeRequest.getStatus()).isEqualTo(ChangeRequestStatus.CANCELLED);
-            verify(loanContractService).rejectChangedContract(V2_CONTRACT_ID);
+            verify(loanChangeService).rejectChangedContract(V2_CONTRACT_ID);
         }
 
         @Test
@@ -710,7 +714,7 @@ class ContractChangeServiceTest {
                     );
 
             verify(contractChangeRepository, never()).save(any());
-            verify(loanContractService, never()).rejectChangedContract(any());
+            verify(loanChangeService, never()).rejectChangedContract(any());
         }
 
         @Test
@@ -728,7 +732,7 @@ class ContractChangeServiceTest {
                     );
 
             verify(contractChangeRepository, never()).save(any());
-            verify(loanContractService, never()).rejectChangedContract(any());
+            verify(loanChangeService, never()).rejectChangedContract(any());
         }
 
         @Test
@@ -746,7 +750,7 @@ class ContractChangeServiceTest {
                     );
 
             verify(contractChangeRepository, never()).save(any());
-            verify(loanContractService, never()).rejectChangedContract(any());
+            verify(loanChangeService, never()).rejectChangedContract(any());
         }
 
         @Test
