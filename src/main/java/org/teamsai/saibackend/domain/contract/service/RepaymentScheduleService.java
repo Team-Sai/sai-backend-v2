@@ -11,12 +11,10 @@ import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleReposi
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
-import org.teamsai.saibackend.domain.contract.util.ScheduleGenerator;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Period;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +28,7 @@ public class RepaymentScheduleService {
 
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final LoanContractService loanContractService;
+    private final RepaymentScheduleGenerator repaymentScheduleGenerator;
 
     @EventListener
     @Transactional
@@ -41,21 +40,9 @@ public class RepaymentScheduleService {
     public void generateSchedule(Long contractId) {
         LoanContractResponse contract = loanContractService.getContractForInternalUse(contractId);
 
-        Period period = Period.between(contract.getStartDate(), contract.getMaturityDate());
-        int months = period.getYears() * 12 + period.getMonths();
-
-        if (months <= 0) {
-            throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
-        }
-
-        List<RepaymentScheduleEntity> schedules = switch (contract.getRepaymentType()) {
-            case EQUAL_PRINCIPAL_AND_INTEREST -> ScheduleGenerator.generateEqualPrincipalAndInterest(
-                    contractId, contract.getPrincipalAmount(), contract.getInterestRate(), months, contract.getStartDate());
-            case EQUAL_PRINCIPAL -> ScheduleGenerator.generateEqualPrincipal(
-                    contractId, contract.getPrincipalAmount(), contract.getInterestRate(), months, contract.getStartDate());
-            case BULLET_REPAYMENT -> ScheduleGenerator.generateBulletRepayment(
-                    contractId, contract.getPrincipalAmount(), contract.getInterestRate(), months, contract.getStartDate());
-        };
+        List<RepaymentScheduleEntity> schedules = repaymentScheduleGenerator.generate(
+                contractId, contract.getRepaymentType(), contract.getPrincipalAmount(),
+                contract.getInterestRate(), contract.getStartDate(), contract.getMaturityDate());
 
         repaymentScheduleRepository.saveAll(schedules);
     }
@@ -97,21 +84,9 @@ public class RepaymentScheduleService {
 
         repaymentScheduleRepository.deleteByContractIdAndStatus(v1ContractId, RepaymentScheduleStatus.PENDING);
 
-        Period period = Period.between(baseDate, v2.getMaturityDate());
-        int months = period.getYears() * 12 + period.getMonths();
-
-        if (months <= 0) {
-            throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
-        }
-
-        List<RepaymentScheduleEntity> newSchedules = switch (v2.getRepaymentType()) {
-            case EQUAL_PRINCIPAL_AND_INTEREST -> ScheduleGenerator.generateEqualPrincipalAndInterest(
-                    v2ContractId, openingPrincipal, v2.getInterestRate(), months, baseDate);
-            case EQUAL_PRINCIPAL -> ScheduleGenerator.generateEqualPrincipal(
-                    v2ContractId, openingPrincipal, v2.getInterestRate(), months, baseDate);
-            case BULLET_REPAYMENT -> ScheduleGenerator.generateBulletRepayment(
-                    v2ContractId, openingPrincipal, v2.getInterestRate(), months, baseDate);
-        };
+        List<RepaymentScheduleEntity> newSchedules = repaymentScheduleGenerator.generate(
+                v2ContractId, v2.getRepaymentType(), openingPrincipal,
+                v2.getInterestRate(), baseDate, v2.getMaturityDate());
 
         repaymentScheduleRepository.saveAll(newSchedules);
     }

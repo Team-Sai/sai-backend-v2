@@ -8,7 +8,6 @@ import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
-import org.teamsai.saibackend.domain.contract.util.RepaymentCalculator;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -18,6 +17,7 @@ import java.util.Objects;
 public class ChangeRequestDetailQueryService {
 
     private final ContractChangeService contractChangeService;
+    private final MonthlyPaymentEstimator monthlyPaymentEstimator;
 
     public ChangeRequestDetailResponse getDetail(Long contractId, Long changeRequestId, Long userId) {
 
@@ -34,7 +34,7 @@ public class ChangeRequestDetailQueryService {
             throw ChangeRequestDetailErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
         }
 
-        BigDecimal currentMonthlyPayment = RepaymentCalculator.calculate(
+        BigDecimal currentMonthlyPayment = monthlyPaymentEstimator.estimate(
                 contract.getPrincipalAmount(),
                 contract.getInterestRate(),
                 contract.getRepaymentType().name(),
@@ -42,7 +42,7 @@ public class ChangeRequestDetailQueryService {
                 contract.getMaturityDate()
         );
 
-        BigDecimal newMonthlyPayment = RepaymentCalculator.calculate(
+        BigDecimal newMonthlyPayment = monthlyPaymentEstimator.estimate(
                 contract.getPrincipalAmount(),
                 ChangeRequestDetailAssembler.effectiveInterestRate(contract, changeRequest),
                 ChangeRequestDetailAssembler.effectiveRepaymentType(contract, changeRequest),
