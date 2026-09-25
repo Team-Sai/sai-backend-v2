@@ -12,7 +12,6 @@ import org.teamsai.saibackend.domain.integration.dto.response.IntegrationDashboa
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
-import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -25,7 +24,6 @@ public class IntegrationDashboardQueryService {
 
     private final ContractDashboardQueryService contractDashboardQueryService;
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusChecker paymentStatusChecker;
     public IntegrationDashboardResponse getDashboard(
             Long userId,
             YearMonth yearMonth

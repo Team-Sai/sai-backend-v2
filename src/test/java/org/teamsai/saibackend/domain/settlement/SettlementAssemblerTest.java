@@ -10,7 +10,6 @@ import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
 import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementObligationStatusResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
@@ -267,24 +266,6 @@ class SettlementAssemblerTest {
         @DisplayName("obligation이 없으면 false")
         void falseWhenEmpty() {
             assertThat(SettlementAssembler.isFullyResolved(List.of())).isFalse();
-        }
-    }
-
-    @Nested
-    @DisplayName("obligation 상태 응답 조립")
-    class ToObligationStatusResponse {
-
-        @Test
-        @DisplayName("obligation과 납부액을 그대로 조합한다")
-        void combinesObligationAndPaidAmount() {
-            PaymentObligationEntity obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
-
-            SettlementObligationStatusResponse result =
-                    SettlementAssembler.toObligationStatusResponse(obligation, BigDecimal.valueOf(3_000));
-
-            assertThat(result.paymentObligationId()).isEqualTo(11L);
-            assertThat(result.expectedAmount()).isEqualByComparingTo("10000");
-            assertThat(result.paidAmount()).isEqualByComparingTo("3000");
         }
     }
 

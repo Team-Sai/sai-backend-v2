@@ -5,7 +5,6 @@ import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementObligationStatusResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
@@ -130,18 +129,6 @@ public final class SettlementAssembler {
                 && obligations.stream().allMatch(o ->
                 o.getObligationStatus() == ObligationStatus.WRITTEN_OFF
                         || o.getPaidAmount().compareTo(o.getExpectedAmount()) == 0
-        );
-    }
-
-    public static SettlementObligationStatusResponse toObligationStatusResponse(
-            PaymentObligationEntity obligation,
-            BigDecimal paidAmount
-    ) {
-        return new SettlementObligationStatusResponse(
-                obligation.getPaymentObligationId(),
-                obligation.getObligationStatus(),
-                obligation.getExpectedAmount(),
-                paidAmount
         );
     }
 

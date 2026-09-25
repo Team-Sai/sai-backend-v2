@@ -63,6 +63,7 @@ public class SettlementParticipantService {
 
         return savedParticipant.getParticipantId();
     }
+    @Transactional
     public void registerParticipants(
             Long ownerId,
             Long settlementId,
