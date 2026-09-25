@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.contract.dto;
+package org.teamsai.saibackend.domain.contract.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 @Getter@Builder
 @NoArgsConstructor@AllArgsConstructor
-public class ChangeRequestDetailDTO {
+public class ChangeRequestDetailResponse {
 
     private Long changeRequestId;
     private Long newContractId;

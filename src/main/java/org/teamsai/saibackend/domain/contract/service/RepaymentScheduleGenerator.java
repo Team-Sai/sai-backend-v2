@@ -1,8 +1,8 @@
 package org.teamsai.saibackend.domain.contract.service;
 
 import org.springframework.stereotype.Component;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
@@ -22,7 +22,7 @@ public class RepaymentScheduleGenerator {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal MONTHS_PER_YEAR = BigDecimal.valueOf(12);
 
-    public List<RepaymentScheduleDTO> generate(
+    public List<RepaymentScheduleEntity> generate(
             Long contractId, RepaymentMethod repaymentType, BigDecimal principal,
             BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate
     ) {
@@ -43,7 +43,7 @@ public class RepaymentScheduleGenerator {
         };
     }
 
-    public List<RepaymentScheduleDTO> generateEqualPrincipalAndInterest(
+    public List<RepaymentScheduleEntity> generateEqualPrincipalAndInterest(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
             int months, LocalDate startDate
     ) {
@@ -77,7 +77,7 @@ public class RepaymentScheduleGenerator {
         BigDecimal regularTotalPayment = finalizedTotalPayment
                 .divide(BigDecimal.valueOf(months), WON_SCALE, RoundingMode.DOWN);
 
-        List<RepaymentScheduleDTO> schedules = new ArrayList<>();
+        List<RepaymentScheduleEntity> schedules = new ArrayList<>();
         BigDecimal remainingPrincipal = principal;
         BigDecimal allocatedPrincipal = BigDecimal.ZERO;
         BigDecimal allocatedInterest = BigDecimal.ZERO;
@@ -108,7 +108,7 @@ public class RepaymentScheduleGenerator {
         return schedules;
     }
 
-    public List<RepaymentScheduleDTO> generateEqualPrincipal(
+    public List<RepaymentScheduleEntity> generateEqualPrincipal(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
             int months, LocalDate startDate
     ) {
@@ -130,7 +130,7 @@ public class RepaymentScheduleGenerator {
         }
 
         BigDecimal finalizedTotalInterest = floorToWon(theoreticalTotalInterest);
-        List<RepaymentScheduleDTO> schedules = new ArrayList<>();
+        List<RepaymentScheduleEntity> schedules = new ArrayList<>();
         BigDecimal remainingPrincipal = principal;
         BigDecimal allocatedInterest = BigDecimal.ZERO;
 
@@ -153,7 +153,7 @@ public class RepaymentScheduleGenerator {
         return schedules;
     }
 
-    public List<RepaymentScheduleDTO> generateBulletRepayment(
+    public List<RepaymentScheduleEntity> generateBulletRepayment(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
             int months, LocalDate startDate
     ) {
@@ -164,7 +164,7 @@ public class RepaymentScheduleGenerator {
         );
         BigDecimal regularInterest = floorToWon(theoreticalMonthlyInterest);
 
-        List<RepaymentScheduleDTO> schedules = new ArrayList<>();
+        List<RepaymentScheduleEntity> schedules = new ArrayList<>();
         BigDecimal allocatedInterest = BigDecimal.ZERO;
 
         for (int i = 1; i <= months; i++) {
@@ -196,7 +196,7 @@ public class RepaymentScheduleGenerator {
         return amount.setScale(WON_SCALE, RoundingMode.DOWN);
     }
 
-    private static RepaymentScheduleDTO buildScheduleRow(
+    private static RepaymentScheduleEntity buildScheduleRow(
             Long contractId, int sequence, LocalDate dueDate,
             BigDecimal principalDue, BigDecimal interestDue, BigDecimal remainingPrincipal
     ) {
@@ -211,25 +211,25 @@ public class RepaymentScheduleGenerator {
             throw RepaymentScheduleErrorCode.SCHEDULE_GENERATION_FAILED.toException();
         }
 
-        return RepaymentScheduleDTO.builder()
-                .contractId(contractId)
-                .sequence(sequence)
-                .dueDate(dueDate)
-                .principalDue(principalDue)
-                .interestDue(interestDue)
-                .totalPaymentDue(totalPaymentDue)
-                .remainingPrincipal(remainingPrincipal)
-                .status(RepaymentScheduleStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        return new RepaymentScheduleEntity(
+                contractId,
+                sequence,
+                dueDate,
+                principalDue,
+                interestDue,
+                totalPaymentDue,
+                remainingPrincipal,
+                RepaymentScheduleStatus.PENDING,
+                LocalDateTime.now()
+        );
     }
 
-    private static List<RepaymentScheduleDTO> generateZeroInterestRows(
+    private static List<RepaymentScheduleEntity> generateZeroInterestRows(
             Long contractId, BigDecimal principal, int months, LocalDate startDate
     ) {
         BigDecimal monthlyPrincipal = principal
                 .divide(BigDecimal.valueOf(months), WON_SCALE, RoundingMode.DOWN);
-        List<RepaymentScheduleDTO> schedules = new ArrayList<>();
+        List<RepaymentScheduleEntity> schedules = new ArrayList<>();
         BigDecimal remainingPrincipal = principal;
 
         for (int i = 1; i <= months; i++) {
@@ -252,15 +252,15 @@ public class RepaymentScheduleGenerator {
     }
 
     private static void validateSchedule(
-            List<RepaymentScheduleDTO> schedules,
+            List<RepaymentScheduleEntity> schedules,
             BigDecimal expectedPrincipal,
             BigDecimal expectedInterest
     ) {
         BigDecimal principalSum = schedules.stream()
-                .map(RepaymentScheduleDTO::getPrincipalDue)
+                .map(RepaymentScheduleEntity::getPrincipalDue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal interestSum = schedules.stream()
-                .map(RepaymentScheduleDTO::getInterestDue)
+                .map(RepaymentScheduleEntity::getInterestDue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         if (principalSum.compareTo(expectedPrincipal) != 0) {

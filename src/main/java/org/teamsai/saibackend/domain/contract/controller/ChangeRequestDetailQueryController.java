@@ -9,7 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
-import org.teamsai.saibackend.domain.contract.dto.ChangeRequestDetailDTO;
+import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailQueryService;
 
 @Tag(
@@ -36,7 +36,7 @@ public class ChangeRequestDetailQueryController {
     })
 
     @GetMapping("/api/contracts/{contractId}/change-requests/{changeRequestId}")
-    public ChangeRequestDetailDTO requestDetail(
+    public ChangeRequestDetailResponse requestDetail(
             @PathVariable Long contractId,
             @PathVariable Long changeRequestId,
             @AuthenticationPrincipal(expression = "userId") Long userId

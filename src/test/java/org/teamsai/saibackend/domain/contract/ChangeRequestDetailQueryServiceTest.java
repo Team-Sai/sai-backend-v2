@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEn
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimator;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
-import org.teamsai.saibackend.domain.contract.dto.ChangeRequestDetailDTO;
+import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
 import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -110,7 +110,7 @@ class ChangeRequestDetailQueryServiceTest {
         given(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID))
                 .willReturn(createChangeRequest());
 
-        ChangeRequestDetailDTO result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getRequesterName()).isEqualTo("김민수");
         assertThat(result.getStatus()).isEqualTo("승인 대기 중");
@@ -147,16 +147,16 @@ class ChangeRequestDetailQueryServiceTest {
     void getDetail_fallsBackToCurrentMaturityDate_whenNewMaturityDateIsNull() {
         LoanContractResponse contract = createContract();
 
-        LoanContractChangeRequestEntity changeDTO = buildChangeRequest(
+        LoanContractChangeRequestEntity changeRequest = buildChangeRequest(
                 CHANGE_REQUEST_ID, CONTRACT_ID, USER_ID, ChangeRequestStatus.PENDING,
                 null, BigDecimal.valueOf(4.2), "EQUAL_PRINCIPAL_AND_INTEREST", 15,
                 "자금 사정으로 인한 연장 요청", null, LocalDateTime.now()
         );
 
         given(contractChangeService.getContract(CONTRACT_ID, USER_ID)).willReturn(contract);
-        given(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeDTO);
+        given(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeRequest);
 
-        ChangeRequestDetailDTO result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getNewMaturityDate()).isEqualTo(contract.getMaturityDate());
     }
@@ -176,15 +176,15 @@ class ChangeRequestDetailQueryServiceTest {
     @DisplayName("채무자가 요청자면 requesterName이 채무자 이름으로 결정된다")
     void getDetail_requesterIsDebtor() {
         LoanContractResponse contract = createContract();
-        LoanContractChangeRequestEntity changeDTO = buildChangeRequest(
+        LoanContractChangeRequestEntity changeRequest = buildChangeRequest(
                 CHANGE_REQUEST_ID, CONTRACT_ID, contract.getDebtorId(), ChangeRequestStatus.PENDING,
                 null, null, null, null, null, null, LocalDateTime.now()
         );
 
         when(contractChangeService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
-        when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeDTO);
+        when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
-        ChangeRequestDetailDTO result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getRequesterName()).isEqualTo(contract.getDebtorName());
     }
@@ -193,15 +193,15 @@ class ChangeRequestDetailQueryServiceTest {
     @DisplayName("반려 사유(returnReason)가 응답에 그대로 채워진다")
     void getDetail_includesReturnReason() {
         LoanContractResponse contract = createContract();
-        LoanContractChangeRequestEntity changeDTO = buildChangeRequest(
+        LoanContractChangeRequestEntity changeRequest = buildChangeRequest(
                 CHANGE_REQUEST_ID, CONTRACT_ID, contract.getCreditorId(), ChangeRequestStatus.REJECTED,
                 null, null, null, null, null, "이율이 너무 높습니다", LocalDateTime.now()
         );
 
         when(contractChangeService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
-        when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeDTO);
+        when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
-        ChangeRequestDetailDTO result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getReturnReason()).isEqualTo("이율이 너무 높습니다");
     }

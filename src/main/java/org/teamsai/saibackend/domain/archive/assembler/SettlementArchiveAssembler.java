@@ -8,10 +8,7 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentSt
 
 import java.util.List;
 
-/**
- * 정산 상세/결제상태/결제이력/정산계좌 등 여러 소스를 조합해서
- * 정산 보관함 미리보기 응답을 만드는 조립 전담 클래스.
- */
+
 public final class SettlementArchiveAssembler {
 
     private static final String DOCUMENT_VERSION = "v1";

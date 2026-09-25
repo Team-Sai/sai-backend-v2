@@ -19,11 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * 대출계약(LoanContractResponse) + 상환일정(RepaymentScheduleWithRemainingProjection) 등
- * 2개 이상의 소스를 조합해서 대시보드 응답 DTO를 만드는 조립 전담 클래스.
- * 필터링/정렬/페이지네이션 같은 흐름 제어는 DashboardService에 남아있다.
- */
 public final class DashboardAssembler {
 
     private record RoleDueSummary(BigDecimal amount, Integer dueMonth) {}
