@@ -23,7 +23,6 @@ import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.service.UserService;
 
 import java.time.LocalDateTime;
@@ -55,6 +54,32 @@ public class ContractChangeService {
     private LoanContractResponse getPendingChangedContract(Long contractId) {
         return loanChangeService.findPendingContractByPreviousId(contractId)
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
+    }
+
+    private Long resolveApproverId(LoanContractResponse contract, LoanContractChangeRequestEntity changeRequest) {
+        boolean requesterIsCreditor = Objects.equals(contract.getCreditorId(), changeRequest.getUserId());
+        return requesterIsCreditor ? contract.getDebtorId() : contract.getCreditorId();
+    }
+
+    private void notifyChange(Long recipientId, Long actorId, String title, String messageSuffix,
+                              Long contractId, Long changeRequestId) {
+        if (recipientId == null) {
+            log.warn("계약 변경 알림 발송 생략 - recipientId가 null입니다. title={}, contractId={}", title, contractId);
+            return;
+        }
+        try {
+            String actorName = userService.getMyInfo(actorId).getName();
+            if (changeRequestId != null) {
+                notificationService.create(recipientId, NotificationType.CONTRACT_CHANGE,
+                        title, actorName + messageSuffix, contractId, changeRequestId);
+            } else {
+                notificationService.create(recipientId, NotificationType.CONTRACT_CHANGE,
+                        title, actorName + messageSuffix, contractId);
+            }
+        } catch (Exception e) {
+            log.error("계약 변경 알림 발송 실패: title={}, contractId={}, recipientId={}, error={}",
+            title, contractId, recipientId, e.getMessage(), e);
+        }
     }
 
     @Transactional
@@ -138,39 +163,18 @@ public class ContractChangeService {
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
-        boolean requesterIsCreditor = Objects.equals(contract.getCreditorId(), changeRequest.getUserId());
-        Long approverId = requesterIsCreditor ? contract.getDebtorId() : contract.getCreditorId();
-
-        if(!Objects.equals(approverId, userId)) {
+        if (!Objects.equals(resolveApproverId(contract, changeRequest), userId)) {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
         }
 
-        if(!changeRequest.getContractId().equals(contractId)) {
-            throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
-        }
-
-        if(changeRequest.getStatus() != ChangeRequestStatus.PENDING)  {
-            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
-        }
+        changeRequest.validateBelongsTo(contractId);
+        changeRequest.validatePending();
 
         changeRequest.reject(returnReason);
         contractChangeRepository.save(changeRequest);
 
-        try {
-            UserResponse rejectorInfo = userService.getMyInfo(userId);
-
-            notificationService.create(
-                    changeRequest.getUserId(),
-                    NotificationType.CONTRACT_CHANGE,
-                    "계약 변경 요청 반려",
-                    rejectorInfo.getName() + "님이 변경 요청을 반려했습니다.",
-                    contractId,
-                    changeRequestId
-            );
-        } catch (Exception e) {
-            log.error("계약 변경 반려 알림 발송 실패: contractId={}, changeRequestId={}, rror={}",
-                    contractId, changeRequestId, e.getMessage(), e);
-        }
+        notifyChange(changeRequest.getUserId(), userId, "계약 변경 요청 반려",
+                "님이 변경 요청을 반려했습니다.", contractId, changeRequestId);
 
         LoanContractResponse v2 = getPendingChangedContract(contractId);
 
@@ -211,14 +215,9 @@ public class ContractChangeService {
 
         changeRequest = getChangeRequestForUpdate(changeRequest.getChangeRequestId());
 
-        if (changeRequest.getStatus() != ChangeRequestStatus.PENDING) {
-            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
-        }
+        changeRequest.validatePending();
 
-        boolean requesterIsCreditor = Objects.equals(contract.getCreditorId(), changeRequest.getUserId());
-        Long approverId = requesterIsCreditor ? contract.getDebtorId() : contract.getCreditorId();
-
-        if (!Objects.equals(approverId, userId)) {
+        if (!Objects.equals(resolveApproverId(contract, changeRequest), userId)) {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
         }
 
@@ -245,20 +244,8 @@ public class ContractChangeService {
         LoanContractResponse completedContract = loanChangeService.buildCompletedSnapshot(contract, isCreditor, savedPath);
         eventPublisher.publishEvent(new ContractCompletedEvent(completedContract));
 
-        try {
-            UserResponse approverInfo = userService.getMyInfo(userId);
-
-            notificationService.create(
-                    changeRequest.getUserId(),
-                    NotificationType.CONTRACT_CHANGE,
-                    "계약 변경 승인 완료",
-                    approverInfo.getName() + "님이 신청하신 계약 변경 요청을 승인했습니다.",
-                    contractId
-            );
-        } catch (Exception e) {
-            log.error("계약 변경 승인 알림 발송 실패: v2ContractId={}, userId={}, error={}",
-                    contractId, changeRequest.getUserId(), e.getMessage(), e);
-        }
+        notifyChange(changeRequest.getUserId(), userId, "계약 변경 승인 완료",
+                "님이 신청하신 계약 변경 요청을 승인했습니다.", contractId, null);
 
         return ContractStatus.COMPLETED;
     }
@@ -267,21 +254,10 @@ public class ContractChangeService {
     public void cancelChangeRequest(Long contractId, Long changeRequestId, Long userId) {
         LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
-        if (!changeRequest.getContractId().equals(contractId)) {
-            throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
-        }
-
-        if (!changeRequest.getUserId().equals(userId)) {
-            throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
-        }
-
-        if (changeRequest.getStatus() != ChangeRequestStatus.PENDING) {
-            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
-        }
-
-        if (changeRequest.getRequesterSignature() != null) {
-            throw ContractChangeErrorCode.ALREADY_SIGNED.toException();
-        }
+        changeRequest.validateBelongsTo(contractId);
+        changeRequest.validateRequestedBy(userId);
+        changeRequest.validatePending();
+        changeRequest.validateNotSigned();
 
         changeRequest.cancel();
         contractChangeRepository.save(changeRequest);
@@ -308,21 +284,10 @@ public class ContractChangeService {
 
         LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
 
-        if (!changeRequest.getContractId().equals(contractId)) {
-            throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
-        }
-
-        if (!changeRequest.getUserId().equals(userId)) {
-            throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
-        }
-
-        if (changeRequest.getStatus() != ChangeRequestStatus.PENDING) {
-            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
-        }
-
-        if (changeRequest.getRequesterSignature() != null) {
-            throw ContractChangeErrorCode.ALREADY_SIGNED.toException();
-        }
+        changeRequest.validateBelongsTo(contractId);
+        changeRequest.validateRequestedBy(userId);
+        changeRequest.validatePending();
+        changeRequest.validateNotSigned();
 
         String savedPath = fileService.saveSignatureFile(changeRequestId, signature);
 
@@ -330,24 +295,10 @@ public class ContractChangeService {
         contractChangeRepository.save(changeRequest);
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
-        UserResponse requesterInfo = userService.getMyInfo(userId);
+        Long recipientId = contract.isCreditor(userId) ? contract.getDebtorId() : contract.getCreditorId();
 
-        boolean isCreditor = contract.isCreditor(userId);
-        Long recipientId = isCreditor ? contract.getDebtorId() : contract.getCreditorId();
-
-        if(recipientId != null) {
-            notificationService.create(
-                    recipientId,
-                    NotificationType.CONTRACT_CHANGE,
-                    "계약 변경 요청",
-                    requesterInfo.getName() + "님으로부터 계약 내용 변경 요청이 도착했습니다.",
-                    contractId,
-                    changeRequestId
-            );
-        }else{
-            log.warn("계약 변경 요청 알림 발송 실패 - recipientId가 null입니다. contractId={}, changeRequestId={}",
-            contractId, changeRequestId);
-        }
+        notifyChange(recipientId, userId, "계약 변경 요청",
+                "님으로부터 계약 내용 변경 요청이 도착했습니다.", contractId, changeRequestId);
 
         return LoanContractChangeResponse.from(changeRequest);
     }

@@ -321,6 +321,32 @@ class ContractChangeServiceTest {
             verify(repaymentScheduleService, never()).generateChangedSchedule(any(), any());
             verify(contractChangeRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("요청자 본인이 자기 요청을 승인하려 하면 예외가 발생한다")
+        void approveChangeFailsWhenRequesterApprovesOwnRequest() {
+            MultipartFile signature = mock(MultipartFile.class);
+            LoanContractChangeRequestEntity changeRequest = pendingChangeRequest(); // 요청자 = USER_ID(채권자)
+
+            given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
+                    .willReturn(pendingV2Contract());
+            given(contractChangeRepository.findByContractId(V1_CONTRACT_ID))
+                    .willReturn(List.of(changeRequest));
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
+                    .willReturn(Optional.of(changeRequest));
+
+            // 요청자(USER_ID)가 직접 승인 시도
+            assertThatThrownBy(() ->
+                    contractChangeService.approveChange(V2_CONTRACT_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID))
+                    .isInstanceOfSatisfying(
+                            DomainException.class,
+                            exception -> assertThat(exception.getErrorCode())
+                                    .isEqualTo(ContractChangeErrorCode.NOT_CONTRACT_PARTY)
+                    );
+
+            verify(identityService, never()).consume(any(), any(), any());
+            verify(contractChangeRepository, never()).save(any());
+        }
     }
 
     @Nested
