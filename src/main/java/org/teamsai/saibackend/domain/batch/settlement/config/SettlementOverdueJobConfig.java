@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementService;
-import org.teamsai.saibackend.domain.settlement.service.OverdueUpdateResult;
+import org.teamsai.saibackend.domain.settlement.support.OverdueUpdateResult;
 
 import java.time.LocalDate;
 

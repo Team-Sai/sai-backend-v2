@@ -11,8 +11,8 @@ import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -39,7 +39,7 @@ class SettlementCloseServiceTest {
     private SettlementRepository settlementRepository;
 
     @Mock
-    private SettlementPaymentStatusQueryService paymentStatusService;
+    private SettlementPaymentStatusChecker checker;
 
     @Mock
     private SettlementValidator settlementValidator;
@@ -62,7 +62,7 @@ class SettlementCloseServiceTest {
         );
 
         given(
-                paymentStatusService.areAllObligationsResolved(
+                checker.areAllObligationsResolved(
                         SETTLEMENT_ID
                 )
         ).willReturn(true);
@@ -97,7 +97,7 @@ class SettlementCloseServiceTest {
                         OWNER_ID
                 );
 
-        verify(paymentStatusService)
+        verify(checker)
                 .areAllObligationsResolved(
                         SETTLEMENT_ID
                 );
@@ -151,7 +151,7 @@ class SettlementCloseServiceTest {
                         )
         );
 
-        verify(paymentStatusService, never())
+        verify(checker, never())
                 .areAllObligationsResolved(
                         SETTLEMENT_ID
                 );
@@ -180,7 +180,7 @@ class SettlementCloseServiceTest {
         );
 
         given(
-                paymentStatusService.areAllObligationsResolved(
+                checker.areAllObligationsResolved(
                         SETTLEMENT_ID
                 )
         ).willReturn(false);
@@ -207,7 +207,7 @@ class SettlementCloseServiceTest {
                         OWNER_ID
                 );
 
-        verify(paymentStatusService)
+        verify(checker)
                 .areAllObligationsResolved(
                         SETTLEMENT_ID
                 );
@@ -264,7 +264,7 @@ class SettlementCloseServiceTest {
                         OWNER_ID
                 );
 
-        verify(paymentStatusService, never())
+        verify(checker, never())
                 .areAllObligationsResolved(
                         SETTLEMENT_ID
                 );

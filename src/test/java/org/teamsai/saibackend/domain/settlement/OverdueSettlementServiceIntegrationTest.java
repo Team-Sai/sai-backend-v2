@@ -43,17 +43,40 @@ class OverdueSettlementServiceIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        jdbcTemplate.update(
-                "DELETE FROM bank_transaction_match_candidate WHERE bank_transaction_id >= 90000"
-        );
+        jdbcTemplate.update("DELETE FROM bank_transaction_match_candidate WHERE bank_transaction_id >= 90000");
         jdbcTemplate.update("DELETE FROM payment_record WHERE bank_transaction_id >= 90000");
         jdbcTemplate.update("DELETE FROM bank_transaction WHERE bank_transaction_id >= 90000");
-        jdbcTemplate.update("DELETE FROM settlement_account WHERE settlement_id >= 90000");
-        jdbcTemplate.update("DELETE FROM linked_bank_account WHERE linked_account_id >= 90000");
         jdbcTemplate.update("DELETE FROM payment_obligation WHERE payment_obligation_id >= 90000");
-        jdbcTemplate.update("DELETE FROM settlement_participant WHERE participant_id >= 90000");
+        jdbcTemplate.update(
+                """
+                DELETE FROM settlement_account
+                WHERE settlement_id >= 90000
+                   OR linked_account_id >= 90000
+                """);
+        jdbcTemplate.update("""
+                DELETE FROM settlement_invitation
+                WHERE settlement_id >= 90000
+                   OR user_id >= 90000
+                """);
+        jdbcTemplate.update("""
+                DELETE FROM settlement_participant
+                WHERE participant_id >= 90000
+                   OR settlement_id >= 90000
+                   OR user_id >= 90000
+                """);
         jdbcTemplate.update("DELETE FROM settlement WHERE settlement_id >= 90000");
-        jdbcTemplate.update("DELETE FROM recurring_settlement WHERE recurring_settlement_id >= 90000"); // 추가
+        jdbcTemplate.update("DELETE FROM recurring_settlement WHERE recurring_settlement_id >= 90000");
+        jdbcTemplate.update("DELETE FROM contract_account WHERE linked_account_id >= 90000");
+        jdbcTemplate.update("DELETE FROM linked_bank_account WHERE linked_account_id >= 90000");
+        jdbcTemplate.update("DELETE FROM identity WHERE user_id >= 90000");
+        jdbcTemplate.update(
+                """
+                DELETE FROM loan_contract
+                WHERE creditor_id >= 90000
+                   OR debtor_id >= 90000
+                """);
+        jdbcTemplate.update("DELETE FROM loan_contract_change_request WHERE user_id >= 90000");
+        jdbcTemplate.update("DELETE FROM notification WHERE user_id >= 90000");
         jdbcTemplate.update("DELETE FROM users WHERE user_id >= 90000");
     }
 

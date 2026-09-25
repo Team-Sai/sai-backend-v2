@@ -17,8 +17,6 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentOb
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryQueryService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
@@ -44,12 +42,6 @@ class SettlementArchiveQueryServiceTest {
     private SettlementQueryService settlementQueryService;
 
     @Mock
-    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
-
-    @Mock
-    private SettlementPaymentHistoryQueryService settlementPaymentHistoryService;
-
-    @Mock
     private SettlementAccountService settlementAccountService;
 
     private SettlementArchiveQueryService settlementArchiveService;
@@ -58,8 +50,6 @@ class SettlementArchiveQueryServiceTest {
     void setUp() {
         settlementArchiveService = new SettlementArchiveQueryService(
                 settlementQueryService,
-                settlementPaymentStatusService,
-                settlementPaymentHistoryService,
                 settlementAccountService
         );
     }
@@ -69,9 +59,9 @@ class SettlementArchiveQueryServiceTest {
     class ArchivePreviewRetrieval {
 
         private void stubLiveDataDependencies() {
-            given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
+            given(settlementQueryService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
                     .willReturn(paymentStatus());
-            given(settlementPaymentHistoryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
+            given(settlementQueryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
                     .willReturn(List.of());
             given(settlementAccountService.findCurrentAccount(USER_ID, SETTLEMENT_ID))
                     .willThrow(SettlementErrorCode.SETTLEMENT_ACCOUNT_NOT_FOUND.toException());
@@ -88,7 +78,7 @@ class SettlementArchiveQueryServiceTest {
 
             assertThat(preview.settlementId()).isEqualTo(SETTLEMENT_ID);
             assertThat(preview.settlementStatus()).isEqualTo("CLOSED");
-            verify(settlementPaymentStatusService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
+            verify(settlementQueryService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
 
         @Test
@@ -101,7 +91,7 @@ class SettlementArchiveQueryServiceTest {
             SettlementArchivePreviewResponse preview = settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
             assertThat(preview.settlementStatus()).isEqualTo("IN_PROGRESS");
-            verify(settlementPaymentStatusService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
+            verify(settlementQueryService).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
 
         @Test
@@ -114,7 +104,7 @@ class SettlementArchiveQueryServiceTest {
             settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
             settlementArchiveService.getArchivePreview(SETTLEMENT_ID, USER_ID);
 
-            verify(settlementPaymentStatusService, times(2)).getPaymentStatus(SETTLEMENT_ID, USER_ID);
+            verify(settlementQueryService, times(2)).getPaymentStatus(SETTLEMENT_ID, USER_ID);
         }
     }
 
@@ -126,9 +116,9 @@ class SettlementArchiveQueryServiceTest {
         void stubLiveDataDependencies() {
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("IN_PROGRESS"));
-            given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
+            given(settlementQueryService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
                     .willReturn(paymentStatus());
-            given(settlementPaymentHistoryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
+            given(settlementQueryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
                     .willReturn(List.of());
         }
 
@@ -168,9 +158,9 @@ class SettlementArchiveQueryServiceTest {
         void reflectsSettlementDataIntoPreview() {
             given(settlementQueryService.getSettlementDetail(SETTLEMENT_ID, USER_ID))
                     .willReturn(detail("CLOSED"));
-            given(settlementPaymentStatusService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
+            given(settlementQueryService.getPaymentStatus(SETTLEMENT_ID, USER_ID))
                     .willReturn(paymentStatusWithObligation());
-            given(settlementPaymentHistoryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
+            given(settlementQueryService.getPaymentHistory(SETTLEMENT_ID, USER_ID))
                     .willReturn(List.of(historyRecord()));
             given(settlementAccountService.findCurrentAccount(USER_ID, SETTLEMENT_ID))
                     .willThrow(SettlementErrorCode.SETTLEMENT_ACCOUNT_NOT_FOUND.toException());

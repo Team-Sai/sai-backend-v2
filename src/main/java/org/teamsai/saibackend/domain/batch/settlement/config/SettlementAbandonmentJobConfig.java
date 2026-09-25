@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAbandonmentDetectionService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementAbandonmentResult;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAbandonmentResult;
 
 import java.time.LocalDate;
 

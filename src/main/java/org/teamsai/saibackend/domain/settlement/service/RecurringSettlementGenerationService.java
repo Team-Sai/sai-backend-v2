@@ -8,6 +8,8 @@ import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.RecurringSettlementRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.CycleGenerationResult;
+import org.teamsai.saibackend.domain.settlement.support.RecurringSettlementBatchResult;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -22,7 +24,7 @@ public class RecurringSettlementGenerationService {
 
     private final RecurringSettlementRepository recurringSettlementRepository;
     private final SettlementRepository settlementRepository;
-    private final RecurringSettlementCycleGenerator cycleGenerator;
+    private final RecurringSettlementCycleService cycleGenerator;
 
     public RecurringSettlementBatchResult generateTodaySettlements(LocalDate baseDate) {
         List<RecurringSettlement> candidates =
@@ -90,7 +92,7 @@ public class RecurringSettlementGenerationService {
             }
 
             try {
-                CycleGenerationOutcome outcome =
+                CycleGenerationResult outcome =
                         cycleGenerator.generateOneCycle(recurring, cursorSettlement, theoreticalNextDate);
 
                 switch (outcome.result()) {

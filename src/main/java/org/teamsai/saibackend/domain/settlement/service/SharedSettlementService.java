@@ -7,6 +7,8 @@ import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettleme
 import org.teamsai.saibackend.domain.settlement.dto.response.CreateSharedSettlementResponse;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
@@ -23,7 +25,7 @@ public class SharedSettlementService {
 
     private final SettlementAccountService settlementAccountService;
     private final SettlementValidator settlementValidator;
-    private final SettlementParticipantRegistrationService participantRegistrationService;
+    private final SettlementParticipantService settlementParticipantService;
     private final SettlementAmountCalculator settlementAmountCalculator;
     private final SettlementRepository settlementRepository;
     private final UserRepository userRepository;
@@ -67,7 +69,7 @@ public class SharedSettlementService {
         Settlement savedSettlement =
                 settlementRepository.save(settlement);
 
-        participantRegistrationService.registerParticipants(
+        settlementParticipantService.registerParticipants(
                 ownerId,
                 savedSettlement.getSettlementId(),
                 request.getParticipants(),

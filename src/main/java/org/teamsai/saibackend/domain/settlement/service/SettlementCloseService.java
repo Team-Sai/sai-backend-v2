@@ -7,14 +7,17 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementCloseResp
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class SettlementCloseService {
     private final SettlementRepository settlementRepository;
-    private final SettlementPaymentStatusQueryService paymentStatusService;
+    private final SettlementPaymentStatusChecker paymentStatusChecker;
     private final SettlementValidator settlementValidator;
+    
     @Transactional
     public SettlementCloseResponse close(Long settlementId, Long userId){
         Settlement settlement =
@@ -31,7 +34,7 @@ public class SettlementCloseService {
                     .ALREADY_CLOSED_SETTLEMENT
                     .toException();
         }
-        if(!paymentStatusService.areAllObligationsResolved(settlementId)){
+        if(!paymentStatusChecker.areAllObligationsResolved(settlementId)){
             throw SettlementErrorCode.SETTLEMENT_NOT_CLOSABLE.toException();
         }
         LocalDateTime closedAt = LocalDateTime.now();
@@ -60,7 +63,7 @@ public class SettlementCloseService {
         if (settlement.getSettlementStatus() != SettlementStatus.IN_PROGRESS) {
             return false;
         }
-        if (!paymentStatusService.areAllObligationsResolved(settlementId)) {
+        if (!paymentStatusChecker.areAllObligationsResolved(settlementId)) {
             return false;
         }
         LocalDateTime closedAt = LocalDateTime.now();

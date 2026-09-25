@@ -6,6 +6,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
+import org.teamsai.saibackend.domain.settlement.support.OverdueUpdateResult;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDate;
@@ -20,7 +22,7 @@ public class OverdueSettlementService {
 
     private final OverdueCriteria overdueCriteria;
     private final SettlementRepository settlementRepository;
-    private final OverdueSettlementUpdater overdueSettlementUpdater;
+    private final OverdueSettlementUpdateService overdueSettlementUpdateService;
 
     public OverdueUpdateResult updateOverdueStatus(LocalDate baseDate) {
         long totalCount = settlementRepository.countBySettlementStatus(
@@ -51,7 +53,7 @@ public class OverdueSettlementService {
                 }
 
                 try {
-                    overdueSettlementUpdater.updateOverdueForSettlement(
+                    overdueSettlementUpdateService.updateOverdueForSettlement(
                             settlement,
                             referenceDate
                     );

@@ -1,11 +1,11 @@
 package org.teamsai.saibackend.domain.integration.assembler;
 
 import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
-import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
+import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
+import org.teamsai.saibackend.domain.contract.type.ContractDashboardStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.dto.response.DashboardAmountSummaryResponse;
 import org.teamsai.saibackend.domain.integration.dto.response.DashboardAttentionItemResponse;
@@ -68,7 +68,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static DashboardAmountSummaryResponse toAmountSummary(
-            DashboardSummaryResponse contractSummary,
+            ContractDashboardSummaryResponse contractSummary,
             List<SettlementContext> settlements
     ) {
         BigDecimal settlementReceivable = settlements.stream()
@@ -97,7 +97,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static List<DashboardRecentTransactionResponse> toRecentTransactions(
-            DashboardResponse contractDashboard,
+            ContractDashboardResponse contractDashboard,
             List<SettlementContext> settlements
     ) {
         Comparator<DashboardRecentTransactionResponse> newestFirst = Comparator.comparing(
@@ -119,8 +119,8 @@ public final class IntegrationDashboardAssembler {
                 .toList();
     }
 
-    private static List<DashboardRecentTransactionResponse> recentLoanTransactions(DashboardResponse contractDashboard) {
-        List<DashboardContractRowResponse> contracts = contractDashboard.getContracts();
+    private static List<DashboardRecentTransactionResponse> recentLoanTransactions(ContractDashboardResponse contractDashboard) {
+        List<ContractDashboardRowResponse> contracts = contractDashboard.getContracts();
         if (contracts == null) {
             return List.of();
         }
@@ -129,9 +129,9 @@ public final class IntegrationDashboardAssembler {
                 .toList();
     }
 
-    private static DashboardRecentTransactionResponse toRecentLoanTransaction(DashboardContractRowResponse contract) {
+    private static DashboardRecentTransactionResponse toRecentLoanTransaction(ContractDashboardRowResponse contract) {
         DashboardTransactionStatus status =
-                contract.getContractStatus() == DashboardContractStatus.COMPLETED
+                contract.getContractStatus() == ContractDashboardStatus.COMPLETED
                         ? DashboardTransactionStatus.COMPLETED
                         : DashboardTransactionStatus.IN_PROGRESS;
 
@@ -162,7 +162,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static List<DashboardCalendarDayResponse> toCalendarDays(
-            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
+            List<ContractDashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             YearMonth yearMonth,
             Long userId
@@ -197,7 +197,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     private static List<DashboardCalendarDayResponse> loanCalendarDays(
-            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
+            List<ContractDashboardQueryService.LoanScheduleContext> loanSchedules,
             YearMonth yearMonth,
             Long userId
     ) {
@@ -229,7 +229,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static List<DashboardCalendarItemResponse> toCalendarDayDetail(
-            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
+            List<ContractDashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             LocalDate date,
             Long userId
@@ -243,7 +243,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     private static List<DashboardCalendarItemResponse> loanCalendarItems(
-            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
+            List<ContractDashboardQueryService.LoanScheduleContext> loanSchedules,
             LocalDate date,
             Long userId
     ) {
@@ -311,7 +311,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static List<DashboardAttentionItemResponse> toAttentionItems(
-            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
+            List<ContractDashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements
     ) {
         LocalDate today = LocalDate.now();
@@ -339,7 +339,7 @@ public final class IntegrationDashboardAssembler {
     }
 
     private static List<DashboardAttentionItemResponse> upcomingLoanAttentionItems(
-            List<DashboardQueryService.LoanScheduleContext> loanSchedules
+            List<ContractDashboardQueryService.LoanScheduleContext> loanSchedules
     ) {
         LocalDate today = LocalDate.now();
         LocalDate attentionLimit = today.plusDays(3);
@@ -368,11 +368,11 @@ public final class IntegrationDashboardAssembler {
     }
 
     public static DashboardMonthlySummaryResponse toMonthlySummary(
-            List<DashboardQueryService.LoanScheduleContext> loanSchedules,
+            List<ContractDashboardQueryService.LoanScheduleContext> loanSchedules,
             List<SettlementContext> settlements,
             YearMonth yearMonth
     ) {
-        List<DashboardQueryService.LoanScheduleContext> monthlySchedules = loanSchedules.stream()
+        List<ContractDashboardQueryService.LoanScheduleContext> monthlySchedules = loanSchedules.stream()
                 .filter(context -> YearMonth.from(context.schedule().getDueDate()).equals(yearMonth))
                 .toList();
 

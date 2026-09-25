@@ -34,7 +34,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                      AND bt.processing_status != 'NEEDS_CHECK'
                     THEN TRUE
                     ELSE FALSE
-                END AS resolved,
+                END AS resolvedFlag,
                 n.created_at AS createdAt
             FROM notification n
             LEFT JOIN bank_transaction bt
@@ -60,7 +60,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                 'SETTLEMENT' AS referenceType,
                 s.settlement_type AS settlementType,
                 NULL AS relatedTransactionStatus,
-                FALSE AS resolved,
+                FALSE AS resolvedFlag,
                 n.created_at AS createdAt
             FROM notification n
             LEFT JOIN settlement s
@@ -101,7 +101,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                 'CONTRACT' AS referenceType,
                 NULL AS settlementType,
                 NULL AS relatedTransactionStatus,
-                FALSE AS resolved,
+                FALSE AS resolvedFlag,
                 n.created_at AS createdAt
             FROM notification n
             LEFT JOIN loan_contract lc
@@ -126,7 +126,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                 'CONTRACT' AS referenceType,
                 NULL AS settlementType,
                 NULL AS relatedTransactionStatus,
-                FALSE AS resolved,
+                FALSE AS resolvedFlag,
                 n.created_at AS createdAt
             FROM notification n
             LEFT JOIN repayment_schedule rs

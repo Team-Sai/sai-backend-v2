@@ -9,7 +9,6 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListRespo
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementSummaryResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementSummaryQueryService;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
@@ -28,9 +27,6 @@ class SettlementSummaryQueryServiceTest {
     @Mock
     private SettlementQueryService settlementQueryService;
 
-    @Mock
-    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
-
     @InjectMocks
     private SettlementSummaryQueryService settlementSummaryQueryService;
 
@@ -41,12 +37,12 @@ class SettlementSummaryQueryServiceTest {
                 settlement(2L, "MEMBER", SettlementStatus.IN_PROGRESS),
                 settlement(3L, "OWNER", SettlementStatus.CLOSED)
         ));
-        given(settlementPaymentStatusService.getPaymentStatus(1L, 7L)).willReturn(
+        given(settlementQueryService.getPaymentStatus(1L, 7L)).willReturn(
                 SettlementPaymentStatusResponse.builder()
                         .totalRemainingAmount(new BigDecimal("5000"))
                         .build()
         );
-        given(settlementPaymentStatusService.getPaymentStatus(2L, 7L)).willReturn(
+        given(settlementQueryService.getPaymentStatus(2L, 7L)).willReturn(
                 SettlementPaymentStatusResponse.builder()
                         .obligations(List.of(
                                 obligation(7L, "2000"),
@@ -61,7 +57,7 @@ class SettlementSummaryQueryServiceTest {
         assertThat(result.receivableCount()).isEqualTo(1);
         assertThat(result.payableAmount()).isEqualByComparingTo("2000");
         assertThat(result.payableCount()).isEqualTo(1);
-        verify(settlementPaymentStatusService, never()).getPaymentStatus(3L, 7L);
+        verify(settlementQueryService, never()).getPaymentStatus(3L, 7L);
     }
 
     @Test
@@ -70,10 +66,10 @@ class SettlementSummaryQueryServiceTest {
                 settlement(1L, "OWNER", SettlementStatus.IN_PROGRESS),
                 settlement(2L, "MEMBER", SettlementStatus.IN_PROGRESS)
         ));
-        given(settlementPaymentStatusService.getPaymentStatus(1L, 7L)).willReturn(
+        given(settlementQueryService.getPaymentStatus(1L, 7L)).willReturn(
                 SettlementPaymentStatusResponse.builder().build()
         );
-        given(settlementPaymentStatusService.getPaymentStatus(2L, 7L)).willReturn(
+        given(settlementQueryService.getPaymentStatus(2L, 7L)).willReturn(
                 SettlementPaymentStatusResponse.builder()
                         .obligations(List.of(obligation(7L, "0")))
                         .build()
