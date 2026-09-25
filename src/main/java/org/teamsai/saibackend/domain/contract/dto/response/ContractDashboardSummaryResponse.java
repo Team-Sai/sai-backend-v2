@@ -8,7 +8,7 @@ import java.time.LocalDate;
 
 @Getter
 @Builder
-public class DashboardSummaryResponse {
+public class ContractDashboardSummaryResponse {
 
     private int totalContractCount;
     private BigDecimal totalLentAmount;

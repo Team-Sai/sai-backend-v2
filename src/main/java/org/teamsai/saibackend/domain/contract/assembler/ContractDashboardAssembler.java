@@ -1,13 +1,13 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
-import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
-import org.teamsai.saibackend.domain.contract.type.DashboardPaymentStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractDashboardStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractDashboardPaymentStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.type.TransactionCategory;
 
@@ -19,19 +19,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * 대출계약(LoanContractResponse) + 상환일정(RepaymentScheduleWithRemainingProjection) 등
- * 2개 이상의 소스를 조합해서 대시보드 응답 DTO를 만드는 조립 전담 클래스.
- * 필터링/정렬/페이지네이션 같은 흐름 제어는 DashboardService에 남아있다.
- */
-public final class DashboardAssembler {
+public final class ContractDashboardAssembler {
 
     private record RoleDueSummary(BigDecimal amount, Integer dueMonth) {}
 
-    private DashboardAssembler() {
+    private ContractDashboardAssembler() {
     }
 
-    public static DashboardContractRowResponse toRow(
+    public static ContractDashboardRowResponse toRow(
             LoanContractResponse contract,
             List<RepaymentScheduleWithRemainingProjection> schedules,
             Long userId
@@ -41,14 +36,14 @@ public final class DashboardAssembler {
 
         ContractRole role = determineRole(contract, userId);
         TransactionCategory category = determineCategory(role);
-        DashboardContractStatus contractStatus = determineContractStatus(totalRemaining);
-        DashboardPaymentStatus paymentStatus = determinePaymentStatus(totalRemaining);
+        ContractDashboardStatus contractStatus = determineContractStatus(totalRemaining);
+        ContractDashboardPaymentStatus paymentStatus = determinePaymentStatus(totalRemaining);
         Optional<RepaymentScheduleWithRemainingProjection> nearestSchedule = findNearestSchedule(schedules);
         LocalDate nearestDueDate = nearestSchedule.map(RepaymentScheduleWithRemainingProjection::getDueDate).orElse(null);
         BigDecimal nextDueAmount = nearestSchedule
-                .map(DashboardAssembler::getRemainingPaymentAmount)
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
                 .orElse(null);
-        return DashboardContractRowResponse.builder()
+        return ContractDashboardRowResponse.builder()
                 .contractId(contract.getContractId())
                 .contractAlias(contract.getContractAlias())
                 .role(role)
@@ -66,43 +61,43 @@ public final class DashboardAssembler {
                 .build();
     }
 
-    public static DashboardSummaryResponse buildSummary(
-            List<DashboardContractRowResponse> rows,
+    public static ContractDashboardSummaryResponse buildSummary(
+            List<ContractDashboardRowResponse> rows,
             Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap
     ) {
         int totalContractCount = rows.size();
 
         BigDecimal totalLentAmount = rows.stream()
                 .filter(c -> c.getRole() == ContractRole.CREDITOR)
-                .map(DashboardContractRowResponse::getTotalRemainingAmount)
+                .map(ContractDashboardRowResponse::getTotalRemainingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalBorrowedAmount = rows.stream()
                 .filter(c -> c.getRole() == ContractRole.DEBTOR)
-                .map(DashboardContractRowResponse::getTotalRemainingAmount)
+                .map(ContractDashboardRowResponse::getTotalRemainingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         String defaultFilter = totalLentAmount.compareTo(totalBorrowedAmount) >= 0 ? "LENT" : "BORROWED";
 
         LocalDate nearestDueDate = rows.stream()
                 .filter(s -> s.getNearestScheduleDueDate() != null)
-                .map(DashboardContractRowResponse::getNearestScheduleDueDate)
+                .map(ContractDashboardRowResponse::getNearestScheduleDueDate)
                 .min(LocalDate::compareTo)
                 .orElse(null);
 
         RoleDueSummary allSummary = calculateRoleDueSummary(rows, scheduleMap);
 
-        List<DashboardContractRowResponse> creditorRows = rows.stream()
+        List<ContractDashboardRowResponse> creditorRows = rows.stream()
                 .filter(row -> row.getRole() == ContractRole.CREDITOR)
                 .toList();
-        List<DashboardContractRowResponse> debtorRows = rows.stream()
+        List<ContractDashboardRowResponse> debtorRows = rows.stream()
                 .filter(row -> row.getRole() == ContractRole.DEBTOR)
                 .toList();
 
         RoleDueSummary receivableSummary = calculateRoleDueSummary(creditorRows, scheduleMap);
         RoleDueSummary payableSummary = calculateRoleDueSummary(debtorRows, scheduleMap);
 
-        return DashboardSummaryResponse.builder()
+        return ContractDashboardSummaryResponse.builder()
                 .totalContractCount(totalContractCount)
                 .totalLentAmount(totalLentAmount)
                 .totalBorrowedAmount(totalBorrowedAmount)
@@ -122,7 +117,7 @@ public final class DashboardAssembler {
     private static BigDecimal calculateTotalRemaining(List<RepaymentScheduleWithRemainingProjection> schedules) {
         return schedules.stream()
                 .filter(s -> s.getStatus().isUnresolved())
-                .map(DashboardAssembler::getRemainingPaymentAmount)
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -131,7 +126,7 @@ public final class DashboardAssembler {
         return schedules.stream()
                 .filter(s -> s.getStatus().isUnresolved()
                         && YearMonth.from(s.getDueDate()).equals(thisMonth))
-                .map(DashboardAssembler::getRemainingPaymentAmount)
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -139,7 +134,7 @@ public final class DashboardAssembler {
         return schedules.stream()
                 .filter(s -> s.getStatus().isUnresolved()
                         && YearMonth.from(s.getDueDate()).equals(targetMonth))
-                .map(DashboardAssembler::getRemainingPaymentAmount)
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -148,16 +143,16 @@ public final class DashboardAssembler {
                 .orElse(schedule.getTotalPaymentDue());
     }
 
-    private static DashboardPaymentStatus determinePaymentStatus(BigDecimal totalRemaining) {
+    private static ContractDashboardPaymentStatus determinePaymentStatus(BigDecimal totalRemaining) {
         return totalRemaining.compareTo(BigDecimal.ZERO) == 0
-                ? DashboardPaymentStatus.PAID
-                : DashboardPaymentStatus.ONGOING;
+                ? ContractDashboardPaymentStatus.PAID
+                : ContractDashboardPaymentStatus.ONGOING;
     }
 
-    private static DashboardContractStatus determineContractStatus(BigDecimal totalRemaining) {
+    private static ContractDashboardStatus determineContractStatus(BigDecimal totalRemaining) {
         return totalRemaining.compareTo(BigDecimal.ZERO) == 0
-                ? DashboardContractStatus.COMPLETED
-                : DashboardContractStatus.ONGOING;
+                ? ContractDashboardStatus.COMPLETED
+                : ContractDashboardStatus.ONGOING;
     }
 
     private static String determineRepaymentStatus(LoanContractResponse contract, List<RepaymentScheduleWithRemainingProjection> schedules) {
@@ -178,14 +173,14 @@ public final class DashboardAssembler {
                 : TransactionCategory.PAY;
     }
 
-    private static RoleDueSummary calculateRoleDueSummary(List<DashboardContractRowResponse> roleRows, Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap) {
+    private static RoleDueSummary calculateRoleDueSummary(List<ContractDashboardRowResponse> roleRows, Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap) {
         BigDecimal thisMonthDue = roleRows.stream()
-                .map(DashboardContractRowResponse::getThisMonthDueAmount)
+                .map(ContractDashboardRowResponse::getThisMonthDueAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         LocalDate nearestDueDate = roleRows.stream()
                 .filter(row -> row.getNearestScheduleDueDate() != null)
-                .map(DashboardContractRowResponse::getNearestScheduleDueDate)
+                .map(ContractDashboardRowResponse::getNearestScheduleDueDate)
                 .min(LocalDate::compareTo)
                 .orElse(null);
 

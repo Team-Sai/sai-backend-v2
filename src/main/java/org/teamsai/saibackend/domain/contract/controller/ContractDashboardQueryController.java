@@ -10,8 +10,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
+import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
 
 @Tag(
         name = "차용증 API",
@@ -19,9 +19,9 @@ import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
 )
 @RestController
 @RequiredArgsConstructor
-public class DashboardQueryController {
+public class ContractDashboardQueryController {
 
-    private final DashboardQueryService dashboardQueryService;
+    private final ContractDashboardQueryService contractDashboardQueryService;
 
     @Operation(
             summary = "계약 대시보드 조회",
@@ -35,8 +35,8 @@ public class DashboardQueryController {
             @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
     })
 
-    @GetMapping("/api/dashboard")
-    public DashboardResponse getDashboard(
+    @GetMapping("/api/contracts/dashboard")
+    public ContractDashboardResponse getDashboard(
             @AuthenticationPrincipal(expression = "userId") Long userId,
             @Parameter(description = "계약명 검색 키워드") @RequestParam(required = false) String keyword,
 
@@ -50,7 +50,7 @@ public class DashboardQueryController {
             @Parameter(description = "페이지 번호 (1부터 시작)", example = "1")
             @RequestParam(defaultValue = "1") int page
     ) {
-        return dashboardQueryService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
+        return contractDashboardQueryService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
     }
 
 }

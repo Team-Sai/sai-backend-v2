@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.contract.dto;
+package org.teamsai.saibackend.domain.contract.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoanContractChangeDTO {
+public class LoanContractChangeResponse {
 
     private Long changeRequestId;
     private Long userId;
@@ -32,8 +32,8 @@ public class LoanContractChangeDTO {
     private String returnReason;
     private String requesterSignature;
 
-    public static LoanContractChangeDTO from(LoanContractChangeRequestEntity entity) {
-        return LoanContractChangeDTO.builder()
+    public static LoanContractChangeResponse from(LoanContractChangeRequestEntity entity) {
+        return LoanContractChangeResponse.builder()
                 .changeRequestId(entity.getChangeRequestId())
                 .contractId(entity.getContractId())
                 .userId(entity.getUserId())

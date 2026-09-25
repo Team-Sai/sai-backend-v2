@@ -1,9 +1,8 @@
 package org.teamsai.saibackend.domain.notification.dto.response;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
-
 import java.time.LocalDateTime;
 
 public interface NotificationResponse {
@@ -27,8 +26,14 @@ public interface NotificationResponse {
     String getSettlementType();
 
     BankTransactionProcessingStatus getRelatedTransactionStatus();
-    @Value("#{target.resolved == 1}")
-    boolean isResolved();
+
+    @JsonIgnore
+    Long getResolvedFlag();
+
+    default boolean isResolved() {
+        Long resolvedFlag = getResolvedFlag();
+        return resolvedFlag != null && resolvedFlag == 1L;
+    }
 
     LocalDateTime getCreatedAt();
 }
