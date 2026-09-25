@@ -6,22 +6,22 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.contract.controller.DashboardQueryController;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
+import org.teamsai.saibackend.domain.contract.controller.ContractDashboardQueryController;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
+import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class DashboardQueryControllerTest {
+class ContractDashboardQueryControllerTest {
 
     @Mock
-    private DashboardQueryService dashboardQueryService;
+    private ContractDashboardQueryService contractDashboardQueryService;
 
     @InjectMocks
-    private DashboardQueryController dashboardQueryController;
+    private ContractDashboardQueryController dashboardQueryController;
 
     @Test
     @DisplayName("전달받은 파라미터를 그대로 Service에 넘기고 결과를 반환한다")
@@ -33,20 +33,20 @@ class DashboardQueryControllerTest {
         String sortType = "AMOUNT_DESC";
         int page = 2;
 
-        DashboardResponse expected = DashboardResponse.builder()
+        ContractDashboardResponse expected = ContractDashboardResponse.builder()
                 .currentPage(2)
                 .totalPages(3)
                 .totalCount(12L)
                 .pageSize(5)
                 .build();
 
-        when(dashboardQueryService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page))
+        when(contractDashboardQueryService.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page))
                 .thenReturn(expected);
 
-        DashboardResponse actual = dashboardQueryController.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
+        ContractDashboardResponse actual = dashboardQueryController.getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
 
         assertThat(actual).isEqualTo(expected);
-        verify(dashboardQueryService).getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
+        verify(contractDashboardQueryService).getDashboard(userId, keyword, roleFilter, statusFilter, sortType, page);
     }
 
     @Test
@@ -54,10 +54,10 @@ class DashboardQueryControllerTest {
     void getDashboard_defaultPageIsOne() {
         Long userId = 1L;
 
-        when(dashboardQueryService.getDashboard(userId, null, null, null, null, 1))
-                .thenReturn(DashboardResponse.builder().currentPage(1).build());
+        when(contractDashboardQueryService.getDashboard(userId, null, null, null, null, 1))
+                .thenReturn(ContractDashboardResponse.builder().currentPage(1).build());
 
-        DashboardResponse actual = dashboardQueryController.getDashboard(userId, null, null, null, null, 1);
+        ContractDashboardResponse actual = dashboardQueryController.getDashboard(userId, null, null, null, null, 1);
 
         assertThat(actual.getCurrentPage()).isEqualTo(1);
     }

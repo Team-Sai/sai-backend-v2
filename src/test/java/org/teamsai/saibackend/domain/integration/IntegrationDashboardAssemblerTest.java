@@ -5,13 +5,13 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
-import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
+import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
+import org.teamsai.saibackend.domain.contract.type.ContractDashboardStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardAssembler;
 import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardAssembler.SettlementContext;
@@ -148,7 +148,7 @@ class IntegrationDashboardAssemblerTest {
         @Test
         @DisplayName("대출과 정산 금액을 역할별로 합산한다")
         void combinesLoanAndSettlementAmounts() {
-            DashboardSummaryResponse loanSummary = DashboardSummaryResponse.builder()
+            ContractDashboardSummaryResponse loanSummary = ContractDashboardSummaryResponse.builder()
                     .totalLentAmount(BigDecimal.valueOf(12_000_000))
                     .totalBorrowedAmount(BigDecimal.valueOf(1_000_000))
                     .build();
@@ -172,7 +172,7 @@ class IntegrationDashboardAssemblerTest {
         @Test
         @DisplayName("정산이 없으면 대출 금액만 반영한다")
         void handlesNoSettlements() {
-            DashboardSummaryResponse loanSummary = DashboardSummaryResponse.builder()
+            ContractDashboardSummaryResponse loanSummary = ContractDashboardSummaryResponse.builder()
                     .totalLentAmount(BigDecimal.valueOf(5_000))
                     .totalBorrowedAmount(null)
                     .build();
@@ -194,14 +194,14 @@ class IntegrationDashboardAssemblerTest {
             LocalDateTime older = LocalDateTime.of(2026, 8, 1, 0, 0);
             LocalDateTime newer = LocalDateTime.of(2026, 8, 5, 0, 0);
 
-            DashboardContractRowResponse loan = DashboardContractRowResponse.builder()
+            ContractDashboardRowResponse loan = ContractDashboardRowResponse.builder()
                     .contractId(1L)
                     .contractAlias("차용증")
                     .principalAmount(BigDecimal.valueOf(1_000))
-                    .contractStatus(DashboardContractStatus.ONGOING)
+                    .contractStatus(ContractDashboardStatus.ONGOING)
                     .createdAt(older)
                     .build();
-            DashboardResponse contractDashboard = DashboardResponse.builder().contracts(List.of(loan)).build();
+            ContractDashboardResponse contractDashboard = ContractDashboardResponse.builder().contracts(List.of(loan)).build();
 
             SettlementContext settlementContext = new SettlementContext(
                     settlement(2L, "정산", "OWNER", "IN_PROGRESS", LocalDate.now(), newer),
@@ -220,16 +220,16 @@ class IntegrationDashboardAssemblerTest {
         @Test
         @DisplayName("각 타입별로 최대 5건까지만 남긴다")
         void limitsToFivePerType() {
-            List<DashboardContractRowResponse> loans = java.util.stream.IntStream.rangeClosed(1, 7)
-                    .mapToObj(i -> DashboardContractRowResponse.builder()
+            List<ContractDashboardRowResponse> loans = java.util.stream.IntStream.rangeClosed(1, 7)
+                    .mapToObj(i -> ContractDashboardRowResponse.builder()
                             .contractId((long) i)
                             .contractAlias("차용증 " + i)
                             .principalAmount(BigDecimal.valueOf(i))
-                            .contractStatus(DashboardContractStatus.ONGOING)
+                            .contractStatus(ContractDashboardStatus.ONGOING)
                             .createdAt(LocalDateTime.of(2026, 8, i, 0, 0))
                             .build())
                     .toList();
-            DashboardResponse contractDashboard = DashboardResponse.builder().contracts(loans).build();
+            ContractDashboardResponse contractDashboard = ContractDashboardResponse.builder().contracts(loans).build();
 
             List<DashboardRecentTransactionResponse> result =
                     IntegrationDashboardAssembler.toRecentTransactions(contractDashboard, List.of());
@@ -241,7 +241,7 @@ class IntegrationDashboardAssemblerTest {
         @Test
         @DisplayName("계약 목록이 null이면 빈 목록으로 처리한다")
         void handlesNullContracts() {
-            DashboardResponse contractDashboard = DashboardResponse.builder().contracts(null).build();
+            ContractDashboardResponse contractDashboard = ContractDashboardResponse.builder().contracts(null).build();
 
             List<DashboardRecentTransactionResponse> result =
                     IntegrationDashboardAssembler.toRecentTransactions(contractDashboard, List.of());
@@ -261,7 +261,7 @@ class IntegrationDashboardAssemblerTest {
             YearMonth yearMonth = YearMonth.from(dueDate);
 
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
+            var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, dueDate, RepaymentScheduleStatus.PENDING)
             ));
             List<SettlementContext> settlements = List.of(new SettlementContext(
@@ -308,7 +308,7 @@ class IntegrationDashboardAssemblerTest {
         void mergesLoanAndSettlementItemsSortedByTitle() {
             LocalDate date = LocalDate.of(2026, 8, 15);
             LoanContractResponse contract = loanContract(1L, USER_ID, OTHER_USER_ID);
-            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
+            var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, date, RepaymentScheduleStatus.PENDING)
             ));
             SettlementContext settlementContext = new SettlementContext(
@@ -333,7 +333,7 @@ class IntegrationDashboardAssemblerTest {
         void showsPayableLabelForDebtor() {
             LocalDate date = LocalDate.of(2026, 8, 15);
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
+            var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, date, RepaymentScheduleStatus.PENDING)
             ));
 
@@ -352,7 +352,7 @@ class IntegrationDashboardAssemblerTest {
             LocalDate date = LocalDate.of(2026, 8, 15);
             LocalDate otherDate = LocalDate.of(2026, 8, 16);
             LoanContractResponse contract = loanContract(1L, USER_ID, OTHER_USER_ID);
-            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
+            var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, otherDate, RepaymentScheduleStatus.PENDING)
             ));
 
@@ -373,7 +373,7 @@ class IntegrationDashboardAssemblerTest {
         void sortsByRemainingDays() {
             LocalDate today = LocalDate.now();
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
+            var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, today.plusDays(2), RepaymentScheduleStatus.PENDING)
             ));
             SettlementContext settlementContext = new SettlementContext(
@@ -396,7 +396,7 @@ class IntegrationDashboardAssemblerTest {
         void excludesItemsBeyondThreeDays() {
             LocalDate today = LocalDate.now();
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
+            var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, today.plusDays(4), RepaymentScheduleStatus.PENDING)
             ));
 
@@ -417,8 +417,8 @@ class IntegrationDashboardAssemblerTest {
             YearMonth yearMonth = YearMonth.of(2026, 8);
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
             var loanSchedules = List.of(
-                    new DashboardQueryService.LoanScheduleContext(contract, schedule(1L, yearMonth.atDay(1), RepaymentScheduleStatus.PAID)),
-                    new DashboardQueryService.LoanScheduleContext(contract, schedule(2L, yearMonth.atDay(2), RepaymentScheduleStatus.PENDING))
+                    new ContractDashboardQueryService.LoanScheduleContext(contract, schedule(1L, yearMonth.atDay(1), RepaymentScheduleStatus.PAID)),
+                    new ContractDashboardQueryService.LoanScheduleContext(contract, schedule(2L, yearMonth.atDay(2), RepaymentScheduleStatus.PENDING))
             );
             SettlementContext closedSettlement = new SettlementContext(
                     settlement(2L, "정산", "OWNER", "CLOSED", yearMonth.atDay(3), LocalDateTime.now()),
@@ -449,7 +449,7 @@ class IntegrationDashboardAssemblerTest {
         void excludesOtherMonths() {
             YearMonth yearMonth = YearMonth.of(2026, 8);
             LoanContractResponse contract = loanContract(1L, OTHER_USER_ID, USER_ID);
-            var loanSchedules = List.of(new DashboardQueryService.LoanScheduleContext(
+            var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(1L, YearMonth.of(2026, 9).atDay(1), RepaymentScheduleStatus.PENDING)
             ));
 

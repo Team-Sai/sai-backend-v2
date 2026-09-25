@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 import lombok.Getter;
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
-import org.teamsai.saibackend.domain.contract.type.DashboardContractStatus;
-import org.teamsai.saibackend.domain.contract.type.DashboardPaymentStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractDashboardStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractDashboardPaymentStatus;
 import org.teamsai.saibackend.domain.contract.type.TransactionCategory;
 
 import java.math.BigDecimal;
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Builder
-public class DashboardContractRowResponse {
+public class ContractDashboardRowResponse {
 
     private Long contractId;
     private String contractAlias;
@@ -23,9 +23,9 @@ public class DashboardContractRowResponse {
     private BigDecimal principalAmount;
     private BigDecimal totalRemainingAmount;
     private BigDecimal thisMonthDueAmount;
-    private DashboardContractStatus contractStatus;
+    private ContractDashboardStatus contractStatus;
     private String repaymentStatus;
-    private DashboardPaymentStatus paymentStatus;
+    private ContractDashboardPaymentStatus paymentStatus;
     private LocalDate maturityDate;
     private LocalDate nearestScheduleDueDate;
     private BigDecimal nextDueAmount;

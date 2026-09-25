@@ -7,10 +7,10 @@ import java.util.List;
 
 @Getter
 @Builder
-public class DashboardResponse {
+public class ContractDashboardResponse {
 
-    private DashboardSummaryResponse summary;
-    private List<DashboardContractRowResponse> contracts;
+    private ContractDashboardSummaryResponse summary;
+    private List<ContractDashboardRowResponse> contracts;
     private int currentPage;
     private int totalPages;
     private long totalCount;
