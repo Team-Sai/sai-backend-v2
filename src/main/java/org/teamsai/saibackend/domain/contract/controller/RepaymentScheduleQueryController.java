@@ -40,8 +40,8 @@ public class RepaymentScheduleQueryController {
     @GetMapping("/api/contracts/{contractId}/schedules")
     public RepaymentScheduleSummaryResponse getScheduleSummary(
             @PathVariable Long contractId,
-            @AuthenticationPrincipal(expression = "userId") Long userID
+            @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
-        return repaymentScheduleQueryService.getScheduleSummary(contractId, userID);
+        return repaymentScheduleQueryService.getScheduleSummary(contractId, userId);
     }
 }

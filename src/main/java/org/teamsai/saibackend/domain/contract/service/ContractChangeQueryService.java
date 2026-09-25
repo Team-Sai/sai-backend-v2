@@ -22,8 +22,8 @@ public class ContractChangeQueryService {
     private final LoanChangeService loanChangeService;
 
 
-    public LoanContractResponse getContract(Long contractId, Long userID) {
-        LoanContractResponse contract = loanContractService.findContract(contractId, userID);
+    public LoanContractResponse getContract(Long contractId, Long userid) {
+        LoanContractResponse contract = loanContractService.findContract(contractId, userid);
 
         if(contract.getStatus() != ContractStatus.COMPLETED) {
             throw ContractChangeErrorCode.CONTRACT_NOT_COMPLETED.toException();
