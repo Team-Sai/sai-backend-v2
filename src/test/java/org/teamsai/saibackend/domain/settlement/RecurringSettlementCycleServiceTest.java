@@ -21,6 +21,9 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementAccountRepo
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.*;
+import org.teamsai.saibackend.domain.settlement.support.CycleGenerationResult;
+import org.teamsai.saibackend.domain.settlement.support.CycleGenerationStatus;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
 import org.teamsai.saibackend.domain.settlement.type.*;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -37,7 +40,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class RecurringSettlementCycleGeneratorTest {
+class RecurringSettlementCycleServiceTest {
 
     @Mock
     private SettlementRepository settlementRepository;
@@ -58,7 +61,7 @@ class RecurringSettlementCycleGeneratorTest {
     private SettlementAccountRepository settlementAccountRepository;
 
     @InjectMocks
-    private RecurringSettlementCycleGenerator sut;
+    private RecurringSettlementCycleService sut;
 
 
     private RecurringSettlement recurring(SplitType splitType) {
@@ -240,7 +243,7 @@ class RecurringSettlementCycleGeneratorTest {
                     List.of(alreadyCreatedByOther)
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -249,7 +252,7 @@ class RecurringSettlementCycleGeneratorTest {
 
             assertThat(outcome.result())
                     .isEqualTo(
-                            CycleGenerationResult.CONCURRENTLY_SKIPPED
+                            CycleGenerationStatus.CONCURRENTLY_SKIPPED
                     );
 
             assertThat(outcome.settlement())
@@ -293,7 +296,7 @@ class RecurringSettlementCycleGeneratorTest {
                     List.of()
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -302,7 +305,7 @@ class RecurringSettlementCycleGeneratorTest {
 
             assertThat(outcome.result())
                     .isEqualTo(
-                            CycleGenerationResult.CONCURRENTLY_SKIPPED
+                            CycleGenerationStatus.CONCURRENTLY_SKIPPED
                     );
 
             verify(
@@ -350,7 +353,7 @@ class RecurringSettlementCycleGeneratorTest {
                     List.of()
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -359,7 +362,7 @@ class RecurringSettlementCycleGeneratorTest {
 
             assertThat(outcome.result())
                     .isEqualTo(
-                            CycleGenerationResult.NO_ACTIVE_PARTICIPANT
+                            CycleGenerationStatus.NO_ACTIVE_PARTICIPANT
                     );
 
             assertThat(outcome.settlement())
@@ -424,7 +427,7 @@ class RecurringSettlementCycleGeneratorTest {
                     BigDecimal.valueOf(150000)
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -432,7 +435,7 @@ class RecurringSettlementCycleGeneratorTest {
                     );
 
             assertThat(outcome.result())
-                    .isEqualTo(CycleGenerationResult.CREATED);
+                    .isEqualTo(CycleGenerationStatus.CREATED);
 
             assertThat(outcome.settlement())
                     .isNotNull();
@@ -508,7 +511,7 @@ class RecurringSettlementCycleGeneratorTest {
                     BigDecimal.valueOf(3333)
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -516,7 +519,7 @@ class RecurringSettlementCycleGeneratorTest {
                     );
 
             assertThat(outcome.result())
-                    .isEqualTo(CycleGenerationResult.CREATED);
+                    .isEqualTo(CycleGenerationStatus.CREATED);
 
             verify(settlementAmountCalculator)
                     .calculateEqualAmount(
@@ -587,7 +590,7 @@ class RecurringSettlementCycleGeneratorTest {
                     )
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -595,7 +598,7 @@ class RecurringSettlementCycleGeneratorTest {
                     );
 
             assertThat(outcome.result())
-                    .isEqualTo(CycleGenerationResult.CREATED);
+                    .isEqualTo(CycleGenerationStatus.CREATED);
 
             verify(settlementPaymentService)
                     .createObligation(
@@ -736,7 +739,7 @@ class RecurringSettlementCycleGeneratorTest {
                     BigDecimal.valueOf(150000)
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -744,7 +747,7 @@ class RecurringSettlementCycleGeneratorTest {
                     );
 
             assertThat(outcome.result())
-                    .isEqualTo(CycleGenerationResult.CREATED);
+                    .isEqualTo(CycleGenerationStatus.CREATED);
 
             assertThat(outcome.settlement())
                     .isNotNull();
@@ -829,7 +832,7 @@ class RecurringSettlementCycleGeneratorTest {
                     )
             );
 
-            CycleGenerationOutcome outcome =
+            CycleGenerationResult outcome =
                     sut.generateOneCycle(
                             recurring,
                             previous,
@@ -837,7 +840,7 @@ class RecurringSettlementCycleGeneratorTest {
                     );
 
             assertThat(outcome.result())
-                    .isEqualTo(CycleGenerationResult.CREATED);
+                    .isEqualTo(CycleGenerationStatus.CREATED);
 
             verify(
                     participantRepository,

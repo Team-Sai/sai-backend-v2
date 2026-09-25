@@ -9,10 +9,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
-import org.teamsai.saibackend.domain.settlement.service.OverdueCriteria;
+import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
 import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementService;
-import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementUpdater;
-import org.teamsai.saibackend.domain.settlement.service.OverdueUpdateResult;
+import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementUpdateService;
+import org.teamsai.saibackend.domain.settlement.support.OverdueUpdateResult;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDate;
@@ -28,7 +28,7 @@ class OverdueSettlementServiceTest {
 
     @Mock private OverdueCriteria overdueCriteria;
     @Mock private SettlementRepository settlementRepository;
-    @Mock private OverdueSettlementUpdater overdueSettlementUpdater;
+    @Mock private OverdueSettlementUpdateService overdueSettlementUpdateService;
 
     @InjectMocks
     private OverdueSettlementService sut;
@@ -60,8 +60,8 @@ class OverdueSettlementServiceTest {
 
         sut.updateOverdueStatus(baseDate);
 
-        verify(overdueSettlementUpdater).updateOverdueForSettlement(overdue, overdueRefDate);
-        verify(overdueSettlementUpdater, never()).updateOverdueForSettlement(eq(notOverdue), any());
+        verify(overdueSettlementUpdateService).updateOverdueForSettlement(overdue, overdueRefDate);
+        verify(overdueSettlementUpdateService, never()).updateOverdueForSettlement(eq(notOverdue), any());
     }
 
     @Test
@@ -144,7 +144,7 @@ class OverdueSettlementServiceTest {
 
         sut.updateOverdueStatus(baseDate);
 
-        verify(overdueSettlementUpdater, never())
+        verify(overdueSettlementUpdateService, never())
                 .updateOverdueForSettlement(any(), any());
     }
 
@@ -168,15 +168,15 @@ class OverdueSettlementServiceTest {
         when(overdueCriteria.isOverdue(s2, baseDate, refDate2)).thenReturn(true);
 
         doThrow(new IllegalStateException("갱신 실패"))
-                .when(overdueSettlementUpdater)
+                .when(overdueSettlementUpdateService)
                 .updateOverdueForSettlement(s1, refDate1);
 
         OverdueUpdateResult result = sut.updateOverdueStatus(baseDate);
 
-        verify(overdueSettlementUpdater)
+        verify(overdueSettlementUpdateService)
                 .updateOverdueForSettlement(s1, refDate1);
 
-        verify(overdueSettlementUpdater)
+        verify(overdueSettlementUpdateService)
                 .updateOverdueForSettlement(s2, refDate2);
 
         assertThat(result.processedCount()).isEqualTo(1);

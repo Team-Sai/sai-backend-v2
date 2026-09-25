@@ -19,6 +19,8 @@ import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementAccountRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.CycleGenerationResult;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
 import org.teamsai.saibackend.domain.settlement.type.*;
 
 import java.math.BigDecimal;
@@ -33,7 +35,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RecurringSettlementCycleGenerator {
+public class RecurringSettlementCycleService {
 
     private final SettlementRepository settlementRepository;
     private final SettlementParticipantRepository settlementParticipantRepository;
@@ -44,7 +46,7 @@ public class RecurringSettlementCycleGenerator {
     private final SlackNotifier slackNotifier;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public CycleGenerationOutcome generateOneCycle(RecurringSettlement recurring, Settlement previousSettlement, LocalDate cycleDate) {
+    public CycleGenerationResult generateOneCycle(RecurringSettlement recurring, Settlement previousSettlement, LocalDate cycleDate) {
         Settlement lockedLatest =
                 settlementRepository.findLatestByRecurringIdForUpdate(
                                 recurring.getRecurringSettlementId(),
@@ -55,7 +57,7 @@ public class RecurringSettlementCycleGenerator {
                         .orElse(null);
         if (lockedLatest == null || !lockedLatest.getSettlementId().equals(previousSettlement.getSettlementId())) {
             log.warn("동시 생성 감지, 스킵 recurringId={}", recurring.getRecurringSettlementId());
-            return CycleGenerationOutcome.concurrentlySkipped();
+            return CycleGenerationResult.concurrentlySkipped();
         }
 
         List<SettlementParticipant> activeParticipants =
@@ -66,7 +68,7 @@ public class RecurringSettlementCycleGenerator {
         if (activeParticipants.isEmpty()) {
             log.warn("ACTIVE 참여자 없음, 생성 스킵 recurringId={}, cycleDate={}",
                     recurring.getRecurringSettlementId(), cycleDate);
-            return CycleGenerationOutcome.noActiveParticipant();
+            return CycleGenerationResult.noActiveParticipant();
         }
 
         Settlement newSettlement = Settlement.builder()
@@ -94,7 +96,7 @@ public class RecurringSettlementCycleGenerator {
 
         copySettlementAccount(previousSettlement, savedSettlement);
 
-        return CycleGenerationOutcome.created(savedSettlement);
+        return CycleGenerationResult.created(savedSettlement);
     }
 
     private void copySettlementAccount(Settlement previousSettlement, Settlement newSettlement) {

@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.notification.dto.response;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 
@@ -26,7 +27,7 @@ public interface NotificationResponse {
     String getSettlementType();
 
     BankTransactionProcessingStatus getRelatedTransactionStatus();
-
+    @Value("#{target.resolved == 1}")
     boolean isResolved();
 
     LocalDateTime getCreatedAt();

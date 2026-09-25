@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.settlement.service;
+package org.teamsai.saibackend.domain.settlement.support;
 
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;

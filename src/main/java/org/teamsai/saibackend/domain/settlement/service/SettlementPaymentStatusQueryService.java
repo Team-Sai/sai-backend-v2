@@ -20,6 +20,7 @@ import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 
 import java.math.BigDecimal;

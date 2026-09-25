@@ -19,7 +19,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class OverdueSettlementUpdater {
+public class OverdueSettlementUpdateService {
 
     private final SettlementParticipantRepository participantRepository;
     private final PaymentObligationRepository paymentObligationRepository;

@@ -13,7 +13,7 @@ import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
-import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementUpdater;
+import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementUpdateService;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 
 import java.time.LocalDate;
@@ -23,13 +23,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class OverdueSettlementUpdaterTest {
+class OverdueSettlementUpdateServiceTest {
 
     @Mock private SettlementParticipantRepository participantRepository;
     @Mock private PaymentObligationRepository paymentObligationRepository;
 
     @InjectMocks
-    private OverdueSettlementUpdater sut;
+    private OverdueSettlementUpdateService sut;
 
     private Settlement settlement(Long id) {
         return Settlement.builder()

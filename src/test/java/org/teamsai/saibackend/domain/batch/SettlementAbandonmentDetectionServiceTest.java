@@ -12,9 +12,9 @@ import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementAbandonmentAlert;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementAbandonmentAlertRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
-import org.teamsai.saibackend.domain.settlement.service.OverdueCriteria;
+import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAbandonmentDetectionService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementAbandonmentResult;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAbandonmentResult;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDate;
