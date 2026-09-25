@@ -9,9 +9,9 @@ import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItem
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
-import org.teamsai.saibackend.domain.contract.service.DashboardQueryService;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
+import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardQueryService;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 public class CalendarTest {
 
     @Mock
-    private DashboardQueryService contractDashboardQueryService;
+    private ContractDashboardQueryService contractDashboardQueryService;
 
     @Mock
     private SettlementQueryService settlementQueryService;
@@ -274,25 +274,25 @@ public class CalendarTest {
         return schedule;
     }
 
-    private DashboardQueryService.IntegrationDashboardData loanData(
+    private ContractDashboardQueryService.IntegrationDashboardData loanData(
             LoanContractResponse contract, List<RepaymentScheduleWithRemainingProjection> schedules
     ) {
 
-        DashboardResponse dashboard = DashboardResponse.builder()
-                .summary(DashboardSummaryResponse.builder()
+        ContractDashboardResponse dashboard = ContractDashboardResponse.builder()
+                .summary(ContractDashboardSummaryResponse.builder()
                         .totalLentAmount(BigDecimal.ZERO)
                         .totalBorrowedAmount(BigDecimal.ZERO)
                         .build())
                 .contracts(List.of())
                 .build();
 
-        List<DashboardQueryService.LoanScheduleContext> contexts = contract == null
+        List<ContractDashboardQueryService.LoanScheduleContext> contexts = contract == null
                 ? List.of()
                 : schedules.stream()
-                .map(schedule -> new DashboardQueryService.LoanScheduleContext(contract, schedule))
+                .map(schedule -> new ContractDashboardQueryService.LoanScheduleContext(contract, schedule))
                 .toList();
 
-        return new DashboardQueryService.IntegrationDashboardData(dashboard, contexts);
+        return new ContractDashboardQueryService.IntegrationDashboardData(dashboard, contexts);
 
     }
 
@@ -326,22 +326,22 @@ public class CalendarTest {
         return new SettlementListResponse(id, title, role, "ETC", "ONE_TIME", "EQUAL", status, BigDecimal.ZERO, dueDate, null, null, null, createdAt);
     }
 
-    private DashboardQueryService.IntegrationDashboardData loanData(
+    private ContractDashboardQueryService.IntegrationDashboardData loanData(
             LoanContractResponse contract, RepaymentScheduleWithRemainingProjection schedule
     ) {
-        DashboardResponse dashboard = DashboardResponse.builder()
-                .summary(DashboardSummaryResponse.builder()
+        ContractDashboardResponse dashboard = ContractDashboardResponse.builder()
+                .summary(ContractDashboardSummaryResponse.builder()
                         .totalLentAmount(BigDecimal.ZERO)
                         .totalBorrowedAmount(BigDecimal.ZERO)
                         .build())
                 .contracts(List.of())
                 .build();
 
-        List<DashboardQueryService.LoanScheduleContext> contexts = contract == null
+        List<ContractDashboardQueryService.LoanScheduleContext> contexts = contract == null
                 ? List.of()
-                : List.of(new DashboardQueryService.LoanScheduleContext(contract, schedule));
+                : List.of(new ContractDashboardQueryService.LoanScheduleContext(contract, schedule));
 
-        return new DashboardQueryService.IntegrationDashboardData(dashboard, contexts);
+        return new ContractDashboardQueryService.IntegrationDashboardData(dashboard, contexts);
     }
 
     @Test

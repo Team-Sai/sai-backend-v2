@@ -5,9 +5,12 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 @Getter
-public enum DashboardContractStatus {
+public enum ContractDashboardPaymentStatus {
 
-    ONGOING("진행중"), COMPLETED("완료");
+    ONGOING("납부중"),
+    PAID("납부완료");
 
     private final String description;
+
+
 }

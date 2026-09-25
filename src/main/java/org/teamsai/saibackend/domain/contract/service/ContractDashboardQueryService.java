@@ -3,13 +3,13 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.contract.assembler.DashboardAssembler;
+import org.teamsai.saibackend.domain.contract.assembler.ContractDashboardAssembler;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardContractRowResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.DashboardSummaryResponse;
-import org.teamsai.saibackend.domain.contract.exception.DashboardErrorCode;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
+import org.teamsai.saibackend.domain.contract.exception.ContractDashboardErrorCode;
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class DashboardQueryService {
+public class ContractDashboardQueryService {
 
     private final LoanContractService loanContractService;
     private final RepaymentScheduleService repaymentScheduleService;
@@ -38,7 +38,7 @@ public class DashboardQueryService {
                 .toList();
     }
 
-    private List<DashboardContractRowResponse> filterByKeyword(List<DashboardContractRowResponse> rows, String keyword) {
+    private List<ContractDashboardRowResponse> filterByKeyword(List<ContractDashboardRowResponse> rows, String keyword) {
         if (keyword == null || keyword.isEmpty()) {
             return rows;
         }
@@ -50,7 +50,7 @@ public class DashboardQueryService {
                 .toList();
     }
 
-    private List<DashboardContractRowResponse> filterByRole(List<DashboardContractRowResponse> rows, String filterType) {
+    private List<ContractDashboardRowResponse> filterByRole(List<ContractDashboardRowResponse> rows, String filterType) {
         if (filterType == null || filterType.equals("ALL")) {
             return rows;
         } else if (filterType.equals("LENT")) {
@@ -62,44 +62,44 @@ public class DashboardQueryService {
                     .filter(c -> c.getRole() == ContractRole.DEBTOR)
                     .toList();
         }
-        throw DashboardErrorCode.INVALID_ROLE_FILTER.toException();
+        throw ContractDashboardErrorCode.INVALID_ROLE_FILTER.toException();
     }
 
-    private List<DashboardContractRowResponse> filterByStatus(List<DashboardContractRowResponse> rows, String statusFilter) {
+    private List<ContractDashboardRowResponse> filterByStatus(List<ContractDashboardRowResponse> rows, String statusFilter) {
         if (statusFilter == null || statusFilter.isBlank() || statusFilter.equals("ALL")) return rows;
         if (statusFilter.equals("ONGOING")) return rows.stream()
                 .filter(row -> !"COMPLETED".equals(row.getRepaymentStatus())).toList();
         if (statusFilter.equals("COMPLETED")) return rows.stream()
                 .filter(row -> "COMPLETED".equals(row.getRepaymentStatus())).toList();
-        throw DashboardErrorCode.INVALID_STATUS_FILTER.toException();
+        throw ContractDashboardErrorCode.INVALID_STATUS_FILTER.toException();
     }
 
-    private List<DashboardContractRowResponse> sortRows(List<DashboardContractRowResponse> rows, String sortType) {
-        List<DashboardContractRowResponse> sorted = new ArrayList<>(rows);
+    private List<ContractDashboardRowResponse> sortRows(List<ContractDashboardRowResponse> rows, String sortType) {
+        List<ContractDashboardRowResponse> sorted = new ArrayList<>(rows);
 
         if (sortType == null || sortType.isEmpty()) {
-            sorted.sort(Comparator.comparing(DashboardContractRowResponse::getContractId).reversed());
+            sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getContractId).reversed());
             return sorted;
         }
 
         switch (sortType) {
-            case "ALPHABET" -> sorted.sort(Comparator.comparing(DashboardContractRowResponse::getContractAlias));
-            case "ROLE" -> sorted.sort(Comparator.comparing(DashboardContractRowResponse::getRole));
-            case "CATEGORY" -> sorted.sort(Comparator.comparing(DashboardContractRowResponse::getCategory));
-            case "AMOUNT_DESC" -> sorted.sort(Comparator.comparing(DashboardContractRowResponse::getTotalRemainingAmount).reversed());
-            case "AMOUNT_ASC" -> sorted.sort(Comparator.comparing(DashboardContractRowResponse::getTotalRemainingAmount));
-            case "STATUS" -> sorted.sort(Comparator.comparing(DashboardContractRowResponse::getContractStatus));
-            case "DEADLINE" -> sorted.sort(Comparator.comparing(DashboardContractRowResponse::getMaturityDate));
+            case "ALPHABET" -> sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getContractAlias));
+            case "ROLE" -> sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getRole));
+            case "CATEGORY" -> sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getCategory));
+            case "AMOUNT_DESC" -> sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getTotalRemainingAmount).reversed());
+            case "AMOUNT_ASC" -> sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getTotalRemainingAmount));
+            case "STATUS" -> sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getContractStatus));
+            case "DEADLINE" -> sorted.sort(Comparator.comparing(ContractDashboardRowResponse::getMaturityDate));
             case "CREATED_DESC" -> sorted.sort(Comparator.comparing(
-                    DashboardContractRowResponse::getCreatedAt,
+                    ContractDashboardRowResponse::getCreatedAt,
                     Comparator.nullsLast(Comparator.reverseOrder())
             ));
-            default -> throw DashboardErrorCode.INVALID_SORT_TYPE.toException();
+            default -> throw ContractDashboardErrorCode.INVALID_SORT_TYPE.toException();
         }
         return sorted;
     }
 
-    private List<DashboardContractRowResponse> paginate(List<DashboardContractRowResponse> rows, int page, int pageSize) {
+    private List<ContractDashboardRowResponse> paginate(List<ContractDashboardRowResponse> rows, int page, int pageSize) {
         if (page < 1) {
             page = 1;
         }
@@ -129,7 +129,7 @@ public class DashboardQueryService {
                 .toList();
     }
 
-    private DashboardResponse buildDashboard(
+    private ContractDashboardResponse buildDashboard(
             List<ContractScheduleContext> contexts,
             Long userId,
             String keyword,
@@ -144,19 +144,19 @@ public class DashboardQueryService {
                         ContractScheduleContext::schedules
                 ));
 
-        List<DashboardContractRowResponse> allRows = contexts.stream()
-                .map(context -> DashboardAssembler.toRow(context.contract(), context.schedules(), userId))
+        List<ContractDashboardRowResponse> allRows = contexts.stream()
+                .map(context -> ContractDashboardAssembler.toRow(context.contract(), context.schedules(), userId))
                 .toList();
 
-        DashboardSummaryResponse summary = DashboardAssembler.buildSummary(allRows, scheduleMap);
-        List<DashboardContractRowResponse> filtered = filterByKeyword(allRows, keyword);
-        List<DashboardContractRowResponse> roleFiltered = filterByRole(filtered, roleFilter);
-        List<DashboardContractRowResponse> sorted = sortRows(filterByStatus(roleFiltered, statusFilter), sortType);
+        ContractDashboardSummaryResponse summary = ContractDashboardAssembler.buildSummary(allRows, scheduleMap);
+        List<ContractDashboardRowResponse> filtered = filterByKeyword(allRows, keyword);
+        List<ContractDashboardRowResponse> roleFiltered = filterByRole(filtered, roleFilter);
+        List<ContractDashboardRowResponse> sorted = sortRows(filterByStatus(roleFiltered, statusFilter), sortType);
         long totalCount = sorted.size();
-        List<DashboardContractRowResponse> pagedRows = paginate(sorted, page, 5);
+        List<ContractDashboardRowResponse> pagedRows = paginate(sorted, page, 5);
         int totalPages = (int) Math.ceil((double) totalCount / 5);
 
-        return DashboardResponse.builder()
+        return ContractDashboardResponse.builder()
                 .summary(summary)
                 .contracts(pagedRows)
                 .currentPage(page)
@@ -166,7 +166,7 @@ public class DashboardQueryService {
                 .build();
     }
 
-    public DashboardResponse getDashboard(
+    public ContractDashboardResponse getDashboard(
             Long userId, String keyword, String roleFilter,
             String statusFilter, String sortType, int page
     ) {
@@ -178,7 +178,7 @@ public class DashboardQueryService {
 
     public IntegrationDashboardData getIntegrationDashboardData(Long userId) {
         List<ContractScheduleContext> contexts = getContractScheduleContexts(userId);
-        DashboardResponse dashboard = buildDashboard(
+        ContractDashboardResponse dashboard = buildDashboard(
                 contexts,
                 userId,
                 null,
@@ -207,7 +207,7 @@ public class DashboardQueryService {
     }
 
     public record IntegrationDashboardData(
-            DashboardResponse dashboard,
+            ContractDashboardResponse dashboard,
             List<LoanScheduleContext> loanSchedules
     ) {
     }
