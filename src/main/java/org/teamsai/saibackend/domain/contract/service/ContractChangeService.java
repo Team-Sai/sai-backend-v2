@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.assembler.ContractChangeAssembler;
-import org.teamsai.saibackend.domain.contract.dto.LoanContractChangeDTO;
+import org.teamsai.saibackend.domain.contract.dto.response.LoanContractChangeResponse;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
@@ -79,7 +79,7 @@ public class ContractChangeService {
 
 
     @Transactional
-    public LoanContractChangeDTO requestChange(
+    public LoanContractChangeResponse requestChange(
             Long contractId,
             ContractChangeRequest request,
             Long userId
@@ -150,11 +150,11 @@ public class ContractChangeService {
         log.info("계약 변경 요청 생성 및 차용증 재저장 완료: contractId={}, userId={}",
                 contractId, userId);
 
-        return LoanContractChangeDTO.from(savedEntity);
+        return LoanContractChangeResponse.from(savedEntity);
     }
 
     @Transactional
-    public LoanContractChangeDTO rejectChange(Long contractId, Long changeRequestId, String returnReason, Long userId) {
+    public LoanContractChangeResponse rejectChange(Long contractId, Long changeRequestId, String returnReason, Long userId) {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
@@ -199,7 +199,7 @@ public class ContractChangeService {
 
         log.info("계약 변경 요청 반려 처리 완료: contractId={}, changeRequestId={}", contractId, changeRequestId);
 
-        return LoanContractChangeDTO.from(changeRequest);
+        return LoanContractChangeResponse.from(changeRequest);
 
     }
 
@@ -321,7 +321,7 @@ public class ContractChangeService {
     }
 
     @Transactional
-    public LoanContractChangeDTO submitRequesterSignature(
+    public LoanContractChangeResponse submitRequesterSignature(
             Long contractId,
             Long changeRequestId,
             Long userId,
@@ -376,6 +376,6 @@ public class ContractChangeService {
             contractId, changeRequestId);
         }
 
-        return LoanContractChangeDTO.from(changeRequest);
+        return LoanContractChangeResponse.from(changeRequest);
     }
 }

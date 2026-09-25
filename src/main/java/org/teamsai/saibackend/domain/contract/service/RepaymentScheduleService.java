@@ -5,11 +5,11 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.event.ContractCreatedEvent;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
@@ -37,48 +37,15 @@ public class RepaymentScheduleService {
         generateSchedule(event.contractId());
     }
 
-    private RepaymentScheduleEntity toEntity(RepaymentScheduleDTO dto) {
-        return new RepaymentScheduleEntity(
-                dto.getContractId(),
-                dto.getSequence(),
-                dto.getDueDate(),
-                dto.getPrincipalDue(),
-                dto.getInterestDue(),
-                dto.getTotalPaymentDue(),
-                dto.getRemainingPrincipal(),
-                dto.getStatus(),
-                dto.getCreatedAt()
-        );
-    }
-
-    private RepaymentScheduleDTO toDTO(RepaymentScheduleEntity entity) {
-        return RepaymentScheduleDTO.builder()
-                .scheduleId(entity.getScheduleId())
-                .contractId(entity.getContractId())
-                .sequence(entity.getSequence())
-                .dueDate(entity.getDueDate())
-                .principalDue(entity.getPrincipalDue())
-                .interestDue(entity.getInterestDue())
-                .totalPaymentDue(entity.getTotalPaymentDue())
-                .remainingPrincipal(entity.getRemainingPrincipal())
-                .status(entity.getStatus())
-                .paidAt(entity.getPaidAt())
-                .createdAt(entity.getCreatedAt())
-                .build();
-    }
-
     @Transactional
     public void generateSchedule(Long contractId) {
         LoanContractResponse contract = loanContractService.getContractForInternalUse(contractId);
 
-        List<RepaymentScheduleDTO> schedules = repaymentScheduleGenerator.generate(
+        List<RepaymentScheduleEntity> schedules = repaymentScheduleGenerator.generate(
                 contractId, contract.getRepaymentType(), contract.getPrincipalAmount(),
                 contract.getInterestRate(), contract.getStartDate(), contract.getMaturityDate());
 
-        List<RepaymentScheduleEntity> entities = schedules.stream()
-                .map(this::toEntity)
-                .toList();
-        repaymentScheduleRepository.saveAll(entities);
+        repaymentScheduleRepository.saveAll(schedules);
     }
 
     public List<RepaymentScheduleEntity> getSchedule(Long contractId) {
@@ -118,21 +85,17 @@ public class RepaymentScheduleService {
 
         repaymentScheduleRepository.deleteByContractIdAndStatus(v1ContractId, RepaymentScheduleStatus.PENDING);
 
-        List<RepaymentScheduleDTO> newSchedules = repaymentScheduleGenerator.generate(
+        List<RepaymentScheduleEntity> newSchedules = repaymentScheduleGenerator.generate(
                 v2ContractId, v2.getRepaymentType(), openingPrincipal,
                 v2.getInterestRate(), baseDate, v2.getMaturityDate());
 
-        List<RepaymentScheduleEntity> newEntities = newSchedules.stream()
-                .map(this::toEntity)
-                .toList();
-
-        repaymentScheduleRepository.saveAll(newEntities);
+        repaymentScheduleRepository.saveAll(newSchedules);
     }
 
-    public RepaymentScheduleDTO getScheduleByScheduleId(Long scheduleId) {
-        RepaymentScheduleEntity entity = repaymentScheduleRepository.findById(scheduleId)
+    public RepaymentScheduleResponse getScheduleByScheduleId(Long scheduleId) {
+        return repaymentScheduleRepository.findById(scheduleId)
+                .map(RepaymentScheduleResponse::from)
                 .orElseThrow(() -> RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND.toException());
-        return toDTO(entity);
     }
 
     public Map<Long, List<RepaymentScheduleWithRemainingProjection>> getSchedulesByContractIds(List<Long> contractIds) {
