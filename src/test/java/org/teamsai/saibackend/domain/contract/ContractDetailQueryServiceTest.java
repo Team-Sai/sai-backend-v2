@@ -7,11 +7,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDetailResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
+import org.teamsai.saibackend.domain.contract.service.ContractChangeQueryService;
 import org.teamsai.saibackend.domain.contract.service.ContractDetailQueryService;
+import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -28,7 +28,7 @@ class ContractDetailQueryServiceTest {
     private LoanContractService loanContractService;
 
     @Mock
-    private ContractChangeService contractChangeService;
+    private ContractChangeQueryService contractChangeQueryService;
 
     @InjectMocks
     private ContractDetailQueryService contractDetailService;
@@ -51,7 +51,7 @@ class ContractDetailQueryServiceTest {
         @DisplayName("채권자이고 PENDING 요청이 없으면 true를 반환한다")
         void trueWhenCreditorAndNoPendingRequest() {
             given(loanContractService.findContract(CONTRACT_ID, CREDITOR_ID)).willReturn(contract());
-            given(contractChangeService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
+            given(contractChangeQueryService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
 
             boolean result = contractDetailService.canRequestChange(CONTRACT_ID, CREDITOR_ID);
 
@@ -62,7 +62,7 @@ class ContractDetailQueryServiceTest {
         @DisplayName("채권자여도 PENDING 요청이 있으면 false를 반환한다")
         void falseWhenCreditorButHasPendingRequest() {
             given(loanContractService.findContract(CONTRACT_ID, CREDITOR_ID)).willReturn(contract());
-            given(contractChangeService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(true);
+            given(contractChangeQueryService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(true);
 
             boolean result = contractDetailService.canRequestChange(CONTRACT_ID, CREDITOR_ID);
 
@@ -73,7 +73,7 @@ class ContractDetailQueryServiceTest {
         @DisplayName("채무자이고 PENDING 요청이 없으면 true를 반환한다")
         void trueWhenDebtorAndNoPendingRequest() {
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID)).willReturn(contract());
-            given(contractChangeService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
+            given(contractChangeQueryService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
 
             boolean result = contractDetailService.canRequestChange(CONTRACT_ID, DEBTOR_ID);
 
@@ -84,7 +84,7 @@ class ContractDetailQueryServiceTest {
         @DisplayName("채무자여도 PENDING 요청이 있으면 false를 반환한다")
         void falseWhenDebtorButHasPendingRequest() {
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID)).willReturn(contract());
-            given(contractChangeService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(true);
+            given(contractChangeQueryService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(true);
 
             boolean result = contractDetailService.canRequestChange(CONTRACT_ID, DEBTOR_ID);
 
@@ -116,7 +116,7 @@ class ContractDetailQueryServiceTest {
         @DisplayName("채권자로 조회하면 채권자 주소를 반환하고 isCreditor는 true다")
         void returnsCreditorAddressForCreditor() {
             given(loanContractService.findContract(CONTRACT_ID, CREDITOR_ID)).willReturn(contract());
-            given(contractChangeService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
+            given(contractChangeQueryService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
 
             ContractDetailResponse result = contractDetailService.getCheck(CONTRACT_ID, CREDITOR_ID);
 
@@ -129,7 +129,7 @@ class ContractDetailQueryServiceTest {
         @DisplayName("채무자로 조회하면 채무자 주소를 반환하고 isCreditor는 false다")
         void returnsDebtorAddressForDebtor() {
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID)).willReturn(contract());
-            given(contractChangeService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
+            given(contractChangeQueryService.hasPendingChangeRequest(CONTRACT_ID)).willReturn(false);
 
             ContractDetailResponse result = contractDetailService.getCheck(CONTRACT_ID, DEBTOR_ID);
 

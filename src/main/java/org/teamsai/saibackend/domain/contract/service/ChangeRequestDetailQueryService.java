@@ -6,8 +6,8 @@ import org.teamsai.saibackend.domain.contract.assembler.ChangeRequestDetailAssem
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
-import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
+import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -16,13 +16,13 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class ChangeRequestDetailQueryService {
 
-    private final ContractChangeService contractChangeService;
+    private final ContractChangeQueryService contractChangeQueryService;
     private final MonthlyPaymentEstimator monthlyPaymentEstimator;
 
     public ChangeRequestDetailResponse getDetail(Long contractId, Long changeRequestId, Long userId) {
 
-        LoanContractResponse contract = contractChangeService.getContract(contractId, userId);
-        LoanContractChangeRequestEntity changeRequest = contractChangeService.getChangeRequest(changeRequestId);
+        LoanContractResponse contract = contractChangeQueryService.getContract(contractId, userId);
+        LoanContractChangeRequestEntity changeRequest = contractChangeQueryService.getChangeRequest(changeRequestId);
 
         if (!changeRequest.getContractId().equals(contractId)) {
             throw ChangeRequestDetailErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
@@ -51,7 +51,7 @@ public class ChangeRequestDetailQueryService {
         );
 
         Long newContractId = changeRequest.getStatus() == ChangeRequestStatus.PENDING
-                ? contractChangeService.getPendingChangedContractId(contractId)
+                ? contractChangeQueryService.getPendingChangedContractId(contractId)
                 : null;
 
         return ChangeRequestDetailAssembler.toDetail(
