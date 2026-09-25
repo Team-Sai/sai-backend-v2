@@ -38,8 +38,9 @@ import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.identity.service.IdentityStatusService;
-import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.service.PortOneIdentityService;
+import org.teamsai.saibackend.domain.identity.support.IdentityFailureReasonFormatter;
+import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
@@ -60,7 +61,8 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -88,7 +90,7 @@ class IdentityTransactionIntegrationTest {
             IdentityRepository.class, UserRepository.class, LoanContractRepository.class
     })
     @Import({IdentityService.class, IdentityStatusService.class, IdentityValidator.class,
-            LoanContractService.class})
+            IdentityFailureReasonFormatter.class, LoanContractService.class})
     static class Config {}
 
     @Autowired IdentityService service;

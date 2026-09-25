@@ -3,17 +3,17 @@ package org.teamsai.saibackend.domain.identity;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
-import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
+import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDate;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 
 @DisplayName("IdentityValidator 단위 테스트")
 class IdentityValidatorTest {
@@ -274,5 +274,86 @@ class IdentityValidatorTest {
                                 exception.getErrorCode()
                         ).isEqualTo(expectedErrorCode)
                 );
+    }
+
+    @Nested
+    @DisplayName("기본 요청 검증")
+    class ValidateRequest {
+
+        @Test
+        @DisplayName("userId가 없으면 예외가 발생한다")
+        void nullUserId() {
+            assertIdentityError(
+                    () -> identityValidator.validateUserId(null),
+                    IdentityErrorCode.UNAUTHENTICATED_USER
+            );
+        }
+
+        @Test
+        @DisplayName("인증 목적이 없으면 예외가 발생한다")
+        void invalidPrepareRequest() {
+            IdentityPrepareRequest request =
+                    new IdentityPrepareRequest(null);
+
+            assertIdentityError(
+                    () -> identityValidator.validatePrepareRequest(request),
+                    IdentityErrorCode.INVALID_IDENTITY_PURPOSE
+            );
+        }
+
+        @Test
+        @DisplayName("인증 ID가 비어 있으면 예외가 발생한다")
+        void blankVerificationId() {
+            assertIdentityError(
+                    () -> identityValidator
+                            .validateIdentityVerificationId(" "),
+                    IdentityErrorCode.INVALID_IDENTITY_VERIFICATION_ID
+            );
+        }
+    }
+    @Nested
+    @DisplayName("인증 소유자 검증")
+    class ValidateOwner {
+
+        @Test
+        @DisplayName("인증 요청의 회원과 요청 회원이 같으면 통과한다")
+        void sameOwner() {
+            Identity identity =
+                    Identity.builder()
+                            .user(
+                                    User.builder()
+                                            .userId(2L)
+                                            .build()
+                            )
+                            .build();
+
+            assertThatCode(
+                    () -> identityValidator.validateOwner(
+                            identity,
+                            2L
+                    )
+            ).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("다른 회원의 인증 요청이면 예외가 발생한다")
+        void differentOwner() {
+            Identity identity =
+                    Identity.builder()
+                            .user(
+                                    User.builder()
+                                            .userId(3L)
+                                            .build()
+                            )
+                            .build();
+
+            assertIdentityError(
+                    () -> identityValidator.validateOwner(
+                            identity,
+                            2L
+                    ),
+                    IdentityErrorCode.IDENTITY_VERIFICATION_FORBIDDEN
+            );
+        }
     }
 }

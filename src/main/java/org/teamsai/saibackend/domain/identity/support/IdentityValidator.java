@@ -1,8 +1,10 @@
-package org.teamsai.saibackend.domain.identity.service;
+package org.teamsai.saibackend.domain.identity.support;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.user.entity.User;
 
@@ -19,6 +21,54 @@ public class IdentityValidator {
                     "VERIFIED",
                     "FAILED"
             );
+
+    public void validateUserId(
+            Long userId
+    ) {
+        if (userId == null) {
+            throw IdentityErrorCode
+                    .UNAUTHENTICATED_USER
+                    .toException();
+        }
+    }
+
+    public void validatePrepareRequest(
+            IdentityPrepareRequest request
+    ) {
+        if (request == null
+                || request.purpose() == null) {
+
+            throw IdentityErrorCode
+                    .INVALID_IDENTITY_PURPOSE
+                    .toException();
+        }
+    }
+
+    public void validateIdentityVerificationId(
+            String identityVerificationId
+    ) {
+        if (!StringUtils.hasText(
+                identityVerificationId
+        )) {
+            throw IdentityErrorCode
+                    .INVALID_IDENTITY_VERIFICATION_ID
+                    .toException();
+        }
+    }
+
+    public void validateOwner(
+            Identity identity,
+            Long userId
+    ) {
+        if (!Objects.equals(
+                identity.getUser().getUserId(),
+                userId
+        )) {
+            throw IdentityErrorCode
+                    .IDENTITY_VERIFICATION_FORBIDDEN
+                    .toException();
+        }
+    }
 
     public void validatePortOneResponse(
             String expectedIdentityVerificationId,
