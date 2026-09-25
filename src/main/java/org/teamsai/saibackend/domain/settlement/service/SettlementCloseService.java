@@ -15,7 +15,9 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class SettlementCloseService {
     private final SettlementRepository settlementRepository;
-    private final SettlementPaymentStatusChecker paymentStatusChecker;    private final SettlementValidator settlementValidator;
+    private final SettlementPaymentStatusChecker paymentStatusChecker;
+    private final SettlementValidator settlementValidator;
+    
     @Transactional
     public SettlementCloseResponse close(Long settlementId, Long userId){
         Settlement settlement =

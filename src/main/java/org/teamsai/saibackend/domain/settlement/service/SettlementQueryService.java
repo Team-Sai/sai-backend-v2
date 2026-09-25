@@ -5,20 +5,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
-import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
-import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
-import org.teamsai.saibackend.domain.settlement.dto.response.*;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentData;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentReader;
 import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
@@ -26,6 +27,7 @@ import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,10 +36,8 @@ public class SettlementQueryService {
 
     private final SettlementRepository settlementRepository;
     private final SettlementParticipantRepository settlementParticipantRepository;
-    private final PaymentObligationRepository paymentObligationRepository;
-    private final PaymentRecordRepository paymentRecordRepository;
     private final SettlementValidator settlementValidator;
-    private final PaymentRecordService paymentRecordService;
+    private final SettlementPaymentReader settlementPaymentReader;
     private final BankTransactionService bankTransactionService;
 
     @Transactional(readOnly = true)
@@ -82,7 +82,10 @@ public class SettlementQueryService {
     }
 
     @Transactional(readOnly = true)
-    public SettlementDetailResponse getSettlementDetail(Long settlementId, Long userId){
+    public SettlementDetailResponse getSettlementDetail(
+            Long settlementId,
+            Long userId
+    ) {
         Settlement settlement =
                 settlementRepository.findDetailById(settlementId)
                         .orElseThrow(
@@ -136,8 +139,97 @@ public class SettlementQueryService {
                 role
         );
     }
+
     @Transactional(readOnly = true)
     public SettlementPaymentStatusResponse getPaymentStatus(
+            Long settlementId,
+            Long userId
+    ) {
+        Settlement settlement =
+                findAccessibleSettlement(
+                        settlementId,
+                        userId
+                );
+
+        SettlementPaymentData paymentData =
+                settlementPaymentReader.read(settlementId);
+
+        List<SettlementPaymentObligationResponse> obligations =
+                buildPaymentObligationResponses(paymentData);
+
+        return SettlementAssembler.toPaymentStatusResponse(
+                settlement,
+                obligations
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SettlementPaymentHistoryResponse> getPaymentHistory(
+            Long settlementId,
+            Long userId
+    ) {
+        // getPaymentStatus()를 다시 호출하지 않고
+        // 권한 검증만 한 번 수행
+        findAccessibleSettlement(
+                settlementId,
+                userId
+        );
+
+        // 참여자 → obligation → paymentRecord 조회도 한 번만 수행
+        SettlementPaymentData paymentData =
+                settlementPaymentReader.read(settlementId);
+
+        List<PaymentObligationEntity> obligations =
+                getPaymentTargetObligations(
+                        paymentData.obligations()
+                );
+
+        if (obligations.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, SettlementParticipant> participantMap =
+                paymentData.participants().stream()
+                        .collect(Collectors.toMap(
+                                SettlementParticipant::getParticipantId,
+                                participant -> participant
+                        ));
+
+        Map<Long, String> payerNameByObligationId =
+                obligations.stream()
+                        .collect(Collectors.toMap(
+                                PaymentObligationEntity::getPaymentObligationId,
+                                obligation -> {
+                                    SettlementParticipant participant =
+                                            participantMap.get(
+                                                    obligation.getParticipantId()
+                                            );
+
+                                    return participant != null
+                                            ? participant.getUser().getName()
+                                            : "";
+                                }
+                        ));
+
+        Set<Long> obligationIds =
+                payerNameByObligationId.keySet();
+
+        return paymentData.paymentRecords().stream()
+                .filter(record ->
+                        obligationIds.contains(
+                                record.getTargetId()
+                        )
+                )
+                .map(record ->
+                        toPaymentHistoryResponse(
+                                record,
+                                payerNameByObligationId
+                        )
+                )
+                .toList();
+    }
+
+    private Settlement findAccessibleSettlement(
             Long settlementId,
             Long userId
     ) {
@@ -148,107 +240,86 @@ public class SettlementQueryService {
                                         .SETTLEMENT_NOT_FOUND
                                         ::toException
                         );
-        settlementValidator.validateAccessibleUser(settlement,userId);
-        List<SettlementPaymentObligationResponse> obligations =
-                buildPaymentObligationResponses(
-                        settlement.getSettlementId()
-                );
 
-        return SettlementAssembler.toPaymentStatusResponse(settlement, obligations);
+        settlementValidator.validateAccessibleUser(
+                settlement,
+                userId
+        );
+
+        return settlement;
     }
 
     private List<SettlementPaymentObligationResponse> buildPaymentObligationResponses(
-            Long settlementId
+            SettlementPaymentData paymentData
     ) {
-        List<SettlementParticipant> participants =
-                settlementParticipantRepository.findBySettlementIdAndStatus(
-                        settlementId,
-                        SettlementParticipantStatus.ACTIVE
-                );
-
-        if (participants.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> participantIds = participants.stream()
-                .map(SettlementParticipant::getParticipantId)
-                .toList();
-
         List<PaymentObligationEntity> obligations =
-                paymentObligationRepository.findByParticipantIdsAndObligationStatuses(
-                        participantIds,
-                        List.of(
-                                ObligationStatus.ACTIVE,
-                                ObligationStatus.WRITTEN_OFF
-                        )
+                getPaymentTargetObligations(
+                        paymentData.obligations()
                 );
 
         if (obligations.isEmpty()) {
             return List.of();
         }
 
-        List<Long> obligationIds = obligations.stream()
-                .map(PaymentObligationEntity::getPaymentObligationId)
-                .toList();
+        Map<Long, SettlementParticipant> participantMap =
+                paymentData.participants().stream()
+                        .collect(Collectors.toMap(
+                                SettlementParticipant::getParticipantId,
+                                participant -> participant
+                        ));
 
-        List<PaymentRecordEntity> paymentRecords =
-                paymentRecordRepository.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        obligationIds,
-                        RecordStatus.CONFIRMED
-                );
-
-        Map<Long, SettlementParticipant> participantMap = participants.stream()
-                .collect(Collectors.toMap(
-                        SettlementParticipant::getParticipantId,
-                        participant -> participant
-                ));
-
-        Map<Long, List<PaymentRecordEntity>> paymentRecordMap = paymentRecords.stream()
-                .collect(Collectors.groupingBy(
-                        PaymentRecordEntity::getTargetId
-                ));
+        Map<Long, List<PaymentRecordEntity>> paymentRecordMap =
+                paymentData.paymentRecords().stream()
+                        .collect(Collectors.groupingBy(
+                                PaymentRecordEntity::getTargetId
+                        ));
 
         return obligations.stream()
-                .map(obligation -> SettlementAssembler.toObligationResponse(
-                        obligation,
-                        participantMap.get(obligation.getParticipantId()),
-                        paymentRecordMap.getOrDefault(obligation.getPaymentObligationId(), List.of())
-                ))
+                .map(obligation ->
+                        SettlementAssembler.toObligationResponse(
+                                obligation,
+                                participantMap.get(
+                                        obligation.getParticipantId()
+                                ),
+                                paymentRecordMap.getOrDefault(
+                                        obligation.getPaymentObligationId(),
+                                        List.of()
+                                )
+                        )
+                )
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<SettlementPaymentHistoryResponse> getPaymentHistory(Long settlementId, Long userId) {
-        SettlementPaymentStatusResponse paymentStatus =
-                getPaymentStatus(settlementId, userId);
-
-        Map<Long, String> payerNameByObligationId = paymentStatus.getObligations().stream()
-                .collect(Collectors.toMap(
-                        SettlementPaymentObligationResponse::getPaymentObligationId,
-                        SettlementPaymentObligationResponse::getParticipantName
-                ));
-
-        List<PaymentRecordEntity> records = paymentRecordService.findConfirmedRecordsByTargetIds(
-                PaymentTargetType.SETTLEMENT,
-                List.copyOf(payerNameByObligationId.keySet())
-        );
-
-        return records.stream()
-                .map(record -> toResponse(record, payerNameByObligationId))
+    private List<PaymentObligationEntity> getPaymentTargetObligations(
+            List<PaymentObligationEntity> obligations
+    ) {
+        return obligations.stream()
+                .filter(obligation ->
+                        obligation.getObligationStatus()
+                                == ObligationStatus.ACTIVE
+                                || obligation.getObligationStatus()
+                                == ObligationStatus.WRITTEN_OFF
+                )
                 .toList();
     }
 
-    private SettlementPaymentHistoryResponse toResponse(
+    private SettlementPaymentHistoryResponse toPaymentHistoryResponse(
             PaymentRecordEntity record,
             Map<Long, String> payerNameByObligationId
     ) {
-        BankTransactionEntity transaction = bankTransactionService
-                .findById(record.getBankTransactionId())
-                .orElse(null);
+        BankTransactionEntity transaction =
+                bankTransactionService
+                        .findById(
+                                record.getBankTransactionId()
+                        )
+                        .orElse(null);
 
         return SettlementAssembler.toPaymentHistoryResponse(
-                record, transaction, payerNameByObligationId.get(record.getTargetId())
+                record,
+                transaction,
+                payerNameByObligationId.get(
+                        record.getTargetId()
+                )
         );
     }
 }

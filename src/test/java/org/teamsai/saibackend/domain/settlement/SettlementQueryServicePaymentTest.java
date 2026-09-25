@@ -9,9 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
-import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
@@ -24,8 +21,9 @@ import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentData;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentReader;
 import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
-import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -35,11 +33,13 @@ import org.teamsai.saibackend.global.exception.DomainException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -59,19 +59,13 @@ class SettlementQueryServicePaymentTest {
     private SettlementParticipantRepository settlementParticipantRepository;
 
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
-
-    @Mock
-    private PaymentRecordRepository paymentRecordRepository;
-
-    @Mock
     private SettlementValidator settlementValidator;
 
     @Mock
-    private PaymentRecordService paymentRecordService;
+    private BankTransactionService bankTransactionService;
 
     @Mock
-    private BankTransactionService bankTransactionService;
+    private SettlementPaymentReader settlementPaymentReader;
 
     @InjectMocks
     private SettlementQueryService settlementQueryService;
@@ -123,6 +117,13 @@ class SettlementQueryServicePaymentTest {
                         20000
                 );
 
+        SettlementPaymentData paymentData =
+                paymentData(
+                        List.of(p1, p2),
+                        List.of(o1, o2),
+                        List.of(r1, r2)
+                );
+
         given(
                 settlementRepository.findById(
                         SETTLEMENT_ID
@@ -132,49 +133,11 @@ class SettlementQueryServicePaymentTest {
         );
 
         given(
-                settlementParticipantRepository.findBySettlementIdAndStatus(
-                        SETTLEMENT_ID,
-                        SettlementParticipantStatus.ACTIVE
+                settlementPaymentReader.read(
+                        SETTLEMENT_ID
                 )
         ).willReturn(
-                List.of(
-                        p1,
-                        p2
-                )
-        );
-
-        given(
-                paymentObligationRepository.findByParticipantIdsAndObligationStatuses(
-                        List.of(
-                                101L,
-                                102L
-                        ),
-                        List.of(
-                                ObligationStatus.ACTIVE,
-                                ObligationStatus.WRITTEN_OFF
-                        )
-                )
-        ).willReturn(
-                List.of(
-                        o1,
-                        o2
-                )
-        );
-
-        given(
-                paymentRecordRepository.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        List.of(
-                                1001L,
-                                1002L
-                        ),
-                        RecordStatus.CONFIRMED
-                )
-        ).willReturn(
-                List.of(
-                        r1,
-                        r2
-                )
+                paymentData
         );
 
         SettlementPaymentStatusResponse response =
@@ -268,6 +231,13 @@ class SettlementQueryServicePaymentTest {
                         4000
                 );
 
+        SettlementPaymentData paymentData =
+                paymentData(
+                        List.of(participant),
+                        List.of(o1, o2, o3, o4),
+                        List.of(r1, r2, r3)
+                );
+
         given(
                 settlementRepository.findById(
                         SETTLEMENT_ID
@@ -277,48 +247,11 @@ class SettlementQueryServicePaymentTest {
         );
 
         given(
-                settlementParticipantRepository.findBySettlementIdAndStatus(
-                        SETTLEMENT_ID,
-                        SettlementParticipantStatus.ACTIVE
+                settlementPaymentReader.read(
+                        SETTLEMENT_ID
                 )
         ).willReturn(
-                List.of(participant)
-        );
-
-        given(
-                paymentObligationRepository.findByParticipantIdsAndObligationStatuses(
-                        List.of(101L),
-                        List.of(
-                                ObligationStatus.ACTIVE,
-                                ObligationStatus.WRITTEN_OFF
-                        )
-                )
-        ).willReturn(
-                List.of(
-                        o1,
-                        o2,
-                        o3,
-                        o4
-                )
-        );
-
-        given(
-                paymentRecordRepository.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        List.of(
-                                1001L,
-                                1002L,
-                                1003L,
-                                1004L
-                        ),
-                        RecordStatus.CONFIRMED
-                )
-        ).willReturn(
-                List.of(
-                        r1,
-                        r2,
-                        r3
-                )
+                paymentData
         );
 
         SettlementPaymentStatusResponse response =
@@ -364,6 +297,13 @@ class SettlementQueryServicePaymentTest {
                         10000
                 );
 
+        SettlementPaymentData paymentData =
+                paymentData(
+                        List.of(participant),
+                        List.of(obligation),
+                        List.of(record)
+                );
+
         given(
                 settlementRepository.findById(
                         SETTLEMENT_ID
@@ -373,34 +313,11 @@ class SettlementQueryServicePaymentTest {
         );
 
         given(
-                settlementParticipantRepository.findBySettlementIdAndStatus(
-                        SETTLEMENT_ID,
-                        SettlementParticipantStatus.ACTIVE
+                settlementPaymentReader.read(
+                        SETTLEMENT_ID
                 )
         ).willReturn(
-                List.of(participant)
-        );
-
-        given(
-                paymentObligationRepository.findByParticipantIdsAndObligationStatuses(
-                        List.of(101L),
-                        List.of(
-                                ObligationStatus.ACTIVE,
-                                ObligationStatus.WRITTEN_OFF
-                        )
-                )
-        ).willReturn(
-                List.of(obligation)
-        );
-
-        given(
-                paymentRecordRepository.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        List.of(1001L),
-                        RecordStatus.CONFIRMED
-                )
-        ).willReturn(
-                List.of(record)
+                paymentData
         );
 
         SettlementPaymentStatusResponse response =
@@ -443,6 +360,13 @@ class SettlementQueryServicePaymentTest {
                         11000
                 );
 
+        SettlementPaymentData paymentData =
+                paymentData(
+                        List.of(participant),
+                        List.of(obligation),
+                        List.of(record)
+                );
+
         given(
                 settlementRepository.findById(
                         SETTLEMENT_ID
@@ -452,34 +376,11 @@ class SettlementQueryServicePaymentTest {
         );
 
         given(
-                settlementParticipantRepository.findBySettlementIdAndStatus(
-                        SETTLEMENT_ID,
-                        SettlementParticipantStatus.ACTIVE
+                settlementPaymentReader.read(
+                        SETTLEMENT_ID
                 )
         ).willReturn(
-                List.of(participant)
-        );
-
-        given(
-                paymentObligationRepository.findByParticipantIdsAndObligationStatuses(
-                        List.of(101L),
-                        List.of(
-                                ObligationStatus.ACTIVE,
-                                ObligationStatus.WRITTEN_OFF
-                        )
-                )
-        ).willReturn(
-                List.of(obligation)
-        );
-
-        given(
-                paymentRecordRepository.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        List.of(1001L),
-                        RecordStatus.CONFIRMED
-                )
-        ).willReturn(
-                List.of(record)
+                paymentData
         );
 
         SettlementPaymentStatusResponse response =
@@ -532,6 +433,10 @@ class SettlementQueryServicePaymentTest {
                 any(),
                 any()
         );
+
+        verifyNoInteractions(
+                settlementPaymentReader
+        );
     }
 
     @Test
@@ -561,6 +466,13 @@ class SettlementQueryServicePaymentTest {
                         5000
                 );
 
+        SettlementPaymentData paymentData =
+                paymentData(
+                        List.of(participant),
+                        List.of(obligation),
+                        List.of(record)
+                );
+
         given(
                 settlementRepository.findById(
                         SETTLEMENT_ID
@@ -570,34 +482,11 @@ class SettlementQueryServicePaymentTest {
         );
 
         given(
-                settlementParticipantRepository.findBySettlementIdAndStatus(
-                        SETTLEMENT_ID,
-                        SettlementParticipantStatus.ACTIVE
+                settlementPaymentReader.read(
+                        SETTLEMENT_ID
                 )
         ).willReturn(
-                List.of(participant)
-        );
-
-        given(
-                paymentObligationRepository.findByParticipantIdsAndObligationStatuses(
-                        List.of(101L),
-                        List.of(
-                                ObligationStatus.ACTIVE,
-                                ObligationStatus.WRITTEN_OFF
-                        )
-                )
-        ).willReturn(
-                List.of(obligation)
-        );
-
-        given(
-                paymentRecordRepository.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        List.of(1001L),
-                        RecordStatus.CONFIRMED
-                )
-        ).willReturn(
-                List.of(record)
+                paymentData
         );
 
         SettlementPaymentStatusResponse response =
@@ -661,32 +550,39 @@ class SettlementQueryServicePaymentTest {
         );
 
         verifyNoInteractions(
-                paymentObligationRepository,
-                paymentRecordRepository
+                settlementPaymentReader
         );
     }
 
     @Test
     @DisplayName("납부의무의 참여자 이름과 거래정보를 조합해 납부 내역을 만든다")
     void getPaymentHistoryComposesPayerNameAndTransactionInfo() {
-        preparePaymentHistoryStatus(
-                100L,
-                "홍길동"
-        );
+        SettlementParticipant participant =
+                participant(
+                        101L,
+                        OWNER_ID,
+                        "홍길동"
+                );
 
-        given(
-                paymentRecordService.findConfirmedRecordsByTargetIds(
-                        eq(PaymentTargetType.SETTLEMENT),
-                        anyList()
-                )
-        ).willReturn(
-                List.of(
-                        historyPaymentRecord(
-                                100L,
-                                200L,
-                                "10000"
-                        )
-                )
+        PaymentObligationEntity obligation =
+                obligation(
+                        100L,
+                        101L,
+                        10000,
+                        ObligationStatus.ACTIVE
+                );
+
+        PaymentRecordEntity record =
+                historyPaymentRecord(
+                        100L,
+                        200L,
+                        "10000"
+                );
+
+        preparePaymentHistoryStatus(
+                List.of(participant),
+                List.of(obligation),
+                List.of(record)
         );
 
         given(
@@ -736,24 +632,32 @@ class SettlementQueryServicePaymentTest {
     @Test
     @DisplayName("연결된 은행거래를 찾을 수 없으면 거래정보는 null이다")
     void getPaymentHistoryFillsNullWhenBankTransactionNotFound() {
-        preparePaymentHistoryStatus(
-                100L,
-                "홍길동"
-        );
+        SettlementParticipant participant =
+                participant(
+                        101L,
+                        OWNER_ID,
+                        "홍길동"
+                );
 
-        given(
-                paymentRecordService.findConfirmedRecordsByTargetIds(
-                        eq(PaymentTargetType.SETTLEMENT),
-                        anyList()
-                )
-        ).willReturn(
-                List.of(
-                        historyPaymentRecord(
-                                100L,
-                                999L,
-                                "10000"
-                        )
-                )
+        PaymentObligationEntity obligation =
+                obligation(
+                        100L,
+                        101L,
+                        10000,
+                        ObligationStatus.ACTIVE
+                );
+
+        PaymentRecordEntity record =
+                historyPaymentRecord(
+                        100L,
+                        999L,
+                        "10000"
+                );
+
+        preparePaymentHistoryStatus(
+                List.of(participant),
+                List.of(obligation),
+                List.of(record)
         );
 
         given(
@@ -786,95 +690,8 @@ class SettlementQueryServicePaymentTest {
     }
 
     @Test
-    @DisplayName("납부의무 ID 목록을 대상으로 확정 납부기록을 조회한다")
-    void getPaymentHistoryQueriesRecordsByObligationIds() {
-        preparePaymentHistoryStatus(
-                List.of(
-                        participant(
-                                101L,
-                                OWNER_ID,
-                                "홍길동"
-                        ),
-                        participant(
-                                102L,
-                                MEMBER_ID,
-                                "김철수"
-                        )
-                ),
-                List.of(
-                        obligation(
-                                100L,
-                                101L,
-                                10000,
-                                ObligationStatus.ACTIVE
-                        ),
-                        obligation(
-                                101L,
-                                102L,
-                                20000,
-                                ObligationStatus.ACTIVE
-                        )
-                )
-        );
-
-        given(
-                paymentRecordService.findConfirmedRecordsByTargetIds(
-                        eq(PaymentTargetType.SETTLEMENT),
-                        anyList()
-                )
-        ).willReturn(
-                List.of()
-        );
-
-        settlementQueryService.getPaymentHistory(
-                SETTLEMENT_ID,
-                OWNER_ID
-        );
-
-        verify(paymentRecordService)
-                .findConfirmedRecordsByTargetIds(
-                        eq(PaymentTargetType.SETTLEMENT),
-                        argThat(
-                                ids ->
-                                        ids != null
-                                                && ids.size() == 2
-                                                && ids.containsAll(
-                                                List.of(
-                                                        100L,
-                                                        101L
-                                                )
-                                        )
-                        )
-                );
-    }
-
-    private void preparePaymentHistoryStatus(
-            Long obligationId,
-            String participantName
-    ) {
-        preparePaymentHistoryStatus(
-                List.of(
-                        participant(
-                                101L,
-                                OWNER_ID,
-                                participantName
-                        )
-                ),
-                List.of(
-                        obligation(
-                                obligationId,
-                                101L,
-                                10000,
-                                ObligationStatus.ACTIVE
-                        )
-                )
-        );
-    }
-
-    private void preparePaymentHistoryStatus(
-            List<SettlementParticipant> participants,
-            List<PaymentObligationEntity> obligations
-    ) {
+    @DisplayName("납부 이력 조회에서도 접근 권한을 검증한다")
+    void getPaymentHistoryValidatesAccess() {
         Settlement settlement =
                 paymentSettlement();
 
@@ -887,48 +704,80 @@ class SettlementQueryServicePaymentTest {
         );
 
         given(
-                settlementParticipantRepository.findBySettlementIdAndStatus(
-                        SETTLEMENT_ID,
-                        SettlementParticipantStatus.ACTIVE
+                settlementPaymentReader.read(
+                        SETTLEMENT_ID
                 )
         ).willReturn(
-                participants
+                SettlementPaymentData.empty()
         );
 
-        List<Long> participantIds =
-                participants.stream()
-                        .map(
-                                SettlementParticipant::getParticipantId
-                        )
-                        .toList();
-
-        given(
-                paymentObligationRepository.findByParticipantIdsAndObligationStatuses(
-                        participantIds,
-                        List.of(
-                                ObligationStatus.ACTIVE,
-                                ObligationStatus.WRITTEN_OFF
-                        )
-                )
-        ).willReturn(
-                obligations
+        settlementQueryService.getPaymentHistory(
+                SETTLEMENT_ID,
+                OWNER_ID
         );
 
-        List<Long> obligationIds =
-                obligations.stream()
-                        .map(
-                                PaymentObligationEntity::getPaymentObligationId
-                        )
-                        .toList();
+        verify(settlementValidator)
+                .validateAccessibleUser(
+                        settlement,
+                        OWNER_ID
+                );
+    }
+
+    private void preparePaymentHistoryStatus(
+            List<SettlementParticipant> participants,
+            List<PaymentObligationEntity> obligations,
+            List<PaymentRecordEntity> paymentRecords
+    ) {
+        Settlement settlement =
+                paymentSettlement();
+
+        SettlementPaymentData paymentData =
+                paymentData(
+                        participants,
+                        obligations,
+                        paymentRecords
+                );
 
         given(
-                paymentRecordRepository.findConfirmedByTargetIds(
-                        PaymentTargetType.SETTLEMENT,
-                        obligationIds,
-                        RecordStatus.CONFIRMED
+                settlementRepository.findById(
+                        SETTLEMENT_ID
                 )
         ).willReturn(
-                List.of()
+                Optional.of(settlement)
+        );
+
+        given(
+                settlementPaymentReader.read(
+                        SETTLEMENT_ID
+                )
+        ).willReturn(
+                paymentData
+        );
+    }
+
+    private SettlementPaymentData paymentData(
+            List<SettlementParticipant> participants,
+            List<PaymentObligationEntity> obligations,
+            List<PaymentRecordEntity> paymentRecords
+    ) {
+        Map<Long, BigDecimal> paidAmountMap =
+                paymentRecords.stream()
+                        .collect(Collectors.groupingBy(
+                                PaymentRecordEntity::getTargetId,
+                                Collectors.mapping(
+                                        PaymentRecordEntity::getAmount,
+                                        Collectors.reducing(
+                                                BigDecimal.ZERO,
+                                                BigDecimal::add
+                                        )
+                                )
+                        ));
+
+        return new SettlementPaymentData(
+                participants,
+                obligations,
+                paymentRecords,
+                paidAmountMap
         );
     }
 
