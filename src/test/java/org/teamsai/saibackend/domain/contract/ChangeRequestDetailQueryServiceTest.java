@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
-import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
+import org.teamsai.saibackend.domain.contract.service.ContractChangeQueryService;
 import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimator;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
@@ -39,7 +39,7 @@ class ChangeRequestDetailQueryServiceTest {
     private static final Long DEBTOR_ID = 20L;
 
     @Mock
-    private ContractChangeService contractChangeService;
+    private ContractChangeQueryService contractChangeQueryService;
 
     @Spy
     private MonthlyPaymentEstimator monthlyPaymentEstimator = new MonthlyPaymentEstimator();
@@ -90,7 +90,7 @@ class ChangeRequestDetailQueryServiceTest {
     @Test
     @DisplayName("변경요청이 다른 계약서에 속하면 예외가 발생한다.")
     void getDetailFailsWhenChangeRequestBelongsToOtherContract(){
-        given(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID))
+        given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID))
                 .willReturn(createChangeRequestWithDifferentContractId());
 
         assertThatThrownBy(() -> changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID))
@@ -105,9 +105,9 @@ class ChangeRequestDetailQueryServiceTest {
     @Test
     @DisplayName("계약서와 변경요청을 조합해 상세 정보(월 상환액 포함)를 반환한다")
     void getDetailSuccess() {
-        given(contractChangeService.getContract(CONTRACT_ID, USER_ID))
+        given(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID))
                 .willReturn(createContract());
-        given(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID))
+        given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID))
                 .willReturn(createChangeRequest());
 
         ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
@@ -153,8 +153,8 @@ class ChangeRequestDetailQueryServiceTest {
                 "자금 사정으로 인한 연장 요청", null, LocalDateTime.now()
         );
 
-        given(contractChangeService.getContract(CONTRACT_ID, USER_ID)).willReturn(contract);
-        given(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeRequest);
+        given(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).willReturn(contract);
+        given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeRequest);
 
         ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
@@ -164,7 +164,7 @@ class ChangeRequestDetailQueryServiceTest {
     @Test
     @DisplayName("계약 당사자가 아니면 예외가 발생한다")
     void getDetailFailsWhenNotContractParty() {
-        given(contractChangeService.getContract(CONTRACT_ID, USER_ID))
+        given(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID))
                 .willThrow(LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException());
 
         assertThatThrownBy(() -> changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID))
@@ -181,8 +181,8 @@ class ChangeRequestDetailQueryServiceTest {
                 null, null, null, null, null, null, LocalDateTime.now()
         );
 
-        when(contractChangeService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
-        when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
+        when(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
+        when(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
         ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
@@ -198,8 +198,8 @@ class ChangeRequestDetailQueryServiceTest {
                 null, null, null, null, null, "이율이 너무 높습니다", LocalDateTime.now()
         );
 
-        when(contractChangeService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
-        when(contractChangeService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
+        when(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
+        when(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
         ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 

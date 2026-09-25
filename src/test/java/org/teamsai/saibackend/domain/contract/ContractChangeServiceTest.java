@@ -11,20 +11,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
-import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractChangeRepository;
-import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
-import org.teamsai.saibackend.domain.contract.service.LoanChangeService;
-import org.teamsai.saibackend.domain.contract.service.LoanContractFileService;
-import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
+import org.teamsai.saibackend.domain.contract.service.*;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
@@ -108,50 +103,6 @@ class ContractChangeServiceTest {
             entity.attachRequesterSignature(requesterSignature);
         }
         return entity;
-    }
-
-    @Nested
-    @DisplayName("계약 조회")
-    class GetContract {
-
-        @Test
-        @DisplayName("완료된 계약이면 정상적으로 반환한다")
-        void getContractSuccess() {
-            given(loanContractService.findContract(CONTRACT_ID, USER_ID))
-                    .willReturn(createContract(ContractStatus.COMPLETED));
-
-            LoanContractResponse result = contractChangeService.getContract(CONTRACT_ID, USER_ID);
-
-            assertThat(result.getContractId()).isEqualTo(CONTRACT_ID);
-        }
-
-        @Test
-        @DisplayName("완료되지 않은 계약이면 예외가 발생한다")
-        void getContractFailsWhenNotCompleted() {
-            given(loanContractService.findContract(CONTRACT_ID, USER_ID))
-                    .willReturn(createContract(ContractStatus.PENDING));
-
-            assertThatThrownBy(() -> contractChangeService.getContract(CONTRACT_ID, USER_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.CONTRACT_NOT_COMPLETED)
-                    );
-        }
-
-        @Test
-        @DisplayName("계약서 도메인에서 던진 예외를 그대로 전달한다")
-        void getContractPropagatesExceptionFromLoanContractService() {
-            given(loanContractService.findContract(CONTRACT_ID, USER_ID))
-                    .willThrow(LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException());
-
-            assertThatThrownBy(() -> contractChangeService.getContract(CONTRACT_ID, USER_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(LoanContractErrorCode.CONTRACT_ACCESS_DENIED)
-                    );
-        }
     }
 
     private LoanContractResponse createContract(ContractStatus status) {
