@@ -11,7 +11,6 @@ import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardA
 import org.teamsai.saibackend.domain.integration.dto.response.IntegrationDashboardResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.time.LocalDate;
@@ -25,8 +24,6 @@ public class IntegrationDashboardQueryService {
 
     private final ContractDashboardQueryService contractDashboardQueryService;
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
-
     public IntegrationDashboardResponse getDashboard(
             Long userId,
             YearMonth yearMonth
@@ -63,7 +60,7 @@ public class IntegrationDashboardQueryService {
         }
         return settlements.stream()
                 .map(settlement -> {
-                    SettlementPaymentStatusResponse paymentStatus = settlementPaymentStatusService
+                    SettlementPaymentStatusResponse paymentStatus = settlementQueryService
                             .getPaymentStatus(settlement.settlementId(), userId);
                     return IntegrationDashboardAssembler.toSettlementContext(settlement, paymentStatus, userId);
                 })

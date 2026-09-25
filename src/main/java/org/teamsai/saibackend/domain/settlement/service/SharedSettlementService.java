@@ -25,7 +25,7 @@ public class SharedSettlementService {
 
     private final SettlementAccountService settlementAccountService;
     private final SettlementValidator settlementValidator;
-    private final SettlementParticipantRegistrationService participantRegistrationService;
+    private final SettlementParticipantService settlementParticipantService;
     private final SettlementAmountCalculator settlementAmountCalculator;
     private final SettlementRepository settlementRepository;
     private final UserRepository userRepository;
@@ -69,7 +69,7 @@ public class SharedSettlementService {
         Settlement savedSettlement =
                 settlementRepository.save(settlement);
 
-        participantRegistrationService.registerParticipants(
+        settlementParticipantService.registerParticipants(
                 ownerId,
                 savedSettlement.getSettlementId(),
                 request.getParticipants(),

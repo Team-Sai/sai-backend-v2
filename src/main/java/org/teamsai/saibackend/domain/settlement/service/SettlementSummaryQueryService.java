@@ -17,7 +17,6 @@ import java.util.List;
 public class SettlementSummaryQueryService {
 
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @Transactional(readOnly = true)
     public SettlementSummaryResponse getSummary(Long userId) {
@@ -36,7 +35,7 @@ public class SettlementSummaryQueryService {
             }
 
             SettlementPaymentStatusResponse paymentStatus =
-                    settlementPaymentStatusService.getPaymentStatus(
+                    settlementQueryService.getPaymentStatus(
                             settlement.settlementId(),
                             userId
                     );

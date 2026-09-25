@@ -27,7 +27,6 @@ import java.util.List;
 public class SettlementController {
 
     private final SharedSettlementService sharedSettlementService;
-    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
     private final SettlementCloseService settlementCloseService;
     private final SettlementQueryService settlementQueryService;
     private final SettlementSummaryQueryService settlementSummaryQueryService;
@@ -125,7 +124,7 @@ public class SettlementController {
             @PathVariable Long settlementId
     ){
         SettlementPaymentStatusResponse response =
-                settlementPaymentStatusService.getPaymentStatus(
+                settlementQueryService.getPaymentStatus(
                         settlementId,
                         userDetails.getUserId()
                 );

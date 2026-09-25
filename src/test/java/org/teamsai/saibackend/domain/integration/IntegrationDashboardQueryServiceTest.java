@@ -23,7 +23,6 @@ import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.math.BigDecimal;
@@ -46,9 +45,6 @@ class IntegrationDashboardQueryServiceTest {
 
     @Mock
     private SettlementQueryService settlementQueryService;
-
-    @Mock
-    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @InjectMocks
     private IntegrationDashboardQueryService integrationDashboardQueryService;
@@ -253,7 +249,7 @@ class IntegrationDashboardQueryServiceTest {
         when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), null, List.of()));
         when(settlementQueryService.getSettlementList(userId)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(30L, userId)).thenReturn(paymentStatus);
+        when(settlementQueryService.getPaymentStatus(30L, userId)).thenReturn(paymentStatus);
 
         IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.from(dueDate)
@@ -306,7 +302,7 @@ class IntegrationDashboardQueryServiceTest {
         when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), null, List.of()));
         when(settlementQueryService.getSettlementList(userId)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(31L, userId)).thenReturn(paymentStatus);
+        when(settlementQueryService.getPaymentStatus(31L, userId)).thenReturn(paymentStatus);
 
         IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.from(dueDate)
@@ -353,7 +349,7 @@ class IntegrationDashboardQueryServiceTest {
                         .contracts(loans)
                         .build(), null, List.of()));
         when(settlementQueryService.getSettlementList(userId)).thenReturn(settlements);
-        settlements.forEach(settlement -> when(settlementPaymentStatusService.getPaymentStatus(
+        settlements.forEach(settlement -> when(settlementQueryService.getPaymentStatus(
                 settlement.settlementId(), userId
         )).thenReturn(paymentStatus(
                 settlement.settlementId(),
