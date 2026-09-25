@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;

@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.settlement.service;
+package org.teamsai.saibackend.domain.settlement.support;
 
 public record SettlementAbandonmentResult(int detectedCount) {
 }

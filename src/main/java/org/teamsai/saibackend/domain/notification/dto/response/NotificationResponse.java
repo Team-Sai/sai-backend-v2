@@ -3,7 +3,6 @@ package org.teamsai.saibackend.domain.notification.dto.response;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
-
 import java.time.LocalDateTime;
 
 public interface NotificationResponse {
