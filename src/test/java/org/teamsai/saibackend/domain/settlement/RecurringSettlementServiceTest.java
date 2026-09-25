@@ -64,7 +64,7 @@ class RecurringSettlementServiceTest {
     private SettlementAmountCalculator settlementAmountCalculator;
 
     @Mock
-    private SettlementParticipantRegistrationService participantRegistrationService;
+    private SettlementParticipantService participantService;
 
     @Mock
     private SettlementAccountService settlementAccountService;
@@ -226,7 +226,7 @@ class RecurringSettlementServiceTest {
         assertThat(firstSettlement.getDueDate())
                 .isNull();
 
-        then(participantRegistrationService)
+        then(participantService)
                 .should()
                 .registerParticipants(
                         OWNER_ID,
@@ -300,7 +300,7 @@ class RecurringSettlementServiceTest {
 
         verifyNoInteractions(
                 settlementRepository,
-                participantRegistrationService,
+                participantService,
                 settlementAccountService
         );
     }
@@ -362,7 +362,7 @@ class RecurringSettlementServiceTest {
         );
 
         verifyNoInteractions(
-                participantRegistrationService,
+                participantService,
                 settlementAccountService
         );
     }
@@ -393,7 +393,7 @@ class RecurringSettlementServiceTest {
                 recurringSettlementRepository,
                 settlementRepository,
                 userRepository,
-                participantRegistrationService,
+                participantService,
                 settlementAccountService
         );
     }
@@ -474,7 +474,7 @@ class RecurringSettlementServiceTest {
                         2
                 );
 
-        then(participantRegistrationService)
+        then(participantService)
                 .should()
                 .registerParticipants(
                         OWNER_ID,
@@ -572,7 +572,7 @@ class RecurringSettlementServiceTest {
                                 )
         );
 
-        then(participantRegistrationService)
+        then(participantService)
                 .should()
                 .registerParticipants(
                         OWNER_ID,

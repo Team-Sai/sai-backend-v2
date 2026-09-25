@@ -4,16 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.archive.assembler.SettlementArchiveAssembler;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.*;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentHistoryQueryService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
+import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.util.List;
@@ -25,15 +19,13 @@ import java.util.Optional;
 public class SettlementArchiveQueryService {
 
     private final SettlementQueryService settlementQueryService;
-    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
-    private final SettlementPaymentHistoryQueryService settlementPaymentHistoryService;
     private final SettlementAccountService settlementAccountService;
 
     public SettlementArchivePreviewResponse getArchivePreview(Long settlementId, Long userId) {
         SettlementDetailResponse detail = settlementQueryService.getSettlementDetail(settlementId, userId);
 
-        SettlementPaymentStatusResponse paymentStatus = settlementPaymentStatusService.getPaymentStatus(settlementId, userId);
-        List<SettlementPaymentHistoryResponse> paymentHistory = settlementPaymentHistoryService.getPaymentHistory(settlementId, userId);
+        SettlementPaymentStatusResponse paymentStatus = settlementQueryService.getPaymentStatus(settlementId, userId);
+        List<SettlementPaymentHistoryResponse> paymentHistory = settlementQueryService.getPaymentHistory(settlementId, userId);
         SettlementAccountResponse settlementAccount = findSettlementAccountIfExists(settlementId, userId).orElse(null);
 
         return SettlementArchiveAssembler.toPreviewResponse(detail, paymentStatus, paymentHistory, settlementAccount);
@@ -50,4 +42,5 @@ public class SettlementArchiveQueryService {
             throw e;
         }
     }
+
 }

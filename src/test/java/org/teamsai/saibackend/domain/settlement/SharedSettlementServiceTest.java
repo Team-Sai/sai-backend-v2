@@ -57,8 +57,7 @@ class SharedSettlementServiceTest {
     private SettlementValidator settlementValidator;
 
     @Mock
-    private SettlementParticipantRegistrationService
-            participantRegistrationService;
+    private SettlementParticipantService participantService;
 
     @Mock
     private SettlementAmountCalculator settlementAmountCalculator;
@@ -205,7 +204,7 @@ class SharedSettlementServiceTest {
                 );
 
 
-        verify(participantRegistrationService)
+        verify(participantService)
                 .registerParticipants(
                         OWNER_ID,
                         SETTLEMENT_ID,
@@ -315,7 +314,7 @@ class SharedSettlementServiceTest {
                 );
 
         verifyNoInteractions(
-                participantRegistrationService,
+                participantService,
                 settlementAccountService
         );
     }
@@ -411,7 +410,7 @@ class SharedSettlementServiceTest {
         );
 
 
-        verify(participantRegistrationService)
+        verify(participantService)
                 .registerParticipants(
                         OWNER_ID,
                         SETTLEMENT_ID,

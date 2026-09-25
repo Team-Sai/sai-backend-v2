@@ -33,7 +33,7 @@ public class RecurringSettlementService {
 
     private final SettlementAmountCalculator settlementAmountCalculator;
 
-    private final SettlementParticipantRegistrationService participantRegistrationService;
+    private final SettlementParticipantService settlementParticipantService;
 
     private final SettlementAccountService settlementAccountService;
 
@@ -91,7 +91,7 @@ public class RecurringSettlementService {
         Settlement savedFirstSettlement =
                 settlementRepository.save(firstSettlement);
 
-        participantRegistrationService.registerParticipants(
+        settlementParticipantService.registerParticipants(
                 ownerId,savedFirstSettlement.getSettlementId(),request.getParticipants(),perPersonAmount
         );
 

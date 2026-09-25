@@ -1,13 +1,14 @@
 package org.teamsai.saibackend.domain.matching.service;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
 import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
 import org.teamsai.saibackend.domain.matching.model.MatchingTransaction;
-import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
 import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateRepository;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
@@ -15,12 +16,14 @@ import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
+
 import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class BankMatchingTransactionService {
@@ -31,7 +34,7 @@ public class BankMatchingTransactionService {
     private final BankTransactionService bankTransactionService;
     private final BankTransactionMatchCandidateService candidateService;
     private final NotificationService notificationService;
-    private final SettlementPaymentStatusQueryService settlementPaymentStatusService;
+    private final SettlementPaymentStatusChecker paymentStatusChecker;
     @Transactional
     public AutoMatchingTransactionResult process(
             Long userId,
@@ -133,7 +136,7 @@ public class BankMatchingTransactionService {
                         paymentObligationRepository.findSettlementIdsByObligationIds(settlementObligationIds);
                 boolean hasUnresolvedSettlement = settlementIds.stream()
                         .anyMatch(settlementId ->
-                                !settlementPaymentStatusService.areAllObligationsResolved(settlementId));
+                                !paymentStatusChecker.areAllObligationsResolved(settlementId));
                 if (hasUnresolvedSettlement) {
                     notificationService.createIfAbsent(
                             userId, NotificationType.BANK_TRANSACTION_MATCHING_REVIEW,

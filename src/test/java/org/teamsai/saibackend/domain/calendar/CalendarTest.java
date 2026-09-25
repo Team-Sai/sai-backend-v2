@@ -19,7 +19,6 @@ import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.math.BigDecimal;
@@ -40,9 +39,6 @@ public class CalendarTest {
 
     @Mock
     private SettlementQueryService settlementQueryService;
-
-    @Mock
-    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
 
     @InjectMocks
     private IntegrationDashboardQueryService integrationDashboardQueryService;
@@ -128,7 +124,7 @@ public class CalendarTest {
                 100L, "회식비 정산", "MEMBER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(100L, USER_ID))
+        when(settlementQueryService.getPaymentStatus(100L, USER_ID))
                 .thenReturn(paymentStatus(
                         100L,
                         BigDecimal.valueOf(35_000),
@@ -156,7 +152,7 @@ public class CalendarTest {
                 101L, "종료된 정산", "OWNER", "CLOSED", TARGET_DATE, LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(101L, USER_ID))
+        when(settlementQueryService.getPaymentStatus(101L, USER_ID))
                 .thenReturn(paymentStatus(101L, BigDecimal.ZERO, BigDecimal.ZERO));
 
         List<DashboardCalendarItemResponse> result =
@@ -176,7 +172,7 @@ public class CalendarTest {
                 102L, "회식비 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(102L, USER_ID))
+        when(settlementQueryService.getPaymentStatus(102L, USER_ID))
                 .thenReturn(paymentStatus(
                         102L,
                         BigDecimal.valueOf(20_000),
@@ -206,7 +202,7 @@ public class CalendarTest {
                 103L, "가나다 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(103L, USER_ID))
+        when(settlementQueryService.getPaymentStatus(103L, USER_ID))
                 .thenReturn(paymentStatus(103L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
@@ -441,7 +437,7 @@ public class CalendarTest {
                 105L, "여행 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(105L, USER_ID))
+        when(settlementQueryService.getPaymentStatus(105L, USER_ID))
                 .thenReturn(paymentStatus(105L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
@@ -466,7 +462,7 @@ public class CalendarTest {
                 LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(106L, USER_ID))
+        when(settlementQueryService.getPaymentStatus(106L, USER_ID))
                 .thenReturn(paymentStatus(106L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
@@ -489,7 +485,7 @@ public class CalendarTest {
                 107L, "회식비 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
-        when(settlementPaymentStatusService.getPaymentStatus(107L, USER_ID))
+        when(settlementQueryService.getPaymentStatus(107L, USER_ID))
                 .thenReturn(paymentStatus(107L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =

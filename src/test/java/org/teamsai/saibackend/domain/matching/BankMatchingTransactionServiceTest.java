@@ -1,39 +1,42 @@
 package org.teamsai.saibackend.domain.matching;
+
 import org.junit.jupiter.api.DisplayName;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
 import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
 import org.teamsai.saibackend.domain.matching.model.MatchingTransaction;
+import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateRepository;
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingTransactionService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
-import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
-import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateRepository;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusQueryService;
+import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
+import org.teamsai.saibackend.domain.notification.service.NotificationService;
+import org.teamsai.saibackend.domain.notification.type.NotificationType;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 import org.teamsai.saibackend.global.exception.DomainException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +44,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("BankMatchingTransactionService 단위 테스트")
 class BankMatchingTransactionServiceTest {
@@ -58,8 +62,9 @@ class BankMatchingTransactionServiceTest {
     private BankTransactionMatchCandidateService candidateService;
     @Mock
     private NotificationService notificationService;
+
     @Mock
-    private SettlementPaymentStatusQueryService settlementPaymentStatusService;
+    private SettlementPaymentStatusChecker settlementPaymentStatusChecker;
     @InjectMocks
     private BankMatchingTransactionService transactionService;
     @Test
@@ -337,7 +342,7 @@ class BankMatchingTransactionServiceTest {
         // candidateDto(1L, SETTLEMENT)의 targetId는 10L(obligationId) → settlementId 20L로 변환된다고 가정
         given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
-        given(settlementPaymentStatusService.areAllObligationsResolved(20L))
+        given(settlementPaymentStatusChecker.areAllObligationsResolved(20L))
                 .willReturn(false);
         transactionService.process(
                 USER_ID,
@@ -378,7 +383,7 @@ class BankMatchingTransactionServiceTest {
                 )));
         given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
-        given(settlementPaymentStatusService.areAllObligationsResolved(20L))
+        given(settlementPaymentStatusChecker.areAllObligationsResolved(20L))
                 .willReturn(true);
         transactionService.process(
                 USER_ID,
@@ -426,7 +431,7 @@ class BankMatchingTransactionServiceTest {
                 101L,
                 LINKED_ACCOUNT_ID
         );
-        verify(settlementPaymentStatusService, never())
+        verify(settlementPaymentStatusChecker, never())
                 .areAllObligationsResolved(any());
     }
     @Test
