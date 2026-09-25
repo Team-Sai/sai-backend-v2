@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.notification.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 
@@ -27,7 +28,13 @@ public interface NotificationResponse {
 
     BankTransactionProcessingStatus getRelatedTransactionStatus();
 
-    boolean isResolved();
+    @JsonIgnore
+    Long getResolvedFlag();
+
+    default boolean isResolved() {
+        Long resolvedFlag = getResolvedFlag();
+        return resolvedFlag != null && resolvedFlag == 1L;
+    }
 
     LocalDateTime getCreatedAt();
 }
