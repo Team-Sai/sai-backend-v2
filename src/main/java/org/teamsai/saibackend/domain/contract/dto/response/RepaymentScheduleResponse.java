@@ -2,7 +2,6 @@ package org.teamsai.saibackend.domain.contract.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import java.math.BigDecimal;

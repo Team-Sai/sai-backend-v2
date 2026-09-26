@@ -3,12 +3,15 @@ package org.teamsai.saibackend.domain.settlement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
 import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.RecurringSettlementRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.RecurringSettlementValidator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
@@ -30,7 +33,7 @@ public class RecurringSettlementService {
 
     private final SettlementAmountCalculator settlementAmountCalculator;
 
-    private final SettlementParticipantRegistrationService participantRegistrationService;
+    private final SettlementParticipantService settlementParticipantService;
 
     private final SettlementAccountService settlementAccountService;
 
@@ -88,23 +91,13 @@ public class RecurringSettlementService {
         Settlement savedFirstSettlement =
                 settlementRepository.save(firstSettlement);
 
-        participantRegistrationService.registerParticipants(
+        settlementParticipantService.registerParticipants(
                 ownerId,savedFirstSettlement.getSettlementId(),request.getParticipants(),perPersonAmount
         );
 
         settlementAccountService.selectAccount(
                 ownerId, savedFirstSettlement.getSettlementId(), request.getLinkedAccountId());
 
-        return CreateRecurringSettlementResponse.builder()
-                .recurringSettlementId(savedRecurringSettlement.getRecurringSettlementId())
-                .firstSettlementId(savedFirstSettlement.getSettlementId())
-                .settlementType(savedFirstSettlement.getSettlementType())
-                .title(savedFirstSettlement.getTitle())
-                .cycleRule(savedRecurringSettlement.getCycleRule())
-                .startDate(savedRecurringSettlement.getStartDate())
-                .endDate(savedRecurringSettlement.getEndDate())
-                .createdAt(savedRecurringSettlement.getCreatedAt())
-                .build();
-
+        return SettlementAssembler.toCreateRecurringSettlementResponse(savedRecurringSettlement, savedFirstSettlement);
     }
 }

@@ -27,10 +27,9 @@ import java.util.List;
 public class SettlementController {
 
     private final SharedSettlementService sharedSettlementService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
     private final SettlementCloseService settlementCloseService;
     private final SettlementQueryService settlementQueryService;
-    private final SettlementSummaryService settlementSummaryService;
+    private final SettlementSummaryQueryService settlementSummaryQueryService;
 
     @GetMapping("/settlements")
     public String settlementListPage() {
@@ -125,7 +124,7 @@ public class SettlementController {
             @PathVariable Long settlementId
     ){
         SettlementPaymentStatusResponse response =
-                settlementPaymentStatusService.getPaymentStatus(
+                settlementQueryService.getPaymentStatus(
                         settlementId,
                         userDetails.getUserId()
                 );
@@ -253,7 +252,7 @@ public class SettlementController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ){
         SettlementSummaryResponse response =
-                settlementSummaryService.getSummary(
+                settlementSummaryQueryService.getSummary(
                         userDetails.getUserId()
                 );
 

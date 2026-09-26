@@ -232,7 +232,7 @@
 
         try {
             const response = await authFetch(
-                `/api/dashboard?roleFilter=ALL&page=${currentPage}`,
+                `/api/contracts/dashboard?roleFilter=ALL&page=${currentPage}`,
                 {
                     headers: {
                         Accept: "application/json"

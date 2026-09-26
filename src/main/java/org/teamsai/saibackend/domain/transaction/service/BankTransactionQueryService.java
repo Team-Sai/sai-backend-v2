@@ -15,6 +15,7 @@ import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQueryRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTran
 public class BankTransactionQueryService {
 
     private final BankTransactionRepository bankTransactionRepository;
+    private final BankTransactionQueryRepository bankTransactionQueryRepository;
 
     private final LinkedBankAccountRepository linkedBankAccountRepository;
 
@@ -36,7 +38,7 @@ public class BankTransactionQueryService {
         if (linkedAccountId != null) {
             validateOwnership(userId, linkedAccountId);
         }
-        Page<IntegratedBankTransactionResponse> result = bankTransactionRepository.searchIntegrated(
+        Page<IntegratedBankTransactionResponse> result = bankTransactionQueryRepository.searchIntegrated(
                 userId, ConnectionStatus.AVAILABLE, linkedAccountId,
                 condition.processingStatus(), condition.transactionType(), condition.keyword(),
                 condition.fromDate() == null ? null : condition.fromDate().atStartOfDay(),
@@ -67,7 +69,7 @@ public class BankTransactionQueryService {
         );
 
         Page<BankTransactionEntity> transactions =
-                bankTransactionRepository.search(
+                bankTransactionQueryRepository.search(
                         linkedAccountId,
                         condition.processingStatus(),
                         condition.transactionType(),
@@ -111,26 +113,6 @@ public class BankTransactionQueryService {
         return BankTransactionDetailResponse.from(transaction);
     }
 
-    @Transactional
-    public BankTransactionDetailResponse getTransactionDetailForUpdate(
-            Long userId,
-            Long linkedAccountId,
-            Long bankTransactionId
-    ) {
-        validateOwnership(userId, linkedAccountId);
-
-        BankTransactionEntity transaction = bankTransactionRepository
-                .findLockedByBankTransactionIdAndLinkedAccountId(
-                        bankTransactionId,
-                        linkedAccountId
-                )
-                .orElseThrow(
-                        BankTransactionErrorCode
-                                .BANK_TRANSACTION_NOT_FOUND::toException
-                );
-
-        return BankTransactionDetailResponse.from(transaction);
-    }
 
     private void validateOwnership(
             Long userId,

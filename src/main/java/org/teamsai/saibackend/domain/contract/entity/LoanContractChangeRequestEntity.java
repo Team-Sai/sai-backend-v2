@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.contract.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 
 import java.math.BigDecimal;
@@ -79,6 +80,30 @@ public class LoanContractChangeRequestEntity {
     public void attachRequesterSignature(String requesterSignature) {
         this.requesterSignature = requesterSignature;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void validateBelongsTo(Long contractId) {
+        if (!this.contractId.equals(contractId)) {
+            throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
+        }
+    }
+
+    public void validateRequestedBy(Long userId) {
+        if (!this.userId.equals(userId)) {
+            throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
+        }
+    }
+
+    public void validatePending() {
+        if (this.status != ChangeRequestStatus.PENDING) {
+            throw ContractChangeErrorCode.ALREADY_BEING_REQUEST.toException();
+        }
+    }
+
+    public void validateNotSigned() {
+        if (this.requesterSignature != null) {
+            throw ContractChangeErrorCode.ALREADY_SIGNED.toException();
+        }
     }
 
     public LoanContractChangeRequestEntity(

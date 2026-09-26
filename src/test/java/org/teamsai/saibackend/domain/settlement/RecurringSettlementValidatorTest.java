@@ -3,7 +3,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.settlement.service.RecurringSettlementValidator;
+import org.teamsai.saibackend.domain.settlement.support.RecurringSettlementValidator;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.util.List;

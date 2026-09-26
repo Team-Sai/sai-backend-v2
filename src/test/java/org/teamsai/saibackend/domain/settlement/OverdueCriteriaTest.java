@@ -3,9 +3,8 @@ package org.teamsai.saibackend.domain.settlement;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
-import org.teamsai.saibackend.domain.settlement.service.OverdueCriteria;
+import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 

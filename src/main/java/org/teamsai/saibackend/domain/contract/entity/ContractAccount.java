@@ -31,9 +31,6 @@ public class ContractAccount {
     @Column(name = "selected_at", nullable = false, updatable = false)
     private LocalDateTime selectedAt;
 
-    @Column(name = "ended_at")
-    private LocalDateTime endedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id", nullable = false)
     private LoanContract loanContract;
@@ -44,10 +41,5 @@ public class ContractAccount {
         this.linkedAccount = linkedAccount;
         this.accountStatus = (accountStatus != null) ? accountStatus : ContractAccountStatus.ACTIVE;
         this.loanContract = loanContract;
-    }
-
-    public void deactivate(ContractAccountStatus accountStatus) {
-        this.accountStatus = accountStatus;
-        this.endedAt = LocalDateTime.now();
     }
 }

@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
-import org.teamsai.saibackend.domain.settlement.service.SettlementReminderSender;
+import org.teamsai.saibackend.domain.settlement.support.SettlementReminderSender;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
 

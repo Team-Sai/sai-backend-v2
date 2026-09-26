@@ -12,6 +12,8 @@ import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.RecurringSettlementRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.*;
+import org.teamsai.saibackend.domain.settlement.support.CycleGenerationResult;
+import org.teamsai.saibackend.domain.settlement.support.RecurringSettlementBatchResult;
 import org.teamsai.saibackend.domain.settlement.type.CycleRule;
 
 import java.time.LocalDate;
@@ -31,7 +33,7 @@ class RecurringSettlementGenerationServiceTest {
     private SettlementRepository settlementRepository;
 
     @Mock
-    private RecurringSettlementCycleGenerator cycleGenerator;
+    private RecurringSettlementCycleService cycleGenerator;
 
     @InjectMocks
     private RecurringSettlementGenerationService sut;
@@ -180,7 +182,7 @@ class RecurringSettlementGenerationServiceTest {
                         LocalDate.of(2026, 2, 28)
                 )
         ).thenReturn(
-                CycleGenerationOutcome.created(created)
+                CycleGenerationResult.created(created)
         );
 
         RecurringSettlementBatchResult result =
@@ -269,7 +271,7 @@ class RecurringSettlementGenerationServiceTest {
                         LocalDate.of(2026, 2, 28)
                 )
         ).thenReturn(
-                CycleGenerationOutcome.created(cycle2)
+                CycleGenerationResult.created(cycle2)
         );
 
         when(
@@ -279,7 +281,7 @@ class RecurringSettlementGenerationServiceTest {
                         LocalDate.of(2026, 3, 31)
                 )
         ).thenReturn(
-                CycleGenerationOutcome.created(cycle3)
+                CycleGenerationResult.created(cycle3)
         );
 
         RecurringSettlementBatchResult result =
@@ -369,7 +371,7 @@ class RecurringSettlementGenerationServiceTest {
                         LocalDate.of(2026, 2, 28)
                 )
         ).thenReturn(
-                CycleGenerationOutcome.created(cycle2)
+                CycleGenerationResult.created(cycle2)
         );
 
         when(

@@ -32,10 +32,12 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("SettlementQueryService 단위 테스트")
+@DisplayName("SettlementQueryService 기본 조회 단위 테스트")
 class SettlementQueryServiceTest {
 
     private static final Long OWNER_ID = 1L;
+    private static final Long MEMBER_ID = 20L;
+    private static final Long OTHER_USER_ID = 30L;
     private static final Long SETTLEMENT_ID = 15L;
 
     @Mock
@@ -50,24 +52,23 @@ class SettlementQueryServiceTest {
     @Test
     @DisplayName("사용자의 정산 목록을 조회한다")
     void getSettlementListSuccess() {
+        Settlement settlement1 =
+                settlement(
+                        15L,
+                        "정산1",
+                        OWNER_ID
+                );
 
-        Long userId = 1L;
-
-        Settlement settlement1 = settlement(
-                15L,
-                "정산1",
-                OWNER_ID
-        );
-
-        Settlement settlement2 = settlement(
-                16L,
-                "정산2",
-                OWNER_ID
-        );
+        Settlement settlement2 =
+                settlement(
+                        16L,
+                        "정산2",
+                        OWNER_ID
+                );
 
         given(
                 settlementRepository.findAllAccessibleByUserId(
-                        userId,
+                        OWNER_ID,
                         SettlementParticipantStatus.ACTIVE
                 )
         ).willReturn(
@@ -78,13 +79,11 @@ class SettlementQueryServiceTest {
         );
 
         List<SettlementListResponse> result =
-                settlementQueryService
-                        .getSettlementList(
-                                userId
-                        );
+                settlementQueryService.getSettlementList(
+                        OWNER_ID
+                );
 
-        assertThat(result)
-                .hasSize(2);
+        assertThat(result).hasSize(2);
 
         assertThat(result.get(0).settlementId())
                 .isEqualTo(15L);
@@ -97,7 +96,7 @@ class SettlementQueryServiceTest {
 
         verify(settlementRepository)
                 .findAllAccessibleByUserId(
-                        userId,
+                        OWNER_ID,
                         SettlementParticipantStatus.ACTIVE
                 );
     }
@@ -105,12 +104,9 @@ class SettlementQueryServiceTest {
     @Test
     @DisplayName("조회되는 정산이 없으면 빈 목록을 반환한다")
     void getSettlementListReturnsEmptyList() {
-
-        Long userId = 1L;
-
         given(
                 settlementRepository.findAllAccessibleByUserId(
-                        userId,
+                        OWNER_ID,
                         SettlementParticipantStatus.ACTIVE
                 )
         ).willReturn(
@@ -118,17 +114,15 @@ class SettlementQueryServiceTest {
         );
 
         List<SettlementListResponse> result =
-                settlementQueryService
-                        .getSettlementList(
-                                userId
-                        );
+                settlementQueryService.getSettlementList(
+                        OWNER_ID
+                );
 
-        assertThat(result)
-                .isEmpty();
+        assertThat(result).isEmpty();
 
         verify(settlementRepository)
                 .findAllAccessibleByUserId(
-                        userId,
+                        OWNER_ID,
                         SettlementParticipantStatus.ACTIVE
                 );
     }
@@ -136,7 +130,6 @@ class SettlementQueryServiceTest {
     @Test
     @DisplayName("정산 생성자는 정산 상세를 조회할 수 있다")
     void getSettlementDetailByOwner() {
-
         Settlement settlement =
                 settlement(
                         SETTLEMENT_ID,
@@ -153,26 +146,19 @@ class SettlementQueryServiceTest {
         );
 
         SettlementDetailResponse result =
-                settlementQueryService
-                        .getSettlementDetail(
-                                SETTLEMENT_ID,
-                                OWNER_ID
-                        );
+                settlementQueryService.getSettlementDetail(
+                        SETTLEMENT_ID,
+                        OWNER_ID
+                );
 
         assertThat(result.settlementId())
-                .isEqualTo(
-                        SETTLEMENT_ID
-                );
+                .isEqualTo(SETTLEMENT_ID);
 
         assertThat(result.title())
-                .isEqualTo(
-                        "테스트 정산"
-                );
+                .isEqualTo("테스트 정산");
 
         assertThat(result.role())
-                .isEqualTo(
-                        "OWNER"
-                );
+                .isEqualTo("OWNER");
 
         verify(
                 settlementParticipantRepository,
@@ -187,9 +173,6 @@ class SettlementQueryServiceTest {
     @Test
     @DisplayName("정산 참여자는 정산 상세를 조회할 수 있다")
     void getSettlementDetailByMember() {
-
-        Long memberId = 2L;
-
         Settlement settlement =
                 settlement(
                         SETTLEMENT_ID,
@@ -208,7 +191,7 @@ class SettlementQueryServiceTest {
         given(
                 settlementParticipantRepository.existsActiveParticipant(
                         SETTLEMENT_ID,
-                        memberId,
+                        MEMBER_ID,
                         SettlementParticipantStatus.ACTIVE
                 )
         ).willReturn(
@@ -216,26 +199,18 @@ class SettlementQueryServiceTest {
         );
 
         SettlementDetailResponse result =
-                settlementQueryService
-                        .getSettlementDetail(
-                                SETTLEMENT_ID,
-                                memberId
-                        );
+                settlementQueryService.getSettlementDetail(
+                        SETTLEMENT_ID,
+                        MEMBER_ID
+                );
 
         assertThat(result.role())
-                .isEqualTo(
-                        "MEMBER"
-                );
+                .isEqualTo("MEMBER");
     }
 
     @Test
-    @DisplayName(
-            "정산과 관계없는 사용자는 상세를 조회할 수 없다"
-    )
+    @DisplayName("정산과 관계없는 사용자는 상세를 조회할 수 없다")
     void getSettlementDetailFailsWhenNotParticipant() {
-
-        Long otherUserId = 3L;
-
         Settlement settlement =
                 settlement(
                         SETTLEMENT_ID,
@@ -254,7 +229,7 @@ class SettlementQueryServiceTest {
         given(
                 settlementParticipantRepository.existsActiveParticipant(
                         SETTLEMENT_ID,
-                        otherUserId,
+                        OTHER_USER_ID,
                         SettlementParticipantStatus.ACTIVE
                 )
         ).willReturn(
@@ -263,11 +238,10 @@ class SettlementQueryServiceTest {
 
         assertThatThrownBy(
                 () ->
-                        settlementQueryService
-                                .getSettlementDetail(
-                                        SETTLEMENT_ID,
-                                        otherUserId
-                                )
+                        settlementQueryService.getSettlementDetail(
+                                SETTLEMENT_ID,
+                                OTHER_USER_ID
+                        )
         ).isInstanceOf(
                 DomainException.class
         ).satisfies(
@@ -291,89 +265,61 @@ class SettlementQueryServiceTest {
         User owner =
                 mock(User.class);
 
-        lenient().when(
-                settlement.getSettlementId()
-        ).thenReturn(
-                settlementId
-        );
+        lenient()
+                .when(settlement.getSettlementId())
+                .thenReturn(settlementId);
 
-        lenient().when(
-                settlement.getTitle()
-        ).thenReturn(
-                title
-        );
+        lenient()
+                .when(settlement.getTitle())
+                .thenReturn(title);
 
-        lenient().when(
-                settlement.getOwner()
-        ).thenReturn(
-                owner
-        );
+        lenient()
+                .when(settlement.getOwner())
+                .thenReturn(owner);
 
-        lenient().when(
-                owner.getUserId()
-        ).thenReturn(
-                ownerId
-        );
+        lenient()
+                .when(owner.getUserId())
+                .thenReturn(ownerId);
 
-        lenient().when(
-                owner.getName()
-        ).thenReturn(
-                "홍길동"
-        );
+        lenient()
+                .when(owner.getName())
+                .thenReturn("홍길동");
 
-        lenient().when(
-                settlement.getSettlementCategory()
-        ).thenReturn(
-                "모임"
-        );
+        lenient()
+                .when(settlement.getSettlementCategory())
+                .thenReturn("모임");
 
-        lenient().when(
-                settlement.getSettlementType()
-        ).thenReturn(
-                SettlementType.SHARED
-        );
+        lenient()
+                .when(settlement.getSettlementType())
+                .thenReturn(SettlementType.SHARED);
 
-        lenient().when(
-                settlement.getSettlementStatus()
-        ).thenReturn(
-                SettlementStatus.IN_PROGRESS
-        );
+        lenient()
+                .when(settlement.getSettlementStatus())
+                .thenReturn(SettlementStatus.IN_PROGRESS);
 
-        lenient().when(
-                settlement.getSplitType()
-        ).thenReturn(
-                SplitType.EQUAL
-        );
+        lenient()
+                .when(settlement.getSplitType())
+                .thenReturn(SplitType.EQUAL);
 
-        lenient().when(
-                settlement.getTotalAmount()
-        ).thenReturn(
-                BigDecimal.valueOf(10000)
-        );
+        lenient()
+                .when(settlement.getTotalAmount())
+                .thenReturn(BigDecimal.valueOf(10000));
 
-        lenient().when(
-                settlement.getDueDate()
-        ).thenReturn(
-                LocalDate.now().plusDays(7)
-        );
+        lenient()
+                .when(settlement.getDueDate())
+                .thenReturn(LocalDate.now().plusDays(7));
 
-        lenient().when(
-                settlement.getCycleDate()
-        ).thenReturn(
-                null
-        );
+        lenient()
+                .when(settlement.getCycleDate())
+                .thenReturn(null);
 
-        lenient().when(
-                settlement.getRecurringSettlement()
-        ).thenReturn(
-                null
-        );
+        lenient()
+                .when(settlement.getRecurringSettlement())
+                .thenReturn(null);
 
-        lenient().when(
-                settlement.getCreatedAt()
-        ).thenReturn(
-                LocalDateTime.now()
-        );
+        lenient()
+                .when(settlement.getCreatedAt())
+                .thenReturn(LocalDateTime.now());
 
         return settlement;
     }

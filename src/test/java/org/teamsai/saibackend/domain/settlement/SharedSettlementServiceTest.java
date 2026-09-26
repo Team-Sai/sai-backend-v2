@@ -14,6 +14,8 @@ import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.*;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
@@ -55,8 +57,7 @@ class SharedSettlementServiceTest {
     private SettlementValidator settlementValidator;
 
     @Mock
-    private SettlementParticipantRegistrationService
-            participantRegistrationService;
+    private SettlementParticipantService participantService;
 
     @Mock
     private SettlementAmountCalculator settlementAmountCalculator;
@@ -203,7 +204,7 @@ class SharedSettlementServiceTest {
                 );
 
 
-        verify(participantRegistrationService)
+        verify(participantService)
                 .registerParticipants(
                         OWNER_ID,
                         SETTLEMENT_ID,
@@ -313,7 +314,7 @@ class SharedSettlementServiceTest {
                 );
 
         verifyNoInteractions(
-                participantRegistrationService,
+                participantService,
                 settlementAccountService
         );
     }
@@ -409,7 +410,7 @@ class SharedSettlementServiceTest {
         );
 
 
-        verify(participantRegistrationService)
+        verify(participantService)
                 .registerParticipants(
                         OWNER_ID,
                         SETTLEMENT_ID,
