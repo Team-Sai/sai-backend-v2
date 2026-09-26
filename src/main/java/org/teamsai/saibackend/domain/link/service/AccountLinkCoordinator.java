@@ -14,6 +14,8 @@ import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.global.client.MockBankClient;
+import org.teamsai.saibackend.global.client.BankKeyRecoveryException;
+import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.nio.charset.StandardCharsets;
@@ -83,33 +85,15 @@ public class AccountLinkCoordinator {
     public UserKeyResponse issueOrGetUserKey(Long userId) {
         return lock.execute(userId, () -> {
             requireResolved(userId);
-            var user = users.findById(userId).orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
+            users.findById(userId).orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
             String existingKey = users.findUserKeyByUserId(userId);
             if (existingKey != null) {
                 return new UserKeyResponse(existingKey);
             }
-            String key;
-            try {
-                key = bank.requestUserKey(user.getName(), user.getUserToken());
-            } catch (RestClientException e) {
-                throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
-            }
-            if (key == null || key.isBlank() || key.length() > 100) {
-                throw AccountErrorCode.INVALID_BANK_RESPONSE.toException();
-            }
-            var operation = new LinkOperationStore.Operation(UUID.randomUUID().toString(), userId,
-                    hash(key), null, key, PROCESSING);
-            try {
-                run(operation, List.of());
-            } catch (DomainException e) {
-                if (e.getErrorCode() == UserErrorCode.LINK_KEY_UPDATE_CONFLICT) {
-                    throw AccountErrorCode.USER_KEY_ALREADY_LINKED.toException();
-                }
-                throw e;
-            } catch (RuntimeException e) {
-                throw AccountErrorCode.LOCAL_KEY_SAVE_FAILED.toException();
-            }
-            return new UserKeyResponse(key);
+            String operationId = UUID.randomUUID().toString();
+            operations.beginIssue(operationId, userId);
+            return new UserKeyResponse(resumeIssuance(new LinkOperationStore.Operation(
+                    operationId, userId, "ISSUE", null, null, ISSUE_PENDING)));
         });
     }
 
@@ -129,22 +113,22 @@ public class AccountLinkCoordinator {
         }
     }
 
-    /**
-     * 미완료 연동 작업을 이전 키 상태로 되돌립니다.
-     *
-     * PROCESSING은 confirm 호출 전 중단뿐 아니라 confirm 성공 후
-     * 후속 처리 전에 중단된 경우에도 남을 수 있으므로,
-     * 로컬 작업 상태만으로 은행의 confirm 여부를 판단하지 않습니다.
-     *
-     * PROCESSING, CONFIRM_UNKNOWN, COMPENSATION_PENDING 모두
-     * 은행 recover API를 통해 이전 키 상태로 수렴시킵니다.
-     * 해당 API는 pending 취소, confirm된 신규 키 복원,
-     * 이미 복구된 요청의 재시도를 처리하며 다른 키와 충돌하면 거부합니다.
-     *
-     * TODO: 은행 측 작업 ID 및 복구 기한 검증 도입 시,
-     *       오래된 미완료 작업과 기한 초과 작업의 정합성 회복 정책도 함께 보강할 예정입니다.
-     */
     private void recover(LinkOperationStore.Operation operation) {
+        if (operation.status() == ISSUE_PENDING || operation.status() == ISSUED) {
+            resumeIssuance(operation);
+            return;
+        }
+        if (operation.status() == RECOVERY_EXPIRED) {
+            throw AccountErrorCode.LINK_RECOVERY_EXPIRED.toException();
+        }
+        if (operation.status() == RECOVERY_CONFLICT) {
+            throw AccountErrorCode.LINK_RECOVERY_CONFLICT.toException();
+        }
+        if (operation.status() != PROCESSING
+                && operation.status() != CONFIRM_UNKNOWN
+                && operation.status() != COMPENSATION_PENDING) {
+            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+        }
         try {
             if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
                 throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
@@ -152,9 +136,23 @@ public class AccountLinkCoordinator {
             if (!Objects.equals(operation.previousKey(), operation.newKey())) {
                 var user = users.findById(operation.userId())
                         .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
-                bank.recoverUserKey(user.getUserToken(), operation.newKey(), operation.previousKey());
+                bank.recoverUserKey(user.getUserToken(), operation.newKey(), operation.previousKey(), operation.id());
             }
             operations.mark(operation.id(), FAILED);
+        } catch (BankKeyRecoveryException e) {
+            boolean expired = e.getReason() == BankKeyRecoveryException.Reason.EXPIRED;
+            operations.mark(operation.id(), expired ? RECOVERY_EXPIRED : RECOVERY_CONFLICT);
+            throw (expired ? AccountErrorCode.LINK_RECOVERY_EXPIRED
+                    : AccountErrorCode.LINK_RECOVERY_CONFLICT).toException();
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().is5xxServerError() || e.getStatusCode().value() == 429
+                    || e.getStatusCode().value() == 408) {
+                throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
+            }
+            operations.mark(operation.id(), RECONCILIATION_REQUIRED);
+            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+        } catch (RestClientException e) {
+            throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
         } catch (RuntimeException e) {
             log.error("계좌 연동 복구 미완료 - userId: {}, operationId: {}",
                     operation.userId(), operation.id());
@@ -164,12 +162,72 @@ public class AccountLinkCoordinator {
 
     private void run(LinkOperationStore.Operation operation, List<Long> ids) {
         operations.begin(operation);
+        runPersisted(operation, ids);
+    }
+
+    private String resumeIssuance(LinkOperationStore.Operation operation) {
+        if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
+            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+        }
+        if (operation.status() == ISSUE_PENDING) {
+            var user = users.findById(operation.userId()).orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
+            String key;
+            try {
+                key = bank.requestUserKey(
+                        user.getName(), user.getUserToken(), operation.id());
+            } catch (RestClientResponseException e) {
+                int status = e.getStatusCode().value();
+                String code = bankErrorCode(e);
+
+                boolean retryable =
+                        e.getStatusCode().is5xxServerError()
+                                || status == 408
+                                || status == 429
+                                || (status == 409
+                                && "PENDING_KEY_ALREADY_EXISTS".equals(code));
+
+                if (retryable) {
+                    throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
+                }
+
+                if (status == 409 && "KEY_RECOVERY_CONFLICT".equals(code)) {
+                    operations.mark(operation.id(), RECOVERY_CONFLICT);
+                    throw AccountErrorCode.LINK_RECOVERY_CONFLICT.toException();
+                }
+
+                operations.mark(operation.id(), RECONCILIATION_REQUIRED);
+                throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+
+            } catch (RestClientException e) {
+                throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
+            }
+            if (key == null || key.isBlank() || key.length() > 100) {
+                throw AccountErrorCode.INVALID_BANK_RESPONSE.toException();
+            }
+            operations.recordIssued(operation.id(), key, hash(key));
+            operation = new LinkOperationStore.Operation(operation.id(), operation.userId(), hash(key),
+                    operation.previousKey(), key, ISSUED);
+        }
+        try {
+            runPersisted(operation, List.of());
+        } catch (DomainException e) {
+            if (e.getErrorCode() == UserErrorCode.LINK_KEY_UPDATE_CONFLICT) {
+                throw AccountErrorCode.USER_KEY_ALREADY_LINKED.toException();
+            }
+            throw e;
+        } catch (RuntimeException e) {
+            throw AccountErrorCode.LOCAL_KEY_SAVE_FAILED.toException();
+        }
+        return operation.newKey();
+    }
+
+    private void runPersisted(LinkOperationStore.Operation operation, List<Long> ids) {
         boolean changesKey = !Objects.equals(operation.previousKey(), operation.newKey());
         if (changesKey) {
+            operations.mark(operation.id(), CONFIRM_UNKNOWN);
             try {
-                bank.confirmUserKey(operation.newKey());
+                bank.confirmUserKey(operation.newKey(), operation.id());
             } catch (RuntimeException e) {
-                operations.mark(operation.id(), CONFIRM_UNKNOWN);
                 throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
             }
         }
@@ -183,7 +241,7 @@ public class AccountLinkCoordinator {
                 return;
             }
             operations.mark(operation.id(), COMPENSATION_PENDING);
-            recover(operation);
+            recover(operations.find(operation.id()).orElseThrow());
             throw e;
         }
     }
@@ -196,4 +254,17 @@ public class AccountLinkCoordinator {
             throw new IllegalStateException(e);
         }
     }
+
+    private static String bankErrorCode(RestClientResponseException e) {
+        try {
+            BankErrorResponse body =
+                    e.getResponseBodyAs(BankErrorResponse.class);
+            return body == null ? null : body.code();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    private record BankErrorResponse(String code) {}
 }
