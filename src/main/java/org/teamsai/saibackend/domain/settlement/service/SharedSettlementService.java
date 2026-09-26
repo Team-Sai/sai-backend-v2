@@ -13,8 +13,7 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,7 +27,7 @@ public class SharedSettlementService {
     private final SettlementParticipantService settlementParticipantService;
     private final SettlementAmountCalculator settlementAmountCalculator;
     private final SettlementRepository settlementRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
     @Transactional
     public CreateSharedSettlementResponse create(
             Long ownerId,
@@ -36,10 +35,7 @@ public class SharedSettlementService {
     ) {
        settlementValidator.validateCreateRequest(request);
 
-       User owner = userRepository.findById(ownerId)
-               .orElseThrow(
-                       UserErrorCode.USER_NOT_FOUND::toException
-               );
+       User owner = userService.getUser(ownerId);
         BigDecimal perPersonAmount =
                 settlementAmountCalculator.calculateEqualAmount(
                         request.getTotalAmount(),

@@ -7,9 +7,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
@@ -28,9 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -39,7 +36,7 @@ public class RecurringSettlementCycleService {
 
     private final SettlementRepository settlementRepository;
     private final SettlementParticipantRepository settlementParticipantRepository;
-    private final PaymentObligationRepository paymentObligationRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
     private final SettlementPaymentService settlementPaymentService;
     private final SettlementAmountCalculator settlementAmountCalculator;
     private final SettlementAccountRepository settlementAccountRepository;
@@ -165,17 +162,16 @@ public class RecurringSettlementCycleService {
                 .map(SettlementParticipant::getParticipantId)
                 .toList();
 
-        Map<Long, BigDecimal> latestObligationByParticipant = paymentObligationRepository
-                .findLatestByParticipantIdsAndObligationStatuses(
+        var latestObligationByParticipant =
+                paymentObligationQueryService.findLatestExpectedAmountsByParticipantIdsAndStatuses(
                         participantIds,
                         List.of(
                                 ObligationStatus.ACTIVE,
                                 ObligationStatus.EXCLUDED,
                                 ObligationStatus.CANCELLED,
                                 ObligationStatus.WRITTEN_OFF
-                        ))
-                .stream()
-                .collect(Collectors.toMap(PaymentObligationEntity::getParticipantId, PaymentObligationEntity::getExpectedAmount));
+                        )
+                );
 
         for (SettlementParticipant oldParticipant : activeParticipants) {
             BigDecimal expectedAmount = latestObligationByParticipant.get(oldParticipant.getParticipantId());

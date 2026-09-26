@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
@@ -27,7 +27,7 @@ public class BankTransactionService {
 
     private final BankTransactionRepository bankTransactionRepository;
     private final BankTransactionQueryRepository bankTransactionQueryRepository;
-    private final LinkedBankAccountRepository linkedBankAccountRepository;
+    private final LinkedBankAccountService linkedBankAccountService;
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -165,8 +165,7 @@ public class BankTransactionService {
             Long linkedAccountId,
             Long bankTransactionId
     ) {
-        LinkedBankAccount account = linkedBankAccountRepository.findById(linkedAccountId)
-                .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
+        LinkedBankAccount account = linkedBankAccountService.getLinkedAccount(linkedAccountId);
 
         if (!account.getUserId().equals(userId)) {
             throw AccountErrorCode.ACCOUNT_ACCESS_DENIED.toException();

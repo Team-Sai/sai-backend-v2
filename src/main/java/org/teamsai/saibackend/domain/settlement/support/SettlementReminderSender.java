@@ -8,8 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
@@ -25,7 +24,7 @@ import java.util.stream.Collectors;
 public class SettlementReminderSender {
 
     private final SettlementParticipantRepository participantRepository;
-    private final PaymentObligationRepository paymentObligationRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
     private final NotificationService notificationService;
 
     public int sendForSettlement(Settlement settlement, ReminderStage stage) {
@@ -50,10 +49,7 @@ public class SettlementReminderSender {
                 .toList();
 
         List<PaymentObligationEntity> unresolvedObligations =
-                paymentObligationRepository.findLatestByParticipantIds(
-                                participantIds,
-                                ObligationStatus.ACTIVE
-                        ).stream()
+                paymentObligationQueryService.findLatestActiveByParticipantIds(participantIds).stream()
                         .filter(o -> o.getPaymentStatus().isUnresolved())
                         .toList();
 

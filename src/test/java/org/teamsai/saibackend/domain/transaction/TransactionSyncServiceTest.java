@@ -14,7 +14,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
@@ -31,7 +31,6 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -118,15 +117,15 @@ class TransactionSyncServiceTest {
     }
 
     private void stubBankFailure(RuntimeException failure) {
-        given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID))
-                .willReturn(Optional.of(createLinkedAccount()));
+        given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID))
+                .willReturn(createLinkedAccount());
         given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-        given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
+        given(linkedBankAccountService.getLastSyncedTransactionId(LINKED_ACCOUNT_ID)).willReturn(5L);
         given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 5L)).willThrow(failure);
     }
 
     @Mock
-    private LinkedBankAccountRepository linkedBankAccountRepository;
+    private LinkedBankAccountService linkedBankAccountService;
 
     @Mock
     private MockBankClient mockBankClient;
@@ -183,9 +182,9 @@ class TransactionSyncServiceTest {
                     createTransactionResponse(7L, "MOCK-TX-0002")
             );
 
-            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID)).willReturn(linkedAccount);
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(null);
+            given(linkedBankAccountService.getLastSyncedTransactionId(LINKED_ACCOUNT_ID)).willReturn(null);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 0L)).willReturn(transactions);
             given(bankTransactionPersistenceService.saveAndAdvanceCursor(LINKED_ACCOUNT_ID, transactions))
                     .willReturn(2);
@@ -201,9 +200,9 @@ class TransactionSyncServiceTest {
         void usesExistingCursorAsAfterTransactionId() {
             LinkedBankAccount linkedAccount = createLinkedAccount();
 
-            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID)).willReturn(linkedAccount);
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
+            given(linkedBankAccountService.getLastSyncedTransactionId(LINKED_ACCOUNT_ID)).willReturn(5L);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 5L)).willReturn(List.of());
             given(bankTransactionPersistenceService.saveAndAdvanceCursor(eq(LINKED_ACCOUNT_ID), any()))
                     .willReturn(0);
@@ -216,7 +215,7 @@ class TransactionSyncServiceTest {
         @Test
         @DisplayName("연동계좌를 찾을 수 없으면 LINKED_ACCOUNT_NOT_FOUND 예외를 던지고 이후 로직은 실행되지 않는다")
         void throwsWhenLinkedAccountNotFound() {
-            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.empty());
+            given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID)).willThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException());
 
             assertThatThrownBy(() -> transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID))
                     .isInstanceOf(DomainException.class)
@@ -233,7 +232,7 @@ class TransactionSyncServiceTest {
         void throwsWhenRequesterIsNotOwner() {
             LinkedBankAccount linkedAccount = createLinkedAccount(); // userId = USER_ID(10L) 소유
 
-            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID)).willReturn(linkedAccount);
 
             assertThatThrownBy(() -> transactionSyncService.syncTransactions(OTHER_USER_ID, LINKED_ACCOUNT_ID))
                     .isInstanceOf(DomainException.class)
@@ -250,9 +249,9 @@ class TransactionSyncServiceTest {
         void throwsWhenBankServerUnavailable() {
             LinkedBankAccount linkedAccount = createLinkedAccount();
 
-            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID)).willReturn(linkedAccount);
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(0L);
+            given(linkedBankAccountService.getLastSyncedTransactionId(LINKED_ACCOUNT_ID)).willReturn(0L);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 0L))
                     .willThrow(new RestClientException("연결 실패"));
 
@@ -273,9 +272,9 @@ class TransactionSyncServiceTest {
             );
             DomainException persistenceFailure = mock(DomainException.class);
 
-            given(linkedBankAccountRepository.findById(LINKED_ACCOUNT_ID)).willReturn(Optional.of(linkedAccount));
+            given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID)).willReturn(linkedAccount);
             given(userService.getUserKeyByUserId(USER_ID)).willReturn(USER_KEY);
-            given(linkedBankAccountRepository.findLastSyncedTransactionIdById(LINKED_ACCOUNT_ID)).willReturn(5L);
+            given(linkedBankAccountService.getLastSyncedTransactionId(LINKED_ACCOUNT_ID)).willReturn(5L);
             given(mockBankClient.getTransactions(BANK_ACCOUNT_ID, USER_KEY, 5L)).willReturn(transactions);
             willThrow(persistenceFailure)
                     .given(bankTransactionPersistenceService)

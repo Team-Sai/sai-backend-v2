@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
@@ -22,7 +22,7 @@ public class WriteOffBatchService {
 
     private static final int WRITE_OFF_DAYS_AFTER_OVERDUE = 30;
 
-    private final PaymentObligationRepository paymentObligationRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
     private final RepaymentScheduleService repaymentScheduleService;
     private final SettlementCloseService settlementCloseService;
     private final WriteOffTransactionExecutor writeOffTransactionExecutor;  // 추가
@@ -30,7 +30,7 @@ public class WriteOffBatchService {
     @Transactional
     public WriteOffResult writeOffSettlementObligations(LocalDate baseDate) {
         LocalDateTime cutoff = baseDate.minusDays(WRITE_OFF_DAYS_AFTER_OVERDUE).atStartOfDay();
-        List<Long> candidateIds = paymentObligationRepository.findWriteOffCandidateIds(
+        List<Long> candidateIds = paymentObligationQueryService.findWriteOffCandidateIds(
                 ObligationStatus.ACTIVE,
                 List.of(
                         PaymentStatus.UNPAID,
@@ -49,7 +49,7 @@ public class WriteOffBatchService {
             return new WriteOffResult(0, 0);
         }
 
-        List<Long> affectedSettlementIds = paymentObligationRepository.findSettlementIdsByObligationIds(candidateIds);
+        List<Long> affectedSettlementIds = paymentObligationQueryService.findSettlementIdsByObligationIds(candidateIds);
         int closedCount = 0;
         for (Long settlementId : affectedSettlementIds) {
             try {
