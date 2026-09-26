@@ -11,6 +11,8 @@ import org.teamsai.saibackend.global.exception.DomainException;
 public enum AccountErrorCode implements BaseErrorCode<DomainException> {
     LINK_IN_PROGRESS(HttpStatus.CONFLICT, "계좌 연동을 처리 중입니다. 잠시 후 다시 시도해주세요."),
     LINK_RECONCILIATION_REQUIRED(HttpStatus.CONFLICT, "이전 계좌 연동 상태 확인이 필요합니다."),
+    LINK_RECOVERY_EXPIRED(HttpStatus.CONFLICT, "연동키 복구 기한이 만료되어 상태 확인이 필요합니다."),
+    LINK_RECOVERY_CONFLICT(HttpStatus.CONFLICT, "은행의 연동키 또는 회전 작업이 일치하지 않아 상태 확인이 필요합니다."),
     LINK_REQUEST_CONFLICT(HttpStatus.CONFLICT, "이미 처리된 연동 요청이거나 요청 내용이 변경되었습니다."),
     ACCOUNT_ACCESS_DENIED(
             HttpStatus.FORBIDDEN,

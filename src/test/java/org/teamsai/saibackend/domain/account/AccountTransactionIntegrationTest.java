@@ -104,7 +104,8 @@ class AccountTransactionIntegrationTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStore.Status.class,
-            names = {"PROCESSING", "CONFIRM_UNKNOWN", "COMPENSATION_PENDING"})
+            names = {"ISSUE_PENDING", "ISSUED", "PROCESSING", "CONFIRM_UNKNOWN", "COMPENSATION_PENDING",
+                    "RECOVERY_EXPIRED", "RECOVERY_CONFLICT", "RECONCILIATION_REQUIRED"})
     void unresolvedOperationBlocksWithdrawal(LinkOperationStore.Status status) {
         operations.begin(new LinkOperationStore.Operation(state, userId, "request-hash", null, key,
                 LinkOperationStore.Status.PROCESSING));
@@ -115,6 +116,26 @@ class AccountTransactionIntegrationTest {
         assertThat(users.existsById(userId)).isTrue();
         assertThat(operations.find(state)).hasValueSatisfying(operation ->
                 assertThat(operation.status()).isEqualTo(status));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(org.teamsai.saibackend.global.client.BankKeyRecoveryException.Reason.class)
+    void definitiveRecoveryFailureIsPersistedAndBlocksNewIssue(
+            org.teamsai.saibackend.global.client.BankKeyRecoveryException.Reason reason) {
+        operations.begin(new LinkOperationStore.Operation(state, userId, "request-hash", null, key,
+                LinkOperationStore.Status.PROCESSING));
+        operations.mark(state, LinkOperationStore.Status.CONFIRM_UNKNOWN);
+        doThrow(new org.teamsai.saibackend.global.client.BankKeyRecoveryException(reason, null))
+                .when(bank).recoverUserKey(state, key, null, state);
+        boolean expired = reason == org.teamsai.saibackend.global.client.BankKeyRecoveryException.Reason.EXPIRED;
+        var expected = expired ? AccountErrorCode.LINK_RECOVERY_EXPIRED : AccountErrorCode.LINK_RECOVERY_CONFLICT;
+        assertError(() -> coordinator.recoverUnresolved(userId), expected);
+        assertThat(operations.find(state).orElseThrow().status()).isEqualTo(expired
+                ? LinkOperationStore.Status.RECOVERY_EXPIRED : LinkOperationStore.Status.RECOVERY_CONFLICT);
+        assertThat(operations.hasUnresolved(userId)).isTrue();
+        assertError(() -> coordinator.issueOrGetUserKey(userId), expected);
+        verify(bank, times(1)).recoverUserKey(state, key, null, state);
+        verify(bank, never()).requestUserKey(anyString(), anyString(), anyString());
     }
 
     @BeforeEach void fixture() {
@@ -142,7 +163,7 @@ class AccountTransactionIntegrationTest {
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(key);
         assertThat(accounts.findAllByUserId(userId)).hasSize(1);
         assertThat(status()).isEqualTo("COMPLETED");
-        verify(bank,times(1)).confirmUserKey(key);
+        verify(bank,times(1)).confirmUserKey(eq(key), anyString());
         verify(bank,times(1)).getAccountDetail(1L,key);
     }
 
@@ -150,7 +171,7 @@ class AccountTransactionIntegrationTest {
         when(bank.getAccountDetail(1L,key)).thenReturn(detail(1L));
         coordinator.completeCallback(userId,state,key,List.of(1L));
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(2L)), AccountErrorCode.LINK_REQUEST_CONFLICT);
-        verify(bank,times(1)).confirmUserKey(key);
+        verify(bank,times(1)).confirmUserKey(eq(key), anyString());
         verify(bank,never()).getAccountDetail(2L,key);
     }
 
@@ -193,7 +214,7 @@ class AccountTransactionIntegrationTest {
         assertThat(users.findUserKeyByUserId(userId)).isNull();
         assertThat(accounts.findAllByUserId(userId)).isEmpty();
         assertThat(status()).isEqualTo("FAILED");
-        verify(bank).recoverUserKey(state, key, null);
+        verify(bank).recoverUserKey(eq(state), eq(key), isNull(), anyString());
     }
 
     @Test void relinkFailureRestoresOriginalKey() {
@@ -202,7 +223,7 @@ class AccountTransactionIntegrationTest {
         when(bank.getAccountDetail(1L,key)).thenThrow(new RestClientException("failed"));
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(old);
-        verify(bank).recoverUserKey(state, key, old);
+        verify(bank).recoverUserKey(eq(state), eq(key), eq(old), anyString());
         assertThat(status()).isEqualTo("FAILED");
     }
 
@@ -210,8 +231,8 @@ class AccountTransactionIntegrationTest {
         jdbc.update("UPDATE users SET user_key=? WHERE user_id=?",key,userId);
         when(bank.getAccountDetail(1L,key)).thenThrow(new RestClientException("failed"));
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
-        verify(bank,never()).confirmUserKey(anyString());
-        verify(bank,never()).recoverUserKey(anyString(),anyString(),nullable(String.class));
+        verify(bank,never()).confirmUserKey(anyString(), anyString());
+        verify(bank,never()).recoverUserKey(anyString(), anyString(), nullable(String.class), anyString());
         verify(bank,never()).revokeUserKey(anyString());
         assertThat(status()).isEqualTo("FAILED");
     }
@@ -220,25 +241,25 @@ class AccountTransactionIntegrationTest {
         when(bank.getAccountDetail(1L,key)).thenThrow(new RestClientException("failed"));
 
         doThrow(new RestClientException("offline")).doThrow(new RestClientException("offline")).doNothing()
-                .when(bank).recoverUserKey(state, key, null);
-        assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+                .when(bank).recoverUserKey(eq(state), eq(key), isNull(), anyString());
+        assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         assertThat(status()).isEqualTo("COMPENSATION_PENDING");
-        assertError(() -> accountService.issueOrGetUserKey(userId),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+        assertError(() -> accountService.issueOrGetUserKey(userId),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.LINK_REQUEST_CONFLICT);
         assertThat(status()).isEqualTo("FAILED");
-        verify(bank,times(1)).confirmUserKey(key);
+        verify(bank,times(1)).confirmUserKey(eq(key), anyString());
         verify(bank,never()).revokeUserKey(anyString());
-        verify(bank,times(3)).recoverUserKey(state, key, null);
+        verify(bank,times(3)).recoverUserKey(eq(state), eq(key), isNull(), anyString());
     }
 
     @Test void confirmTimeoutIsRecordedAndBlocksBlindRetries() {
-        doThrow(new RestClientException("response lost")).when(bank).confirmUserKey(key);
-        doThrow(new RestClientException("offline")).when(bank).recoverUserKey(state, key, null);
+        doThrow(new RestClientException("response lost")).when(bank).confirmUserKey(eq(key), anyString());
+        doThrow(new RestClientException("offline")).when(bank).recoverUserKey(eq(state), eq(key), isNull(), anyString());
         assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         assertThat(status()).isEqualTo("CONFIRM_UNKNOWN");
-        assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
-        assertError(() -> coordinator.completeCallback(userId,state+"other",key,List.of(1L)),AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
-        verify(bank,times(1)).confirmUserKey(key);
+        assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
+        assertError(() -> coordinator.completeCallback(userId,state+"other",key,List.of(1L)),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
+        verify(bank,times(1)).confirmUserKey(eq(key), anyString());
         verify(bank,never()).revokeUserKey(anyString());
     }
 
@@ -249,13 +270,13 @@ class AccountTransactionIntegrationTest {
         coordinator.recoverUnresolved(userId);
         assertThat(operations.hasUnresolved(userId)).isFalse();
         assertThat(status()).isEqualTo("FAILED");
-        verify(bank).recoverUserKey(state, key, null);
+        verify(bank).recoverUserKey(eq(state), eq(key), isNull(), anyString());
     }
 
     @Test void concurrentCallbackAndKeyIssueCannotChangeSameUser() throws Exception {
         CountDownLatch entered=new CountDownLatch(1), release=new CountDownLatch(1);
         doAnswer(i -> {entered.countDown(); if(!release.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("timeout"); return null;})
-                .when(bank).confirmUserKey(key);
+                .when(bank).confirmUserKey(eq(key), anyString());
         when(bank.getAccountDetail(1L,key)).thenReturn(detail(1L));
         ExecutorService pool=Executors.newSingleThreadExecutor();
         try {
@@ -267,7 +288,7 @@ class AccountTransactionIntegrationTest {
             assertError(() -> coordinator.linkSelectedAccounts(userId,selection),AccountErrorCode.LINK_IN_PROGRESS);
             release.countDown(); first.get(10,TimeUnit.SECONDS);
             coordinator.completeCallback(userId,state,key,List.of(1L));
-            verify(bank,times(1)).confirmUserKey(key);
+            verify(bank,times(1)).confirmUserKey(eq(key), anyString());
         } finally {release.countDown();pool.shutdownNow();}
     }
 
@@ -307,19 +328,35 @@ class AccountTransactionIntegrationTest {
     }
 
     @Test void keyIssueIsIdempotentAndCommitsReceipt() {
-        when(bank.requestUserKey(anyString(),anyString())).thenReturn(key);
+        when(bank.requestUserKey(anyString(), anyString(), anyString())).thenReturn(key);
         assertThat(accountService.issueOrGetUserKey(userId)).isEqualTo(accountService.issueOrGetUserKey(userId));
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(key);
         assertThat(status()).isEqualTo("COMPLETED");
-        verify(bank,times(1)).requestUserKey(anyString(),anyString());
-        verify(bank,times(1)).confirmUserKey(key);
+        verify(bank,times(1)).requestUserKey(anyString(), anyString(), anyString());
+        verify(bank,times(1)).confirmUserKey(eq(key), anyString());
     }
 
     @Test void keyIssueNetworkErrorIsTranslated() {
-        when(bank.requestUserKey(anyString(),anyString())).thenThrow(new RestClientException("offline"));
+        when(bank.requestUserKey(anyString(), anyString(), anyString())).thenThrow(new RestClientException("offline"));
         assertError(() -> accountService.issueOrGetUserKey(userId),AccountErrorCode.BANK_SERVER_UNAVAILABLE);
-        verify(bank,never()).confirmUserKey(anyString());
+        verify(bank,never()).confirmUserKey(anyString(), anyString());
         assertThat(users.findUserKeyByUserId(userId)).isNull();
+    }
+
+    @Test void lostIssuanceResponseRetainsIdAndResumesAfterRestart() {
+        when(bank.requestUserKey(anyString(), anyString(), anyString()))
+                .thenThrow(new RestClientException("response lost")).thenReturn(key);
+        assertError(() -> accountService.issueOrGetUserKey(userId), AccountErrorCode.BANK_SERVER_UNAVAILABLE);
+        var pending = operations.findUnresolved(userId).get(0);
+        assertThat(pending.status()).isEqualTo(LinkOperationStore.Status.ISSUE_PENDING);
+        assertThat(pending.newKey()).isNull();
+        // Reconstruct the coordinator to exclude any in-memory state from the retry.
+        var restarted = new AccountLinkCoordinator(lock, users, accountLinks, persistence, bank, operations);
+        assertThat(restarted.issueOrGetUserKey(userId).userKey()).isEqualTo(key);
+        verify(bank, times(2)).requestUserKey("Account Test", state, pending.id());
+        verify(bank).confirmUserKey(key, pending.id());
+        assertThat(operations.find(pending.id()).orElseThrow().status()).isEqualTo(LinkOperationStore.Status.COMPLETED);
+        assertThat(users.findUserKeyByUserId(userId)).isEqualTo(key);
     }
 
     @Test void successfulSameKeyCallbackStillSavesAccountsAndReceipt() {
@@ -328,7 +365,7 @@ class AccountTransactionIntegrationTest {
         coordinator.completeCallback(userId,state,key,List.of(1L));
         assertThat(accounts.findAllByUserId(userId)).hasSize(1);
         assertThat(status()).isEqualTo("COMPLETED");
-        verify(bank,never()).confirmUserKey(anyString());
+        verify(bank,never()).confirmUserKey(anyString(), anyString());
     }
 
     @Test void missingUserDoesNotCallBank() {
@@ -347,7 +384,7 @@ class AccountTransactionIntegrationTest {
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(newer);
         assertThat(status()).isEqualTo("COMPENSATION_PENDING");
         verify(bank,never()).revokeUserKey(anyString());
-        verify(bank,never()).recoverUserKey(anyString(),anyString(),nullable(String.class));
+        verify(bank,never()).recoverUserKey(anyString(), anyString(), nullable(String.class), anyString());
     }
 
     @Test void staleExpectedKeyCannotOverwriteNewKeyOrCompleteReceipt() {

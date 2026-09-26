@@ -131,7 +131,7 @@ class AuthServiceTest {
                     );
 
             verify(authValidator)
-                    .validateSignUp(
+                    .validateEmailAvailable(
                             "user@example.com"
                     );
 
@@ -228,7 +228,7 @@ class AuthServiceTest {
 
             doThrow(expectedException)
                     .when(authValidator)
-                    .validateSignUp(
+                    .validateEmailAvailable(
                             "duplicate@example.com"
                     );
 
@@ -400,7 +400,7 @@ class AuthServiceTest {
             );
 
             verify(authValidator)
-                    .validateSignUp(
+                    .validateEmailAvailable(
                             "duplicate@example.com"
                     );
 

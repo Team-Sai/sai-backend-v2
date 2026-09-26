@@ -50,7 +50,7 @@ class AuthValidatorTest {
             ).willReturn(false);
 
             assertThatCode(
-                    () -> authValidator.validateSignUp(
+                    () -> authValidator.validateEmailAvailable(
                             "user@example.com"
                     )
             ).doesNotThrowAnyException();
@@ -64,7 +64,7 @@ class AuthValidatorTest {
             ).willReturn(true);
 
             assertThatThrownBy(
-                    () -> authValidator.validateSignUp(
+                    () -> authValidator.validateEmailAvailable(
                             "user@example.com"
                     )
             ).isInstanceOfSatisfying(
