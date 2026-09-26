@@ -30,4 +30,24 @@ public class ContractChangePageController {
         model.addAttribute("changeRequestId", changeRequestId);
         return "contract/change-request-signature";
     }
+
+    @Hidden
+    @GetMapping("/contracts/{contractId}/change-approval")
+    public String contractChangeApprovalPage(
+            @PathVariable Long contractId,
+            Model model
+    ) {
+        model.addAttribute("contractId", contractId);
+        return "contract/contract-approval-form";
+    }
+
+    @Hidden
+    @GetMapping("/contracts/{contractId}/change-approval/signature")
+    public String contractChangeApprovalSignaturePage(
+            @PathVariable Long contractId,
+            Model model
+    ) {
+        model.addAttribute("contractId", contractId);
+        return "contract/contract-approval-signature";
+    }
 }

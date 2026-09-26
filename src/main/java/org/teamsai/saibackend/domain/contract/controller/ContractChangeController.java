@@ -1,7 +1,7 @@
 package org.teamsai.saibackend.domain.contract.controller;
 
-
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRejectRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractChangeResponse;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
@@ -44,7 +45,6 @@ public class ContractChangeController {
             @ApiResponse(responseCode = "404", description = "계약을 찾을 수 없음"),
             @ApiResponse(responseCode = "409", description = "이미 처리 대기 중인 변경 요청이 있음")
     })
-
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/contracts/{contractId}/change-requests")
     public LoanContractChangeResponse requestChange(
@@ -67,7 +67,6 @@ public class ContractChangeController {
             @ApiResponse(responseCode = "404", description = "계약 또는 변경 요청을 찾을 수 없음"),
             @ApiResponse(responseCode = "409", description = "이미 처리된 요청임")
     })
-
     @PatchMapping("/api/contracts/{contractId}/change-requests/{changeRequestId}/reject")
     public LoanContractChangeResponse rejectChange(
             @PathVariable Long contractId,
@@ -89,7 +88,6 @@ public class ContractChangeController {
             @ApiResponse(responseCode = "404", description = "변경 요청을 찾을 수 없음"),
             @ApiResponse(responseCode = "409", description = "이미 처리된 요청임")
     })
-
     @PatchMapping(value = "/api/contracts/{contractId}/change-requests/{changeRequestId}/signature",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public LoanContractChangeResponse submitRequesterSignature(
@@ -117,7 +115,6 @@ public class ContractChangeController {
             @ApiResponse(responseCode = "404", description = "변경 요청을 찾을 수 없음"),
             @ApiResponse(responseCode = "409", description = "이미 서명이 제출됐거나 처리된 요청임")
     })
-
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/api/contracts/{contractId}/change-requests/{changeRequestId}")
     public void cancelChangeRequest(
@@ -126,5 +123,20 @@ public class ContractChangeController {
             @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
         contractChangeService.cancelChangeRequest(contractId, changeRequestId, userId);
+    }
+
+    @Operation(
+            summary = "계약 변경 승인 및 전자서명 제출",
+            description = "계약 변경 요청받은 상대방(요청자 본인은 불가)이 본인인증 완료 후 서명을 제출하면, 역할(채권자/채무자)에 맞는 서명란에 반영하고 계약을 완료 처리합니다."
+    )
+    @PatchMapping(value = "/api/contracts/{contractId}/change-approval", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ContractStatus approveChange(
+            @PathVariable Long contractId,
+            @Parameter(description = "전자서명 이미지 파일") @RequestParam("signature") MultipartFile signature,
+            @Parameter(description = "본인인증 요청 식별값", example = "identity-verification-a1b2c3d4")
+            @RequestParam String identityVerificationId,
+            @AuthenticationPrincipal(expression = "userId") Long userId
+    ) {
+        return contractChangeService.approveChange(contractId, userId, signature, identityVerificationId);
     }
 }
