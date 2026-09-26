@@ -23,14 +23,14 @@ public class NotificationService {
     }
 
     public void create(Long userId, NotificationType type, String title, String content, Long referenceId, Long secondaryReferenceId){
-        Notification notification = Notification.builder()
-                .user(entityManager.getReference(User.class, userId))
-                .notificationType(type)
-                .title(title)
-                .content(content)
-                .referenceId(referenceId)
-                .secondaryReferenceId(secondaryReferenceId)
-                .build();
+        Notification notification = Notification.from(
+                entityManager.getReference(User.class, userId),
+                type,
+                title,
+                content,
+                referenceId,
+                secondaryReferenceId
+        );
 
         notificationRepository.save(notification);
     }

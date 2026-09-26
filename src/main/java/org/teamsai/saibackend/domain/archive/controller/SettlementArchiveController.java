@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
-import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.type.ArchiveStatus;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;
 import org.teamsai.saibackend.domain.archive.service.SettlementArchiveQueryService;

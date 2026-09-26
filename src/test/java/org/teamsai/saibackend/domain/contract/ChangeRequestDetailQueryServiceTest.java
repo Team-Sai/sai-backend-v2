@@ -8,12 +8,12 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeQueryService;
-import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimator;
+import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimateService;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
@@ -42,7 +42,7 @@ class ChangeRequestDetailQueryServiceTest {
     private ContractChangeQueryService contractChangeQueryService;
 
     @Spy
-    private MonthlyPaymentEstimator monthlyPaymentEstimator = new MonthlyPaymentEstimator();
+    private MonthlyPaymentEstimateService monthlyPaymentEstimateService = new MonthlyPaymentEstimateService();
 
     @InjectMocks
     private ChangeRequestDetailQueryService changeRequestDetailService;

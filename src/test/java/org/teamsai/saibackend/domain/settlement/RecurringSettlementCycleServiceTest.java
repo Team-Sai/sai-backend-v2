@@ -22,7 +22,7 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipant
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.*;
 import org.teamsai.saibackend.domain.settlement.support.CycleGenerationResult;
-import org.teamsai.saibackend.domain.settlement.support.CycleGenerationStatus;
+import org.teamsai.saibackend.domain.settlement.type.CycleGenerationStatus;
 import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
 import org.teamsai.saibackend.domain.settlement.type.*;
 import org.teamsai.saibackend.domain.user.entity.User;

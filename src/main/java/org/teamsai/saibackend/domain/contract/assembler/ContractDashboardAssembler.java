@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;

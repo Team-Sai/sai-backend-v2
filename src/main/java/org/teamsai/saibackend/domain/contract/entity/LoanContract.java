@@ -6,8 +6,8 @@ import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.teamsai.saibackend.domain.contract.type.ContractRelationType;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.math.BigDecimal;

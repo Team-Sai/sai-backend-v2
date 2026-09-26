@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.contract.dto.request;
+package org.teamsai.saibackend.domain.contract.type;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

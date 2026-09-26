@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
-import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.entity.ContractAccount;

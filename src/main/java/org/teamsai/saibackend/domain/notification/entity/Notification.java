@@ -59,4 +59,22 @@ public class Notification {
         this.referenceId = referenceId;
         this.secondaryReferenceId = secondaryReferenceId;
     }
+
+    public static Notification from(
+            User user,
+            NotificationType notificationType,
+            String title,
+            String content,
+            Long referenceId,
+            Long secondaryReferenceId
+    ) {
+        return Notification.builder()
+                .user(user)
+                .notificationType(notificationType)
+                .title(title)
+                .content(content)
+                .referenceId(referenceId)
+                .secondaryReferenceId(secondaryReferenceId)
+                .build();
+    }
 }

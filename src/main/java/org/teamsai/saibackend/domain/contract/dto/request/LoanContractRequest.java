@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.contract.dto.request;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import org.teamsai.saibackend.domain.contract.type.ContractRelationType;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

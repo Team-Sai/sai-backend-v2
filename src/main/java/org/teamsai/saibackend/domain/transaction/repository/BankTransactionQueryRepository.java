@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.transaction.repository;
 
-import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

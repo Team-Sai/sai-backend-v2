@@ -19,7 +19,7 @@ import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQuery
 
 import java.time.LocalDateTime;
 import java.util.List;
-import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse;
 
 @Service

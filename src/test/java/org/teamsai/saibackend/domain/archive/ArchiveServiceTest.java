@@ -14,7 +14,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.type.ArchiveStatus;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
 import org.teamsai.saibackend.domain.archive.service.ArchiveService;

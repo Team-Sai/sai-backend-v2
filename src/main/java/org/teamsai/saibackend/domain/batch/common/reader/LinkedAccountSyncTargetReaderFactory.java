@@ -9,7 +9,7 @@ import org.teamsai.saibackend.domain.account.dto.LinkedAccountSyncTargetDTO;
 
 import java.util.Map;
 
-import static org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus.AVAILABLE;
+import static org.teamsai.saibackend.domain.account.type.ConnectionStatus.AVAILABLE;
 
 @Component
 @RequiredArgsConstructor

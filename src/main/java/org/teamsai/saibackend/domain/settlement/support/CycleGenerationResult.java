@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.settlement.support;
 
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.type.CycleGenerationStatus;
 
 public record CycleGenerationResult(CycleGenerationStatus result, Settlement settlement) {
 

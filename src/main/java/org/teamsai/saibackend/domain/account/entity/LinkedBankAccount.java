@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
