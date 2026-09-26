@@ -129,15 +129,6 @@ public class AccountLinkCoordinator {
         }
     }
 
-    /**
-     * 미완료 연동 작업을 이전 키 상태로 되돌립니다.
-     *
-     * PROCESSING은 구 버전에서 confirm 이후에도 남을 수 있어 자동 복구하지 않습니다.
-     * 은행 상태를 별도로 확인한 후 운영자가 처리해야 합니다.
-     * CONFIRM_UNKNOWN은 confirm 실행 여부가 불명확하고, COMPENSATION_PENDING은
-     * 로컬 저장 실패가 확인된 상태입니다. 두 상태만 은행의 조건부 복구를 요청합니다.
-     * 은행이 복구 기한 초과 또는 키 충돌을 거부하면 미완료 기록을 유지합니다.
-     */
     private void recover(LinkOperationStore.Operation operation) {
         if (operation.status() != CONFIRM_UNKNOWN && operation.status() != COMPENSATION_PENDING) {
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
