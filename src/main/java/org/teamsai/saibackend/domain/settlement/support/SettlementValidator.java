@@ -3,16 +3,11 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
-
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -41,28 +36,6 @@ public class SettlementValidator {
         }
 
         participantValidator.validateParticipants(request.getParticipants());
-    }
-
-    private void validateDuplicateParticipants(List<CreateSettlementParticipantRequest> participants) {
-        Set<String> userTokens = new HashSet<>();
-
-        for (CreateSettlementParticipantRequest participant
-                : participants) {
-
-            if (participant == null
-                    || participant.getUserToken() == null
-                    || participant.getUserToken().isBlank()) {
-                throw SettlementErrorCode
-                        .INVALID_SETTLEMENT_PARTICIPANT
-                        .toException();
-            }
-
-            if (!userTokens.add(participant.getUserToken())) {
-                throw SettlementErrorCode
-                        .DUPLICATE_SETTLEMENT_PARTICIPANT
-                        .toException();
-            }
-        }
     }
 
     public void validateAccessibleUser(
