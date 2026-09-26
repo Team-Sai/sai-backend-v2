@@ -18,8 +18,7 @@ import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDateTime;
@@ -39,7 +38,7 @@ public class IdentityService {
             "identity-verification-";
 
     private final IdentityRepository identityRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     private final PortOneIdentityService portOneIdentityService;
     private final IdentityValidator identityValidator;
@@ -52,7 +51,7 @@ public class IdentityService {
 
     public IdentityService(
             IdentityRepository identityRepository,
-            UserRepository userRepository,
+            UserService userService,
             PortOneIdentityService portOneIdentityService,
             IdentityValidator identityValidator,
             IdentityStatusService identityStatusService,
@@ -68,7 +67,7 @@ public class IdentityService {
             long validMinutes
     ) {
         this.identityRepository = identityRepository;
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.portOneIdentityService = portOneIdentityService;
         this.identityValidator = identityValidator;
         this.identityStatusService = identityStatusService;
@@ -95,7 +94,7 @@ public class IdentityService {
 
         Identity identity = Identity.builder()
                 .identityVerificationId(identityVerificationId)
-                .user(userRepository.getReferenceById(userId))
+                .user(userService.getUserReference(userId))
 
                 .purpose(request.purpose())
                 .status(IdentityStatus.REQUESTED)
@@ -174,12 +173,7 @@ public class IdentityService {
         }
 
         User user =
-                userRepository.findById(userId)
-                        .orElseThrow(
-                                UserErrorCode
-                                        .USER_NOT_FOUND
-                                        ::toException
-                        );
+                userService.getUser(userId);
 
         try {
             identityValidator.validateSameUser(

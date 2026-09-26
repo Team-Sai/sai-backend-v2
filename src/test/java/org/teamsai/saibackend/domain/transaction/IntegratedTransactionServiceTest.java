@@ -7,13 +7,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
+import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQueryRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionQueryService;
 import org.teamsai.saibackend.domain.transaction.dto.request.BankTransactionSearchCondition;
 import org.teamsai.saibackend.global.exception.DomainException;
 import java.time.LocalDate;
-import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -24,7 +24,7 @@ import static org.teamsai.saibackend.domain.transaction.type.BankTransactionProc
 @ExtendWith(MockitoExtension.class)
 class IntegratedTransactionServiceTest {
     @Mock BankTransactionQueryRepository transactionQueries;
-    @Mock LinkedBankAccountRepository accounts;
+    @Mock LinkedBankAccountService accounts;
     @InjectMocks BankTransactionQueryService service;
 
     @Test void passesNormalizedFiltersAndInclusiveDateBounds() {
@@ -40,8 +40,8 @@ class IntegratedTransactionServiceTest {
     }
 
     @Test void rejectsOtherUsersAccountBeforeQuery() {
-        when(accounts.findById(2L)).thenReturn(Optional.of(
-                LinkedBankAccount.builder().userId(9L).build()));
+        when(accounts.getLinkedAccount(2L)).thenReturn(
+                LinkedBankAccount.builder().userId(9L).build());
         assertThatThrownBy(() -> service.getIntegratedTransactions(1L, 2L, condition()))
                 .isInstanceOfSatisfying(DomainException.class,
                         ex -> assertThat(ex.getHttpStatus().value()).isEqualTo(403));
@@ -49,7 +49,7 @@ class IntegratedTransactionServiceTest {
     }
 
     @Test void rejectsMissingAccountBeforeQuery() {
-        when(accounts.findById(2L)).thenReturn(Optional.empty());
+        when(accounts.getLinkedAccount(2L)).thenThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException());
         assertThatThrownBy(() -> service.getIntegratedTransactions(1L, 2L, condition()))
                 .isInstanceOfSatisfying(DomainException.class,
                         ex -> assertThat(ex.getHttpStatus().value()).isEqualTo(404));
@@ -57,8 +57,8 @@ class IntegratedTransactionServiceTest {
     }
 
     @Test void unavailableOwnedAccountStillUsesAvailableQueryScope() {
-        when(accounts.findById(2L)).thenReturn(Optional.of(
-                LinkedBankAccount.builder().userId(1L).connectionStatus(UNAVAILABLE).build()));
+        when(accounts.getLinkedAccount(2L)).thenReturn(
+                LinkedBankAccount.builder().userId(1L).connectionStatus(UNAVAILABLE).build());
         when(transactionQueries.searchIntegrated(eq(1L), eq(AVAILABLE), eq(2L), isNull(), isNull(),
                 isNull(), isNull(), isNull(), any())).thenReturn(Page.empty());
         assertThat(service.getIntegratedTransactions(1L, 2L, condition()).content()).isEmpty();

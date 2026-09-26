@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
-import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 
@@ -20,7 +20,7 @@ public class RepaymentDueReminderService {
 
     private static final int FAILURE_THRESHOLD = 10;
 
-    private final RepaymentScheduleRepository repaymentScheduleRepository;
+    private final RepaymentScheduleService repaymentScheduleService;
     private final ReminderNotificationSender reminderNotificationSender;
 
     public record ReminderResult(int processed, int skipped, int failed) {
@@ -34,8 +34,8 @@ public class RepaymentDueReminderService {
                 baseDate
         );
 
-        List<RepaymentScheduleEntity> schedules = repaymentScheduleRepository
-                .findByDueDateInAndStatus(targetDates, RepaymentScheduleStatus.PENDING);
+        List<RepaymentScheduleEntity> schedules = repaymentScheduleService
+                .findDueSchedules(targetDates, RepaymentScheduleStatus.PENDING);
 
         int processed = 0;
         int skipped = 0;

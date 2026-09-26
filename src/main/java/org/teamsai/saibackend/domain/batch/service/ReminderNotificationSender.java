@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
+import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 
@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.notification.type.NotificationType;
 @RequiredArgsConstructor
 public class ReminderNotificationSender {
 
-    private final LoanContractRepository loanContractRepository;
+    private final LoanContractService loanContractService;
     private final NotificationService notificationService;
 
     public enum Outcome {
@@ -29,9 +29,7 @@ public class ReminderNotificationSender {
             String title,
             String content
     ) {
-        Long debtorUserId = loanContractRepository
-                .findDebtorUserIdByContractId(contractId)
-                .orElse(null);
+        Long debtorUserId = loanContractService.findDebtorUserId(contractId);
 
         if (debtorUserId == null) {
             return Outcome.SKIPPED;

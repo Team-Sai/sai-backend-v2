@@ -7,7 +7,7 @@ import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.link.service.*;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 
 import java.util.List;
@@ -20,7 +20,7 @@ import static org.teamsai.saibackend.domain.link.service.LinkOperationStore.Stat
 
 class AccountLinkCoordinatorTest {
     private final UserLinkLock lock = mock(UserLinkLock.class);
-    private final UserRepository users = mock(UserRepository.class);
+    private final UserService users = mock(UserService.class);
     private final LinkedBankAccountService accounts = mock(LinkedBankAccountService.class);
     private final AccountLinkService persistence = mock(AccountLinkService.class);
     private final MockBankClient bank = mock(MockBankClient.class);
@@ -32,7 +32,7 @@ class AccountLinkCoordinatorTest {
     @BeforeEach
     void setUp() {
         when(lock.execute(anyLong(), any())).thenAnswer(i -> ((Supplier<?>) i.getArgument(1)).get());
-        when(users.findById(1L)).thenReturn(Optional.of(User.builder().name("name").userToken("token").build()));
+        when(users.getUser(1L)).thenReturn(User.builder().name("name").userToken("token").build());
         when(operations.find(anyString())).thenAnswer(i -> Optional.ofNullable(receipt));
         doAnswer(i -> { receipt = i.getArgument(0); return null; }).when(operations).begin(any());
         doAnswer(i -> {
@@ -52,7 +52,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void existingKeyIsReadFreshWithoutCallingBank() {
-        when(users.findUserKeyByUserId(1L)).thenReturn("current");
+        when(users.getUserKeyByUserId(1L)).thenReturn("current");
         assertThat(coordinator.issueOrGetUserKey(1L).userKey()).isEqualTo("current");
         verifyNoInteractions(bank);
     }
@@ -80,7 +80,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void failedRecoveryRemainsPendingInsteadOfBeingReportedAsCompensated() {
-        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(users.getUserKeyByUserId(1L)).thenReturn("old");
         when(accounts.prepareAccountsByIds(1L,"new",List.of(1L))).thenThrow(new IllegalStateException("failed"));
         doThrow(new RestClientException("offline")).when(bank).recoverUserKey("token", "new", "old");
         assertError(() -> coordinator.completeCallback(1L,"state","new",List.of(1L)), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
@@ -139,7 +139,7 @@ class AccountLinkCoordinatorTest {
             names = {"PROCESSING", "CONFIRM_UNKNOWN", "COMPENSATION_PENDING"})
     void recoveryDoesNotNeedOriginalStateAndRestoresPreviousKey(LinkOperationStore.Status status) {
         receipt = new LinkOperationStore.Operation("old-state", 1L, "hash", "old", "new", status);
-        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(users.getUserKeyByUserId(1L)).thenReturn("old");
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
 
         coordinator.recoverUnresolved(1L);
@@ -170,7 +170,7 @@ class AccountLinkCoordinatorTest {
     void recoveryNeverOverwritesAnUnexpectedLocalKey() {
         receipt = new LinkOperationStore.Operation("id", 1L, "hash", "old", "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
-        when(users.findUserKeyByUserId(1L)).thenReturn("different");
+        when(users.getUserKeyByUserId(1L)).thenReturn("different");
         assertError(() -> coordinator.recoverUnresolved(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
         verifyNoInteractions(bank);
         verify(operations, never()).mark(anyString(), any());

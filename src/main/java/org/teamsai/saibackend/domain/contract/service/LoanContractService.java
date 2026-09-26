@@ -182,6 +182,10 @@ public class LoanContractService {
                 .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
     }
 
+    public Long findDebtorUserId(Long contractId) {
+        return contractRepository.findDebtorUserIdByContractId(contractId).orElse(null);
+    }
+
     public List<LoanContractResponse> findContractsByUser(Long userId) {
         User user = entityManager.getReference(User.class, userId);
         return contractRepository.findByCreditorOrDebtorOrderByCreatedAtDesc(user, user)

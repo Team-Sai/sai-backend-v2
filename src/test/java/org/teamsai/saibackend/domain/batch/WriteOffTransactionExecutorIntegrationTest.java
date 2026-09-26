@@ -24,6 +24,8 @@ import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
+import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.math.BigDecimal;
@@ -38,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         WriteOffTransactionExecutor.class,
         RepaymentScheduleService.class,
         RepaymentScheduleGenerator.class,
+        SettlementPaymentService.class,
         WriteOffTransactionExecutorIntegrationTest.TestSliceConfig.class
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -64,6 +67,11 @@ class WriteOffTransactionExecutorIntegrationTest {
             }
     )
     static class TestSliceConfig {
+        @Bean
+        PaymentRecordService paymentRecordService() {
+            return org.mockito.Mockito.mock(PaymentRecordService.class);
+        }
+
         // RepaymentScheduleService가 요구하지만 이 테스트와는 무관한 의존성 -> 목으로 대체
         @Bean
         LoanContractService loanContractService() {

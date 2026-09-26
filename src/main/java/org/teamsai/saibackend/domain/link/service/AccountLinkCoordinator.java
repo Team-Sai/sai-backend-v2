@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.exception.DomainException;
 
@@ -32,7 +32,7 @@ import static org.teamsai.saibackend.domain.link.service.LinkOperationStore.Stat
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class AccountLinkCoordinator {
     private final UserLinkLock lock;
-    private final UserRepository users;
+    private final UserService users;
     private final LinkedBankAccountService accounts;
     private final AccountLinkService persistence;
     private final MockBankClient bank;
@@ -71,8 +71,8 @@ public class AccountLinkCoordinator {
                 throw AccountErrorCode.LINK_REQUEST_CONFLICT.toException();
             }
             requireResolved(userId);
-            users.findById(userId).orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
-            String previousKey = users.findUserKeyByUserId(userId);
+            users.getUser(userId);
+            String previousKey = users.getUserKeyByUserId(userId);
             var operation = new LinkOperationStore.Operation(operationId, userId, requestHash,
                     previousKey, userKey, PROCESSING);
             run(operation, ids);
@@ -83,8 +83,8 @@ public class AccountLinkCoordinator {
     public UserKeyResponse issueOrGetUserKey(Long userId) {
         return lock.execute(userId, () -> {
             requireResolved(userId);
-            var user = users.findById(userId).orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
-            String existingKey = users.findUserKeyByUserId(userId);
+            var user = users.getUser(userId);
+            String existingKey = users.getUserKeyByUserId(userId);
             if (existingKey != null) {
                 return new UserKeyResponse(existingKey);
             }
@@ -146,12 +146,11 @@ public class AccountLinkCoordinator {
      */
     private void recover(LinkOperationStore.Operation operation) {
         try {
-            if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
+            if (!Objects.equals(users.getUserKeyByUserId(operation.userId()), operation.previousKey())) {
                 throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
             }
             if (!Objects.equals(operation.previousKey(), operation.newKey())) {
-                var user = users.findById(operation.userId())
-                        .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
+                var user = users.getUser(operation.userId());
                 bank.recoverUserKey(user.getUserToken(), operation.newKey(), operation.previousKey());
             }
             operations.mark(operation.id(), FAILED);

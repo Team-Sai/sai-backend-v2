@@ -6,10 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
+import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
@@ -19,14 +16,13 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus
 import java.time.LocalDate;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OverdueSettlementUpdateServiceTest {
 
     @Mock private SettlementParticipantRepository participantRepository;
-    @Mock private PaymentObligationRepository paymentObligationRepository;
+    @Mock private SettlementPaymentService settlementPaymentService;
 
     @InjectMocks
     private OverdueSettlementUpdateService sut;
@@ -60,39 +56,15 @@ class OverdueSettlementUpdateServiceTest {
                 participant(101L, SettlementParticipantStatus.ACTIVE)
         ));
 
-        PaymentObligationEntity first =
-                new PaymentObligationEntity(
-                        101L,
-                        java.math.BigDecimal.TEN
-                );
-
-        PaymentObligationEntity second =
-                new PaymentObligationEntity(
-                        101L,
-                        java.math.BigDecimal.TEN
-                );
-
-        when(paymentObligationRepository.findUnpaidByParticipantIds(
-                List.of(101L),
-                List.of(
-                        PaymentStatus.UNPAID,
-                        PaymentStatus.PARTIALLY_PAID
-                ),
-                ObligationStatus.ACTIVE
-        )).thenReturn(List.of(first, second));
-
         sut.updateOverdueForSettlement(settlement, referenceDate);
 
-        org.assertj.core.api.Assertions.assertThat(first.getOverdueSince())
-                .isEqualTo(referenceDate.plusDays(1).atStartOfDay());
-
-        org.assertj.core.api.Assertions.assertThat(second.getOverdueSince())
-                .isEqualTo(referenceDate.plusDays(1).atStartOfDay());
+        verify(settlementPaymentService).markOverdueByParticipantIds(
+                List.of(101L), referenceDate.plusDays(1).atStartOfDay());
     }
 
     @Test
-    @DisplayName("조회된 모든 미납 obligation을 연체 상태로 변경한다")
-    void logsWhenPartiallyUpdated() {
+    @DisplayName("여러 ACTIVE 참여자의 ID를 한 번에 결제 서비스로 전달한다")
+    void delegatesAllActiveParticipants() {
         LocalDate referenceDate = LocalDate.of(2026, 2, 1);
         Settlement settlement = settlement(1L);
 
@@ -100,28 +72,14 @@ class OverdueSettlementUpdateServiceTest {
                 1L,
                 SettlementParticipantStatus.ACTIVE
         )).thenReturn(List.of(
-                participant(101L, SettlementParticipantStatus.ACTIVE)
+                participant(101L, SettlementParticipantStatus.ACTIVE),
+                participant(102L, SettlementParticipantStatus.ACTIVE)
         ));
-
-        PaymentObligationEntity obligation =
-                new PaymentObligationEntity(
-                        101L,
-                        java.math.BigDecimal.TEN
-                );
-
-        when(paymentObligationRepository.findUnpaidByParticipantIds(
-                List.of(101L),
-                List.of(
-                        PaymentStatus.UNPAID,
-                        PaymentStatus.PARTIALLY_PAID
-                ),
-                ObligationStatus.ACTIVE
-        )).thenReturn(List.of(obligation));
 
         sut.updateOverdueForSettlement(settlement, referenceDate);
 
-        org.assertj.core.api.Assertions.assertThat(obligation.getOverdueSince())
-                .isEqualTo(referenceDate.plusDays(1).atStartOfDay());
+        verify(settlementPaymentService).markOverdueByParticipantIds(
+                List.of(101L, 102L), referenceDate.plusDays(1).atStartOfDay());
     }
 
     @Test
@@ -137,45 +95,7 @@ class OverdueSettlementUpdateServiceTest {
 
         sut.updateOverdueForSettlement(settlement, referenceDate);
 
-        verify(paymentObligationRepository, never())
-                .findUnpaidByParticipantIds(
-                        any(),
-                        any(),
-                        any()
-                );
+        verifyNoInteractions(settlementPaymentService);
     }
 
-    @Test
-    @DisplayName("미납 obligation이 없으면 갱신할 것도 없다")
-    void doesNothingWhenNoUnpaidObligations() {
-        LocalDate referenceDate = LocalDate.of(2026, 2, 1);
-        Settlement settlement = settlement(1L);
-
-        when(participantRepository.findBySettlementIdAndStatus(
-                1L,
-                SettlementParticipantStatus.ACTIVE
-        )).thenReturn(List.of(
-                participant(101L, SettlementParticipantStatus.ACTIVE)
-        ));
-
-        when(paymentObligationRepository.findUnpaidByParticipantIds(
-                List.of(101L),
-                List.of(
-                        PaymentStatus.UNPAID,
-                        PaymentStatus.PARTIALLY_PAID
-                ),
-                ObligationStatus.ACTIVE
-        )).thenReturn(List.of());
-
-        sut.updateOverdueForSettlement(settlement, referenceDate);
-
-        verify(paymentObligationRepository).findUnpaidByParticipantIds(
-                List.of(101L),
-                List.of(
-                        PaymentStatus.UNPAID,
-                        PaymentStatus.PARTIALLY_PAID
-                ),
-                ObligationStatus.ACTIVE
-        );
-    }
 }

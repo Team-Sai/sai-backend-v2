@@ -9,8 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
@@ -32,7 +31,7 @@ class SettlementReminderSenderTest {
     @Mock
     private SettlementParticipantRepository participantRepository;
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
+    private PaymentObligationQueryService paymentObligationQueryService;
     @Mock
     private NotificationService notificationService;
 
@@ -79,7 +78,7 @@ class SettlementReminderSenderTest {
             int result = sender.sendForSettlement(s, ReminderStage.D3);
 
             assertThat(result).isZero();
-            verifyNoInteractions(paymentObligationRepository, notificationService);
+            verifyNoInteractions(paymentObligationQueryService, notificationService);
         }
     }
 
@@ -103,10 +102,7 @@ class SettlementReminderSenderTest {
             PaymentObligationEntity resolvedOb = mock(PaymentObligationEntity.class);
             when(resolvedOb.getPaymentStatus()).thenReturn(PaymentStatus.PAID);
 
-            when(paymentObligationRepository.findLatestByParticipantIds(
-                    List.of(10L),
-                    ObligationStatus.ACTIVE
-            ))
+            when(paymentObligationQueryService.findLatestActiveByParticipantIds(List.of(10L)))
                     .thenReturn(List.of(unresolvedOb, resolvedOb));
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
@@ -135,10 +131,7 @@ class SettlementReminderSenderTest {
             when(orphanOb.getParticipantId()).thenReturn(20L);
             when(orphanOb.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            when(paymentObligationRepository.findLatestByParticipantIds(
-                    List.of(10L),
-                    ObligationStatus.ACTIVE
-            ))
+            when(paymentObligationQueryService.findLatestActiveByParticipantIds(List.of(10L)))
                     .thenReturn(List.of(orphanOb));
 
             int result = sender.sendForSettlement(s, ReminderStage.D3);
@@ -171,10 +164,7 @@ class SettlementReminderSenderTest {
             when(ob2.getPaymentObligationId()).thenReturn(501L);
             when(ob2.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
 
-            when(paymentObligationRepository.findLatestByParticipantIds(
-                    List.of(10L, 11L),
-                    ObligationStatus.ACTIVE
-            ))
+            when(paymentObligationQueryService.findLatestActiveByParticipantIds(List.of(10L, 11L)))
                     .thenReturn(List.of(ob1, ob2));
 
             doThrow(new RuntimeException("알림 발송 실패"))

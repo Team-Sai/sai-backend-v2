@@ -24,7 +24,7 @@ import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
@@ -53,7 +53,7 @@ class BankMatchingTransactionServiceTest {
     @Mock
     private MatchingCandidateRepository matchingCandidateRepository;
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
+    private PaymentObligationQueryService paymentObligationQueryService;
     @Mock
     private AutoMatchingService autoMatchingService;
     @Mock
@@ -340,7 +340,7 @@ class BankMatchingTransactionServiceTest {
                         MatchingTargetType.SETTLEMENT
                 )));
         // candidateDto(1L, SETTLEMENT)의 targetId는 10L(obligationId) → settlementId 20L로 변환된다고 가정
-        given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
+        given(paymentObligationQueryService.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
         given(settlementPaymentStatusChecker.areAllObligationsResolved(20L))
                 .willReturn(false);
@@ -381,7 +381,7 @@ class BankMatchingTransactionServiceTest {
                         1L,
                         MatchingTargetType.SETTLEMENT
                 )));
-        given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
+        given(paymentObligationQueryService.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
         given(settlementPaymentStatusChecker.areAllObligationsResolved(20L))
                 .willReturn(true);
