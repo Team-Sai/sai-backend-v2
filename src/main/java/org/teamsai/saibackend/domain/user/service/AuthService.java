@@ -34,7 +34,7 @@ public class AuthService {
     ) {
         String email = normalizeEmail(request.getEmail());
 
-        authValidator.validateSignUp(email);
+        authValidator.validateEmailAvailable(email);
 
         User user = User.builder()
                 .userToken(createUserToken())

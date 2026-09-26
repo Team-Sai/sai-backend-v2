@@ -20,6 +20,7 @@ public class SettlementValidator {
 
     private final LinkedBankAccountService linkedBankAccountService;
     private final SettlementParticipantRepository settlementParticipantRepository;
+    private final SettlementParticipantValidator participantValidator;
 
     public void validateOwner(Settlement settlement, Long userId){
         if(!settlement.getOwner().getUserId().equals(userId)){
@@ -36,21 +37,10 @@ public class SettlementValidator {
 
     public void validateCreateRequest(CreateSharedSettlementRequest request) {
         if (request == null) {
-            throw SettlementErrorCode
-                    .INVALID_SETTLEMENT_REQUEST
-                    .toException();
+            throw SettlementErrorCode.INVALID_SETTLEMENT_REQUEST.toException();
         }
 
-        List<CreateSettlementParticipantRequest> participants =
-                request.getParticipants();
-
-        if (participants == null || participants.isEmpty()) {
-            throw SettlementErrorCode
-                    .SETTLEMENT_PARTICIPANT_REQUIRED
-                    .toException();
-        }
-
-        validateDuplicateParticipants(participants);
+        participantValidator.validateParticipants(request.getParticipants());
     }
 
     private void validateDuplicateParticipants(List<CreateSettlementParticipantRequest> participants) {

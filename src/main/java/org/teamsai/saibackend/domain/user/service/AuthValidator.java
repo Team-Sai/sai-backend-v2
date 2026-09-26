@@ -14,8 +14,10 @@ public class AuthValidator {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public void validateSignUp(String email) {
-        validateDuplicateEmail(email);
+    public void validateEmailAvailable(String email) {
+        if (userRepository.existsByEmail(email)) {
+            throw UserErrorCode.DUPLICATE_EMAIL.toException();
+        }
     }
 
     public void validateLoginPassword(
@@ -26,12 +28,4 @@ public class AuthValidator {
             throw UserErrorCode.INVALID_LOGIN_CREDENTIALS.toException();
         }
     }
-
-    private void validateDuplicateEmail(String email) {
-        if (userRepository.existsByEmail(email)) {
-            throw UserErrorCode.DUPLICATE_EMAIL.toException();
-        }
-    }
-
-
 }

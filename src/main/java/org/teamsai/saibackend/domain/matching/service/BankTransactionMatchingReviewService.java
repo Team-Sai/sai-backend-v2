@@ -7,7 +7,7 @@ import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCo
 import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
 import org.teamsai.saibackend.domain.matching.dto.response.MatchingReviewProcessResponse;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.MatchingReviewValidator;
+import org.teamsai.saibackend.domain.matching.support.MatchingReviewValidator;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateInvalidationReason;
 import org.teamsai.saibackend.domain.matching.type.MatchingReviewResult;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
@@ -113,7 +113,7 @@ public class BankTransactionMatchingReviewService {
                         bankTransactionId
                 );
 
-        matchingReviewValidator.validate(transaction);
+        matchingReviewValidator.validateReviewable(transaction);
 
         return transaction;
     }
