@@ -237,12 +237,7 @@ public class IdentityService {
     ) {
         identityValidator.validateUserId(userId);
         identityValidator.validateIdentityVerificationId(identityVerificationId);
-
-        if (purpose == null) {
-            throw IdentityErrorCode
-                    .INVALID_IDENTITY_PURPOSE
-                    .toException();
-        }
+        identityValidator.validatePurpose(purpose);
 
         try {
             int updatedCount =

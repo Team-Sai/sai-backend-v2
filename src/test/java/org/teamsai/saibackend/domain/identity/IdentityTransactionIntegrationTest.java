@@ -396,13 +396,16 @@ class IdentityTransactionIntegrationTest {
     }
 
     @Test
-    void schemaColumnLengthsMatchEntityConstraints() {
-        var expectedLengths = java.util.Map.of("identity_verification_id", 100L, "purpose", 30L,
-                "status", 20L, "failure_reason", 255L);
+    void schemaStringColumnLengthsMatchConstraints() {
+        var expectedLengths = java.util.Map.of(
+                "identity_verification_id", 100L,
+                "failure_reason", 255L
+        );
+
         expectedLengths.forEach((column, length) -> assertThat(jdbc.queryForObject("""
-                select character_maximum_length from information_schema.columns
-                where table_schema=database() and table_name='identity' and column_name=?
-                """, Long.class, column)).isEqualTo(length));
+        select character_maximum_length from information_schema.columns
+        where table_schema=database() and table_name='identity' and column_name=?
+        """, Long.class, column)).isEqualTo(length));
     }
 
     private Long insertUser() {

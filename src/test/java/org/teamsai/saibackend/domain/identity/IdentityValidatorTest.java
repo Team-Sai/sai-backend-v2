@@ -290,13 +290,22 @@ class IdentityValidatorTest {
         }
 
         @Test
-        @DisplayName("인증 목적이 없으면 예외가 발생한다")
+        @DisplayName("인증 준비 요청의 목적이 없으면 예외가 발생한다")
         void invalidPrepareRequest() {
             IdentityPrepareRequest request =
                     new IdentityPrepareRequest(null);
 
             assertIdentityError(
                     () -> identityValidator.validatePrepareRequest(request),
+                    IdentityErrorCode.INVALID_IDENTITY_PURPOSE
+            );
+        }
+
+        @Test
+        @DisplayName("인증 사용 목적이 없으면 예외가 발생한다")
+        void nullPurpose() {
+            assertIdentityError(
+                    () -> identityValidator.validatePurpose(null),
                     IdentityErrorCode.INVALID_IDENTITY_PURPOSE
             );
         }

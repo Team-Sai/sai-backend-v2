@@ -6,6 +6,7 @@ import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest
 import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
+import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.text.Normalizer;
@@ -158,5 +159,15 @@ public class IdentityValidator {
                 name.strip(),
                 Normalizer.Form.NFC
         );
+    }
+
+    public void validatePurpose(
+            IdentityPurpose purpose
+    ) {
+        if (purpose == null) {
+            throw IdentityErrorCode
+                    .INVALID_IDENTITY_PURPOSE
+                    .toException();
+        }
     }
 }
