@@ -136,7 +136,7 @@ class AccountLinkCoordinatorTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStore.Status.class,
-            names = {"PROCESSING", "CONFIRM_UNKNOWN", "COMPENSATION_PENDING"})
+            names = {"CONFIRM_UNKNOWN", "COMPENSATION_PENDING"})
     void recoveryDoesNotNeedOriginalStateAndRestoresPreviousKey(LinkOperationStore.Status status) {
         receipt = new LinkOperationStore.Operation("old-state", 1L, "hash", "old", "new", status);
         when(users.findUserKeyByUserId(1L)).thenReturn("old");
@@ -148,6 +148,45 @@ class AccountLinkCoordinatorTest {
         order.verify(bank).recoverUserKey("token", "new", "old");
         order.verify(operations).mark("old-state", FAILED);
         assertThat(receipt.status()).isEqualTo(FAILED);
+    }
+
+    @Test
+    void processingNeedsExplicitReconciliationWithoutCallingBank() {
+        receipt = new LinkOperationStore.Operation("id", 1L, "hash", "old", "new", PROCESSING);
+        when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
+        assertError(() -> coordinator.recoverUnresolved(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+        verifyNoInteractions(bank);
+        verify(operations, never()).mark(anyString(), any());
+        assertThat(receipt.status()).isEqualTo(PROCESSING);
+    }
+
+    @Test
+    void confirmIntentIsPersistedBeforeExternalCall() {
+        coordinator.completeCallback(1L, "state", "new", List.of(1L));
+        var order = inOrder(operations, bank);
+        order.verify(operations).begin(any());
+        order.verify(operations).mark(anyString(), eq(CONFIRM_UNKNOWN));
+        order.verify(bank).confirmUserKey("new");
+    }
+
+    @Test
+    void failedConfirmIntentWritePreventsExternalCall() {
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(operations).mark(anyString(), eq(CONFIRM_UNKNOWN));
+        assertThatThrownBy(() -> coordinator.completeCallback(1L, "state", "new", List.of(1L)))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(bank, persistence);
+    }
+
+    @Test
+    void expiredBankRecoveryKeepsOperationAndBlocksNewIssuance() {
+        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", COMPENSATION_PENDING);
+        when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
+        doThrow(new RestClientException("409 recovery expired"))
+                .when(bank).recoverUserKey("token", "new", null);
+        assertError(() -> coordinator.issueOrGetUserKey(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+        assertThat(receipt.status()).isEqualTo(COMPENSATION_PENDING);
+        verify(bank, never()).requestUserKey(anyString(), anyString());
     }
 
     @Test

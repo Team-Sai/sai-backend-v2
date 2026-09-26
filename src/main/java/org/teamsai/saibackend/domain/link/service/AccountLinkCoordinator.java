@@ -132,19 +132,16 @@ public class AccountLinkCoordinator {
     /**
      * 미완료 연동 작업을 이전 키 상태로 되돌립니다.
      *
-     * PROCESSING은 confirm 호출 전 중단뿐 아니라 confirm 성공 후
-     * 후속 처리 전에 중단된 경우에도 남을 수 있으므로,
-     * 로컬 작업 상태만으로 은행의 confirm 여부를 판단하지 않습니다.
-     *
-     * PROCESSING, CONFIRM_UNKNOWN, COMPENSATION_PENDING 모두
-     * 은행 recover API를 통해 이전 키 상태로 수렴시킵니다.
-     * 해당 API는 pending 취소, confirm된 신규 키 복원,
-     * 이미 복구된 요청의 재시도를 처리하며 다른 키와 충돌하면 거부합니다.
-     *
-     * TODO: 은행 측 작업 ID 및 복구 기한 검증 도입 시,
-     *       오래된 미완료 작업과 기한 초과 작업의 정합성 회복 정책도 함께 보강할 예정입니다.
+     * PROCESSING은 구 버전에서 confirm 이후에도 남을 수 있어 자동 복구하지 않습니다.
+     * 은행 상태를 별도로 확인한 후 운영자가 처리해야 합니다.
+     * CONFIRM_UNKNOWN은 confirm 실행 여부가 불명확하고, COMPENSATION_PENDING은
+     * 로컬 저장 실패가 확인된 상태입니다. 두 상태만 은행의 조건부 복구를 요청합니다.
+     * 은행이 복구 기한 초과 또는 키 충돌을 거부하면 미완료 기록을 유지합니다.
      */
     private void recover(LinkOperationStore.Operation operation) {
+        if (operation.status() != CONFIRM_UNKNOWN && operation.status() != COMPENSATION_PENDING) {
+            throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+        }
         try {
             if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
                 throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
@@ -166,10 +163,11 @@ public class AccountLinkCoordinator {
         operations.begin(operation);
         boolean changesKey = !Objects.equals(operation.previousKey(), operation.newKey());
         if (changesKey) {
+            // 외부 호출 전에 커밋하여 confirm 성공 직후 프로세스가 중단되어도 복구 가능하게 합니다.
+            operations.mark(operation.id(), CONFIRM_UNKNOWN);
             try {
                 bank.confirmUserKey(operation.newKey());
             } catch (RuntimeException e) {
-                operations.mark(operation.id(), CONFIRM_UNKNOWN);
                 throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
             }
         }
@@ -183,7 +181,7 @@ public class AccountLinkCoordinator {
                 return;
             }
             operations.mark(operation.id(), COMPENSATION_PENDING);
-            recover(operation);
+            recover(operations.find(operation.id()).orElseThrow());
             throw e;
         }
     }
