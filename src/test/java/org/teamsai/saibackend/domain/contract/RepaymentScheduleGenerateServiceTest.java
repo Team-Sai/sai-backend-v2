@@ -4,7 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerateService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,9 +12,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class RepaymentScheduleGeneratorTest {
+class RepaymentScheduleGenerateServiceTest {
 
-    private final RepaymentScheduleGenerator generator = new RepaymentScheduleGenerator();
+    private final RepaymentScheduleGenerateService generator = new RepaymentScheduleGenerateService();
 
     private final Long contractId = 1L;
     private final BigDecimal principal = BigDecimal.valueOf(10_000_000);

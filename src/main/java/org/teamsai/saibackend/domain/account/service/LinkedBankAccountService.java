@@ -18,7 +18,7 @@ import org.teamsai.saibackend.global.client.MockBankClient;
 import java.util.*;
 import java.util.function.Predicate;
 
-import static org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus.AVAILABLE;
+import static org.teamsai.saibackend.domain.account.type.ConnectionStatus.AVAILABLE;
 
 @Slf4j
 @Service

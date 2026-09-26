@@ -8,11 +8,11 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerateService;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
@@ -42,7 +42,7 @@ class RepaymentScheduleServiceTest {
     private LoanContractService loanContractService;
 
     @Spy
-    private RepaymentScheduleGenerator repaymentScheduleGenerator = new RepaymentScheduleGenerator();
+    private RepaymentScheduleGenerateService repaymentScheduleGenerateService = new RepaymentScheduleGenerateService();
 
     @InjectMocks
     private RepaymentScheduleService repaymentScheduleService;

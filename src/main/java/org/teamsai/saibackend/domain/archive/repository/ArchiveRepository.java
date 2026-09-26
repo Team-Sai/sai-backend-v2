@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.archive.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.type.ArchiveStatus;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 
 import java.util.List;

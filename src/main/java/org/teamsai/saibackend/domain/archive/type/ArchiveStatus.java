@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.archive.entity;
+package org.teamsai.saibackend.domain.archive.type;
 
 public enum ArchiveStatus {
     CONTRACT,

@@ -1,7 +1,7 @@
 package org.teamsai.saibackend.domain.contract.service;
 
-import org.springframework.stereotype.Component;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
+import org.springframework.stereotype.Service;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
@@ -14,8 +14,8 @@ import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
-public class RepaymentScheduleGenerator {
+@Service
+public class RepaymentScheduleGenerateService {
 
     private static final int CALCULATION_SCALE = 20;
     private static final int WON_SCALE = 0;

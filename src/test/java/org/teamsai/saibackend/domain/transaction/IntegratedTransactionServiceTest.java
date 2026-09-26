@@ -17,7 +17,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus.*;
+import static org.teamsai.saibackend.domain.account.type.ConnectionStatus.*;
 import static org.teamsai.saibackend.domain.transaction.type.BankTransactionType.*;
 import static org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus.*;
 

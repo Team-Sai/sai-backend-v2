@@ -4,7 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
