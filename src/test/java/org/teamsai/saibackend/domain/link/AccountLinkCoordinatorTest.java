@@ -176,13 +176,91 @@ class AccountLinkCoordinatorTest {
     }
 
     @Test
-    void processingNeedsExplicitReconciliationWithoutCallingBank() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", "old", "new", PROCESSING);
-        when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
-        assertError(() -> coordinator.recoverUnresolved(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
-        verifyNoInteractions(bank);
-        verify(operations, never()).mark(anyString(), any());
+    void processingRecoveryRestoresBankBeforeMarkingFailed() {
+        receipt = new LinkOperationStore.Operation(
+                "id", 1L, "hash", "old", "new", PROCESSING
+        );
+
+        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(operations.findUnresolved(1L))
+                .thenReturn(List.of(receipt));
+        when(operations.hasUnresolved(1L))
+                .thenAnswer(invocation -> receipt.status() != FAILED);
+
+        coordinator.recoverUnresolved(1L);
+
+        var order = inOrder(bank, operations);
+        order.verify(bank).recoverUserKey(
+                "token", "new", "old", "id"
+        );
+        order.verify(operations).mark("id", FAILED);
+
+        assertThat(receipt.status()).isEqualTo(FAILED);
+        verifyNoInteractions(persistence);
+    }
+
+    @Test
+    void failedConfirmIntentWriteCanBeRecovered() {
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(operations)
+                .mark(anyString(), eq(CONFIRM_UNKNOWN));
+
+        assertThatThrownBy(() ->
+                coordinator.completeCallback(
+                        1L, "state", "new", List.of(1L)
+                )
+        ).isInstanceOf(IllegalStateException.class);
+
         assertThat(receipt.status()).isEqualTo(PROCESSING);
+        verifyNoInteractions(bank, persistence);
+
+        String operationId = receipt.id();
+
+        when(operations.findUnresolved(1L))
+                .thenReturn(List.of(receipt));
+        when(operations.hasUnresolved(1L))
+                .thenAnswer(invocation -> receipt.status() != FAILED);
+
+        coordinator.recoverUnresolved(1L);
+
+        verify(bank).recoverUserKey(
+                "token", "new", null, operationId
+        );
+        assertThat(receipt.status()).isEqualTo(FAILED);
+        verifyNoInteractions(persistence);
+    }
+
+    @Test
+    void processingRecoveryCanBeRetriedAfterNetworkFailure() {
+        receipt = new LinkOperationStore.Operation(
+                "id", 1L, "hash", "old", "new", PROCESSING
+        );
+
+        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(operations.findUnresolved(1L))
+                .thenReturn(List.of(receipt));
+        when(operations.hasUnresolved(1L))
+                .thenAnswer(invocation -> receipt.status() != FAILED);
+
+        doThrow(new RestClientException("temporary network failure"))
+                .doNothing()
+                .when(bank)
+                .recoverUserKey("token", "new", "old", "id");
+
+        assertError(
+                () -> coordinator.recoverUnresolved(1L),
+                AccountErrorCode.BANK_SERVER_UNAVAILABLE
+        );
+
+        assertThat(receipt.status()).isEqualTo(PROCESSING);
+        verify(operations, never()).mark("id", FAILED);
+
+        // 두 번째 은행 호출은 성공한다.
+        coordinator.recoverUnresolved(1L);
+
+        assertThat(receipt.status()).isEqualTo(FAILED);
+        verify(bank, times(2))
+                .recoverUserKey("token", "new", "old", "id");
     }
 
     @Test

@@ -124,7 +124,9 @@ public class AccountLinkCoordinator {
         if (operation.status() == RECOVERY_CONFLICT) {
             throw AccountErrorCode.LINK_RECOVERY_CONFLICT.toException();
         }
-        if (operation.status() != CONFIRM_UNKNOWN && operation.status() != COMPENSATION_PENDING) {
+        if (operation.status() != PROCESSING
+                && operation.status() != CONFIRM_UNKNOWN
+                && operation.status() != COMPENSATION_PENDING) {
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
         try {
