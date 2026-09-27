@@ -9,7 +9,9 @@ import org.teamsai.saibackend.domain.settlement.entity.SettlementAbandonmentAler
 import org.teamsai.saibackend.domain.settlement.repository.SettlementAbandonmentAlertRepository;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.teamsai.saibackend.domain.settlement.type.AbandonmentDeliveryStatus;
 
 @Repository
 @RequiredArgsConstructor
@@ -18,12 +20,12 @@ public class SettlementAbandonmentRecorder {
     private final EntityManager entityManager;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean recordIfAbsent(Long settlementId, LocalDate referenceDate) {
+    public boolean recordIfAbsent(Long settlementId, LocalDate referenceDate, String message) {
         if (alertRepository.existsBySettlementIdAndReferenceDate(settlementId, referenceDate)) {
             return false;
         }
         // Assigned composite IDs must be inserted, not merged: a concurrent insert must fail.
-        entityManager.persist(SettlementAbandonmentAlert.create(settlementId, referenceDate, LocalDateTime.now()));
+        entityManager.persist(SettlementAbandonmentAlert.pending(settlementId, referenceDate, message));
         entityManager.flush();
         return true;
     }
@@ -31,5 +33,12 @@ public class SettlementAbandonmentRecorder {
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public boolean exists(Long settlementId, LocalDate referenceDate) {
         return alertRepository.existsBySettlementIdAndReferenceDate(settlementId, referenceDate);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public List<SettlementAbandonmentAlert> pendingAfter(Long afterId, LocalDate afterDate) {
+        // See records committed after the outer Tasklet's first read.
+        return alertRepository.findPendingAfter(AbandonmentDeliveryStatus.PENDING,
+                afterId, afterDate, PageRequest.of(0, 100));
     }
 }

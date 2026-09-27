@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.settlement;
+package org.teamsai.saibackend.domain.batch.settlement.overdue;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,7 +10,6 @@ import org.springframework.data.domain.PageRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
-import org.teamsai.saibackend.domain.batch.settlement.overdue.OverdueSettlementService;
 import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementUpdateService;
 import org.teamsai.saibackend.domain.settlement.support.OverdueUpdateResult;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;

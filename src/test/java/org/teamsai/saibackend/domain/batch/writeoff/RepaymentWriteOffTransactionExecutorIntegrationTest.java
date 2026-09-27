@@ -14,7 +14,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
-import org.teamsai.saibackend.domain.batch.writeoff.RepaymentWriteOffTransactionExecutor;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;

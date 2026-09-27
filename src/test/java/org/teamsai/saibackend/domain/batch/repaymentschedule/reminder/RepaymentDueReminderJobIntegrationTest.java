@@ -24,8 +24,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.global.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.batch.repaymentschedule.reminder.RepaymentDueReminderJobConfig;
-import org.teamsai.saibackend.domain.batch.repaymentschedule.reminder.RepaymentDueReminderService;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;

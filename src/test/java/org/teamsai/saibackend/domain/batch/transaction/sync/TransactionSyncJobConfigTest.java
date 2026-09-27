@@ -18,7 +18,6 @@ import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.batch.transaction.reader.LinkedAccountSyncTargetReaderFactory;
-import org.teamsai.saibackend.domain.batch.transaction.sync.TransactionSyncJobConfig;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.transaction.service.TransactionSyncFacade;
 

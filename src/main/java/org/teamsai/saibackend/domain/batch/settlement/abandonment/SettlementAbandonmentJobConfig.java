@@ -12,7 +12,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
-import org.teamsai.saibackend.domain.batch.settlement.abandonment.SettlementAbandonmentDetectionService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementAbandonmentResult;
 
 import java.time.LocalDate;

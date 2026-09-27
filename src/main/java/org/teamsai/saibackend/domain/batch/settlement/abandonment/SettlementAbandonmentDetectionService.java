@@ -50,7 +50,8 @@ public class SettlementAbandonmentDetectionService {
                 }
 
                 try {
-                    if (!recorder.recordIfAbsent(settlement.getSettlementId(), referenceDate)) {
+                    if (!recorder.recordIfAbsent(settlement.getSettlementId(), referenceDate,
+                            buildMessage(settlement, referenceDate, baseDate))) {
                         continue;
                     }
                 } catch (DataIntegrityViolationException e) {
@@ -63,7 +64,6 @@ public class SettlementAbandonmentDetectionService {
                     continue;
                 }
 
-                notifier.notifyAbandoned(settlement, referenceDate, baseDate);
                 detectedCount++;
             }
 
@@ -72,6 +72,8 @@ public class SettlementAbandonmentDetectionService {
             }
             pageNumber++;
         }
+
+        deliverPending();
 
         log.info("정산 장기방치 감지 배치 종료, 신규 방치 감지 {}건 (총 {}건 중)", detectedCount, totalCount);
         return new SettlementAbandonmentResult(detectedCount);
@@ -84,4 +86,34 @@ public class SettlementAbandonmentDetectionService {
         return !referenceDate.plusDays(ABANDONMENT_DAYS_AFTER_DUE).isAfter(baseDate);
     }
 
+
+    private void deliverPending() {
+        Long afterId = null;
+        LocalDate afterDate = null;
+        while (true) {
+            var pending = recorder.pendingAfter(afterId, afterDate);
+            if (pending.isEmpty()) {
+                return;
+            }
+            for (var alert : pending) {
+                try {
+                    notifier.sendPending(alert.getSettlementId(), alert.getReferenceDate());
+                } catch (RuntimeException e) {
+                    log.error("방치 알림 발송 실패, 다음 실행에서 재시도 settlementId={}, referenceDate={}",
+                            alert.getSettlementId(), alert.getReferenceDate(), e);
+                }
+            }
+            // Keyset pagination keeps failed records pending without looping or skipping other records.
+            var last = pending.get(pending.size() - 1);
+            afterId = last.getSettlementId();
+            afterDate = last.getReferenceDate();
+        }
+    }
+
+    private String buildMessage(Settlement settlement, LocalDate referenceDate, LocalDate baseDate) {
+        return String.format(
+                "⚠️ *정산 장기 방치 감지* — settlementId=%d, title=%s, 기준일=%s (%d일 경과), 감지일=%s에 IN_PROGRESS",
+                settlement.getSettlementId(), settlement.getTitle(), referenceDate,
+                java.time.temporal.ChronoUnit.DAYS.between(referenceDate, baseDate), baseDate);
+    }
 }

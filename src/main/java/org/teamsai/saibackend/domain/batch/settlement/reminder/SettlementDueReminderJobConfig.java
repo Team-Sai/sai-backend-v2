@@ -13,7 +13,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
-import org.teamsai.saibackend.domain.batch.settlement.reminder.SettlementDueReminderService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementReminderResult;
 
 import java.time.LocalDate;

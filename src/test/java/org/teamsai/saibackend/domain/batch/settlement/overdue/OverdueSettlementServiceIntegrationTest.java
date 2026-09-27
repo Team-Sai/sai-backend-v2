@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.settlement;
+package org.teamsai.saibackend.domain.batch.settlement.overdue;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,7 +11,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
-import org.teamsai.saibackend.domain.batch.settlement.overdue.OverdueSettlementService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

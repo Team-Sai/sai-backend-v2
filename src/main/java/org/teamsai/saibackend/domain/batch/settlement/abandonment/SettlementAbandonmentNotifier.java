@@ -2,21 +2,33 @@ package org.teamsai.saibackend.domain.batch.settlement.abandonment;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementAbandonmentAlertRepository;
+import org.teamsai.saibackend.domain.settlement.type.AbandonmentDeliveryStatus;
 import org.teamsai.saibackend.global.notification.SlackNotifier;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
 public class SettlementAbandonmentNotifier {
+    private final SettlementAbandonmentAlertRepository alertRepository;
     private final SlackNotifier slackNotifier;
 
-    public void notifyAbandoned(Settlement settlement, LocalDate referenceDate, LocalDate baseDate) {
-        slackNotifier.send(String.format(
-                "⚠️ *정산 장기 방치 감지* — settlementId=%d, title=%s, 기준일=%s (%d일 경과), 여전히 IN_PROGRESS",
-                settlement.getSettlementId(), settlement.getTitle(), referenceDate,
-                ChronoUnit.DAYS.between(referenceDate, baseDate)));
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean sendPending(Long settlementId, LocalDate referenceDate) {
+        // Serialize competing workers until delivery and the SENT transition finish.
+        var alert = alertRepository.findForDelivery(settlementId, referenceDate).orElse(null);
+        if (alert == null || alert.getDeliveryStatus() != AbandonmentDeliveryStatus.PENDING) {
+            return false;
+        }
+        if (!slackNotifier.trySend(alert.getMessage())) {
+            return false;
+        }
+        // At-least-once delivery: a crash after Slack accepts but before commit can replay the message.
+        alert.markSent(LocalDateTime.now());
+        return true;
     }
 }

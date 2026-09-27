@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.settlement;
+package org.teamsai.saibackend.domain.batch.settlement.recurring;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

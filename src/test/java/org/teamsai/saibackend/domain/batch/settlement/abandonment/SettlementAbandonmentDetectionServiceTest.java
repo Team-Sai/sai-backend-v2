@@ -1,281 +1,138 @@
 package org.teamsai.saibackend.domain.batch.settlement.abandonment;
 
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.BeforeEach;
-import jakarta.persistence.EntityManager;
-import org.teamsai.saibackend.domain.settlement.support.SettlementAbandonmentRecorder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.teamsai.saibackend.global.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementAbandonmentAlert;
-import org.teamsai.saibackend.domain.settlement.repository.SettlementAbandonmentAlertRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
-import org.teamsai.saibackend.domain.batch.settlement.abandonment.SettlementAbandonmentDetectionService;
-import org.teamsai.saibackend.domain.settlement.support.SettlementAbandonmentResult;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAbandonmentRecorder;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SettlementAbandonmentDetectionServiceTest {
+    @Mock OverdueCriteria criteria;
+    @Mock SettlementRepository settlements;
+    @Mock SettlementAbandonmentRecorder recorder;
+    @Mock SettlementAbandonmentNotifier notifier;
+    @InjectMocks SettlementAbandonmentDetectionService service;
+    private final LocalDate today = LocalDate.of(2026, 9, 27);
 
-    @Mock
-    private OverdueCriteria overdueCriteria;
-    @Mock
-    private SettlementRepository settlementRepository;
-    @Mock
-    private SettlementAbandonmentAlertRepository abandonmentAlertRepository;
-    @Mock
-    private SlackNotifier slackNotifier;
+    @Test
+    void noCandidatesStillDeliversPreviouslyPendingAlert() {
+        var alert = SettlementAbandonmentAlert.pending(1L, today.minusDays(5), "original message");
+        when(recorder.pendingAfter(null, null)).thenReturn(List.of(alert));
 
-    @Mock
-    private EntityManager entityManager;
-    private SettlementAbandonmentDetectionService service;
+        assertThat(service.detectAbandoned(today).detectedCount()).isZero();
 
-    @BeforeEach
-    void setUp() {
-        service = new SettlementAbandonmentDetectionService(overdueCriteria, settlementRepository,
-                new SettlementAbandonmentRecorder(abandonmentAlertRepository, entityManager),
-                new SettlementAbandonmentNotifier(slackNotifier));
+        verify(notifier).sendPending(1L, today.minusDays(5));
+        verify(recorder, never()).recordIfAbsent(any(), any(), any());
     }
 
-    private final LocalDate baseDate = LocalDate.of(2026, 8, 19);
+    @ParameterizedTest
+    @ValueSource(ints = {0, 2, 3, 10})
+    void recordsOnlySettlementsAtLeastThreeDaysPastDue(int days) {
+        var settlement = candidate(today.minusDays(days));
+        if (days >= 3) {
+            when(recorder.recordIfAbsent(eq(1L), eq(today.minusDays(days)), anyString())).thenReturn(true);
+        }
 
-    private Settlement settlement(Long id, String title) {
-        Settlement settlement = mock(Settlement.class);
-        lenient().when(settlement.getSettlementId()).thenReturn(id);
-        lenient().when(settlement.getTitle()).thenReturn(title);
+        assertThat(service.detectAbandoned(today).detectedCount()).isEqualTo(days >= 3 ? 1 : 0);
+
+        if (days >= 3) {
+            verify(recorder).recordIfAbsent(eq(1L), eq(today.minusDays(days)),
+                    contains("감지일=2026-09-27"));
+        } else {
+            verify(recorder, never()).recordIfAbsent(any(), any(), any());
+        }
+    }
+
+    @Test
+    void nullReferenceDateIsSkipped() {
+        candidate(null);
+        assertThat(service.detectAbandoned(today).detectedCount()).isZero();
+        verify(recorder, never()).recordIfAbsent(any(), any(), any());
+    }
+
+    @Test
+    void existingRecordIsNotCountedAgain() {
+        candidate(today.minusDays(3));
+        when(recorder.recordIfAbsent(eq(1L), any(), any())).thenReturn(false);
+        assertThat(service.detectAbandoned(today).detectedCount()).isZero();
+    }
+
+    @Test
+    void concurrentDuplicateStillAllowsPendingDelivery() {
+        candidate(today.minusDays(3));
+        when(recorder.recordIfAbsent(eq(1L), any(), any()))
+                .thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(recorder.exists(1L, today.minusDays(3))).thenReturn(true);
+        when(recorder.pendingAfter(null, null)).thenReturn(List.of(
+                SettlementAbandonmentAlert.pending(1L, today.minusDays(3), "saved")));
+
+        assertThat(service.detectAbandoned(today).detectedCount()).isZero();
+        verify(notifier).sendPending(1L, today.minusDays(3));
+    }
+
+    @Test
+    void unrelatedIntegrityFailureIsNotSwallowed() {
+        candidate(today.minusDays(3));
+        var failure = new DataIntegrityViolationException("not a duplicate");
+        when(recorder.recordIfAbsent(eq(1L), any(), any())).thenThrow(failure);
+        assertThatThrownBy(() -> service.detectAbandoned(today)).isSameAs(failure);
+        verifyNoInteractions(notifier);
+    }
+
+    @Test
+    void failedDeliveryDoesNotBlockLaterPagesOrLoopOnSameRecord() {
+        var firstDate = today.minusDays(5);
+        var secondDate = today.minusDays(4);
+        when(recorder.pendingAfter(null, null)).thenReturn(List.of(
+                SettlementAbandonmentAlert.pending(1L, firstDate, "first")));
+        when(recorder.pendingAfter(1L, firstDate)).thenReturn(List.of(
+                SettlementAbandonmentAlert.pending(1L, secondDate, "second")));
+        when(notifier.sendPending(1L, firstDate)).thenThrow(new RuntimeException("delivery failed"));
+
+        service.detectAbandoned(today);
+
+        verify(notifier).sendPending(1L, firstDate);
+        verify(notifier).sendPending(1L, secondDate);
+        verify(recorder).pendingAfter(1L, secondDate);
+    }
+
+    @Test
+    void fullCandidatePageContinuesToNextPage() {
+        var settlement = mock(Settlement.class);
+        when(settlements.findBySettlementStatusOrderBySettlementIdAsc(
+                SettlementStatus.IN_PROGRESS, PageRequest.of(0, 100)))
+                .thenReturn(Collections.nCopies(100, settlement));
+        service.detectAbandoned(today);
+        verify(settlements).findBySettlementStatusOrderBySettlementIdAsc(
+                SettlementStatus.IN_PROGRESS, PageRequest.of(1, 100));
+    }
+
+    private Settlement candidate(LocalDate referenceDate) {
+        var settlement = mock(Settlement.class);
+        lenient().when(settlement.getSettlementId()).thenReturn(1L);
+        lenient().when(settlement.getTitle()).thenReturn("test");
+        when(settlements.findBySettlementStatusOrderBySettlementIdAsc(
+                SettlementStatus.IN_PROGRESS, PageRequest.of(0, 100))).thenReturn(List.of(settlement));
+        when(criteria.resolveReferenceDate(settlement)).thenReturn(referenceDate);
         return settlement;
-    }
-
-    @Nested
-    class NoTargets {
-
-        @Test
-        void 대상_정산이_없으면_0건을_반환한다() {
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(0L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(Collections.emptyList());
-
-            SettlementAbandonmentResult result = service.detectAbandoned(baseDate);
-
-            assertThat(result.detectedCount()).isZero();
-            verifyNoInteractions(abandonmentAlertRepository, slackNotifier);
-        }
-    }
-
-    @Nested
-    class AbandonmentJudgement {
-
-        @Test
-        void referenceDate가_null이면_방치로_판단하지_않는다() {
-            Settlement s = settlement(1L, "정산A");
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(1L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(List.of(s));
-            when(overdueCriteria.resolveReferenceDate(s)).thenReturn(null);
-
-            SettlementAbandonmentResult result = service.detectAbandoned(baseDate);
-
-            assertThat(result.detectedCount()).isZero();
-            verifyNoInteractions(abandonmentAlertRepository, slackNotifier);
-        }
-
-        @Test
-        void 기준일로부터_3일_경과전이면_방치로_판단하지_않는다() {
-            Settlement s = settlement(1L, "정산A");
-            LocalDate referenceDate = baseDate.minusDays(2);
-
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(1L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(List.of(s));
-            when(overdueCriteria.resolveReferenceDate(s)).thenReturn(referenceDate);
-
-            SettlementAbandonmentResult result = service.detectAbandoned(baseDate);
-
-            assertThat(result.detectedCount()).isZero();
-            verify(abandonmentAlertRepository, never())
-                    .existsBySettlementIdAndReferenceDate(any(), any());
-            verifyNoInteractions(slackNotifier);
-        }
-
-        @Test
-        void 정확히_3일_경과한_경계값은_방치로_판단한다() {
-            Settlement s = settlement(1L, "정산A");
-            LocalDate referenceDate = baseDate.minusDays(3);
-
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(1L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(List.of(s));
-            when(overdueCriteria.resolveReferenceDate(s)).thenReturn(referenceDate);
-            when(abandonmentAlertRepository.existsBySettlementIdAndReferenceDate(
-                    1L,
-                    referenceDate
-            )).thenReturn(false);
-
-            SettlementAbandonmentResult result = service.detectAbandoned(baseDate);
-
-            assertThat(result.detectedCount()).isEqualTo(1);
-            verify(abandonmentAlertRepository)
-                    .existsBySettlementIdAndReferenceDate(1L, referenceDate);
-            verify(entityManager).persist(any(SettlementAbandonmentAlert.class));
-            verify(slackNotifier).send(any());
-        }
-
-        @Test
-        void 이미_알림이_존재하면_재알림하지_않는다() {
-            Settlement s = settlement(1L, "정산A");
-            LocalDate referenceDate = baseDate.minusDays(5);
-
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(1L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(List.of(s));
-            when(overdueCriteria.resolveReferenceDate(s)).thenReturn(referenceDate);
-            when(abandonmentAlertRepository.existsBySettlementIdAndReferenceDate(
-                    1L,
-                    referenceDate
-            )).thenReturn(true);
-
-            SettlementAbandonmentResult result = service.detectAbandoned(baseDate);
-
-            assertThat(result.detectedCount()).isZero();
-            verify(abandonmentAlertRepository)
-                    .existsBySettlementIdAndReferenceDate(1L, referenceDate);
-            verify(entityManager, never()).persist(any());
-            verifyNoInteractions(slackNotifier);
-        }
-    }
-
-    @Nested
-    class Pagination {
-
-        @Test
-        void 페이지가_가득차면_다음_페이지를_계속_조회한다() {
-            List<Settlement> fullPage = Collections.nCopies(
-                    100,
-                    settlement(1L, "정산")
-            );
-
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(150L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(fullPage);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(1, 100)
-            )).thenReturn(Collections.emptyList());
-            when(overdueCriteria.resolveReferenceDate(any())).thenReturn(null);
-
-            service.detectAbandoned(baseDate);
-
-            verify(settlementRepository)
-                    .findBySettlementStatusOrderBySettlementIdAsc(
-                            SettlementStatus.IN_PROGRESS,
-                            PageRequest.of(0, 100)
-                    );
-            verify(settlementRepository)
-                    .findBySettlementStatusOrderBySettlementIdAsc(
-                            SettlementStatus.IN_PROGRESS,
-                            PageRequest.of(1, 100)
-                    );
-        }
-
-        @Test
-        void 마지막_페이지가_PAGE_SIZE보다_작으면_추가조회하지_않는다() {
-            Settlement s = settlement(1L, "정산A");
-
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(1L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(List.of(s));
-            when(overdueCriteria.resolveReferenceDate(s)).thenReturn(null);
-
-            service.detectAbandoned(baseDate);
-
-            verify(settlementRepository, times(1))
-                    .findBySettlementStatusOrderBySettlementIdAsc(
-                            eq(SettlementStatus.IN_PROGRESS),
-                            any(PageRequest.class)
-                    );
-        }
-    }
-
-    @Nested
-    class MultipleSettlementsInOnePage {
-
-        @Test
-        void 여러건_중_방치건만_선별해서_카운트한다() {
-            Settlement abandoned = settlement(1L, "방치됨");
-            Settlement notAbandoned = settlement(2L, "정상");
-            Settlement nullRef = settlement(3L, "기준일없음");
-
-            when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
-                    .thenReturn(3L);
-            when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
-                    SettlementStatus.IN_PROGRESS,
-                    PageRequest.of(0, 100)
-            )).thenReturn(List.of(abandoned, notAbandoned, nullRef));
-
-            when(overdueCriteria.resolveReferenceDate(abandoned))
-                    .thenReturn(baseDate.minusDays(10));
-            when(overdueCriteria.resolveReferenceDate(notAbandoned))
-                    .thenReturn(baseDate.minusDays(1));
-            when(overdueCriteria.resolveReferenceDate(nullRef))
-                    .thenReturn(null);
-
-            when(abandonmentAlertRepository.existsBySettlementIdAndReferenceDate(
-                    eq(1L),
-                    any()
-            )).thenReturn(false);
-
-            SettlementAbandonmentResult result = service.detectAbandoned(baseDate);
-
-            assertThat(result.detectedCount()).isEqualTo(1);
-
-            verify(abandonmentAlertRepository)
-                    .existsBySettlementIdAndReferenceDate(eq(1L), any());
-
-            verify(abandonmentAlertRepository, never())
-                    .existsBySettlementIdAndReferenceDate(eq(2L), any());
-
-            verify(abandonmentAlertRepository, never())
-                    .existsBySettlementIdAndReferenceDate(eq(3L), any());
-
-            verify(entityManager, times(1)).persist(any(SettlementAbandonmentAlert.class));
-
-            verify(slackNotifier, times(1)).send(any());
-        }
     }
 }

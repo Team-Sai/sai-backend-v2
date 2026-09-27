@@ -11,7 +11,6 @@ import org.teamsai.saibackend.domain.notification.type.ReminderStage;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
-import org.teamsai.saibackend.domain.batch.settlement.reminder.SettlementDueReminderService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementReminderResult;
 import org.teamsai.saibackend.domain.settlement.support.SettlementReminderSender;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
@@ -209,6 +208,23 @@ class SettlementDueReminderServiceTest {
             verify(reminderSender).sendForSettlement(s1, ReminderStage.DDAY);
             verify(reminderSender).sendForSettlement(s2, ReminderStage.DDAY);
         }
+    }
+
+    @Test
+    void partialNotificationFailuresAreAggregatedSeparatelyFromSettlementFailures() {
+        Settlement target = settlement(1L);
+        when(settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS)).thenReturn(1L);
+        when(settlementRepository.findBySettlementStatusOrderBySettlementIdAsc(
+                SettlementStatus.IN_PROGRESS, PageRequest.of(0, 100))).thenReturn(List.of(target));
+        when(overdueCriteria.resolveReferenceDate(target)).thenReturn(baseDate);
+        when(reminderSender.sendForSettlement(target, ReminderStage.DDAY))
+                .thenReturn(new SettlementReminderSender.DeliveryResult(2, 1));
+
+        var result = service.sendDueReminders(baseDate);
+
+        assertThat(result.processedCount()).isEqualTo(2);
+        assertThat(result.failedCount()).isZero();
+        assertThat(result.failedNotificationCount()).isEqualTo(1);
     }
 
     @Nested

@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.batch.settlement.recurring;
 
 import lombok.RequiredArgsConstructor;
+import org.teamsai.saibackend.domain.settlement.service.RecurringSettlementCycleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;

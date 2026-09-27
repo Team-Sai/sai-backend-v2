@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.settlement;
+package org.teamsai.saibackend.domain.batch.settlement.recurring;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +14,6 @@ import org.springframework.test.context.jdbc.Sql;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
-import org.teamsai.saibackend.domain.batch.settlement.recurring.RecurringSettlementGenerationService;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
 
