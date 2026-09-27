@@ -52,6 +52,10 @@ public class RepaymentScheduleService {
         return repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId);
     }
 
+    public List<RepaymentScheduleEntity> findDueSchedules(List<LocalDate> dueDates, RepaymentScheduleStatus status) {
+        return repaymentScheduleRepository.findByDueDateInAndStatus(dueDates, status);
+    }
+
     public Optional<RepaymentScheduleEntity> findNextPendingSchedule(Long contractId) {
         return repaymentScheduleRepository.findFirstByContractIdAndStatusInOrderBySequenceAsc(
                 contractId, List.of(RepaymentScheduleStatus.PENDING, RepaymentScheduleStatus.OVERDUE)

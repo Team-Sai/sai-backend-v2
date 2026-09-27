@@ -93,7 +93,7 @@ class AccountTransactionIntegrationTest {
                 LinkOperationStore.Status.PROCESSING));
         operations.mark(state, status);
 
-        userService.withdraw(userId);
+        coordinator.withdrawUser(userId);
 
         assertThat(users.existsById(userId)).isFalse();
         assertThat(operations.find(state)).hasValueSatisfying(operation -> {
@@ -111,7 +111,7 @@ class AccountTransactionIntegrationTest {
                 LinkOperationStore.Status.PROCESSING));
         operations.mark(state, status);
 
-        assertError(() -> userService.withdraw(userId), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+        assertError(() -> coordinator.withdrawUser(userId), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
 
         assertThat(users.existsById(userId)).isTrue();
         assertThat(operations.find(state)).hasValueSatisfying(operation ->
@@ -351,7 +351,7 @@ class AccountTransactionIntegrationTest {
         assertThat(pending.status()).isEqualTo(LinkOperationStore.Status.ISSUE_PENDING);
         assertThat(pending.newKey()).isNull();
         // Reconstruct the coordinator to exclude any in-memory state from the retry.
-        var restarted = new AccountLinkCoordinator(lock, users, accountLinks, persistence, bank, operations);
+        var restarted = new AccountLinkCoordinator(lock, userService, accountLinks, persistence, bank, operations);
         assertThat(restarted.issueOrGetUserKey(userId).userKey()).isEqualTo(key);
         verify(bank, times(2)).requestUserKey("Account Test", state, pending.id());
         verify(bank).confirmUserKey(key, pending.id());

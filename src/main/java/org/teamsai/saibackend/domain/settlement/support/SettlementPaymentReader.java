@@ -3,12 +3,11 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
+import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
-import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
@@ -23,8 +22,8 @@ import java.util.stream.Collectors;
 public class SettlementPaymentReader {
 
     private final SettlementParticipantRepository settlementParticipantRepository;
-    private final PaymentObligationRepository paymentObligationRepository;
-    private final PaymentRecordRepository paymentRecordRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
+    private final PaymentRecordService paymentRecordService;
 
     @Transactional(readOnly = true)
     public SettlementPaymentData read(Long settlementId) {
@@ -42,8 +41,8 @@ public class SettlementPaymentReader {
                 .map(SettlementParticipant::getParticipantId)
                 .toList();
 
-        List<PaymentObligationEntity> obligations =
-                paymentObligationRepository.findByParticipantIdIn(
+        List<PaymentObligationView> obligations =
+                paymentObligationQueryService.findByParticipantIds(
                         participantIds
                 );
 
@@ -57,14 +56,13 @@ public class SettlementPaymentReader {
         }
 
         List<Long> obligationIds = obligations.stream()
-                .map(PaymentObligationEntity::getPaymentObligationId)
+                .map(PaymentObligationView::paymentObligationId)
                 .toList();
 
         List<PaymentRecordEntity> paymentRecords =
-                paymentRecordRepository.findConfirmedByTargetIds(
+                paymentRecordService.findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
-                        obligationIds,
-                        RecordStatus.CONFIRMED
+                        obligationIds
                 );
 
         Map<Long, BigDecimal> paidAmountMap =

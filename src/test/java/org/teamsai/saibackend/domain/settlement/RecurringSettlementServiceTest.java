@@ -23,13 +23,12 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,7 +54,7 @@ class RecurringSettlementServiceTest {
     private SettlementRepository settlementRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private UserService userService;
 
     @Mock
     private RecurringSettlementValidator recurringSettlementValidator;
@@ -84,8 +83,8 @@ class RecurringSettlementServiceTest {
                         .userId(OWNER_ID)
                         .build();
 
-        given(userRepository.findById(OWNER_ID))
-                .willReturn(Optional.of(owner));
+        given(userService.getUser(OWNER_ID))
+                .willReturn(owner);
 
         given(settlementAmountCalculator.calculateEqualAmount(
                 request.getTotalAmount(),
@@ -273,8 +272,8 @@ class RecurringSettlementServiceTest {
                         .userId(OWNER_ID)
                         .build();
 
-        given(userRepository.findById(OWNER_ID))
-                .willReturn(Optional.of(owner));
+        given(userService.getUser(OWNER_ID))
+                .willReturn(owner);
 
         given(settlementAmountCalculator.calculateEqualAmount(
                 request.getTotalAmount(),
@@ -316,8 +315,8 @@ class RecurringSettlementServiceTest {
                         .userId(OWNER_ID)
                         .build();
 
-        given(userRepository.findById(OWNER_ID))
-                .willReturn(Optional.of(owner));
+        given(userService.getUser(OWNER_ID))
+                .willReturn(owner);
 
         given(settlementAmountCalculator.calculateEqualAmount(
                 request.getTotalAmount(),
@@ -392,7 +391,7 @@ class RecurringSettlementServiceTest {
                 settlementAmountCalculator,
                 recurringSettlementRepository,
                 settlementRepository,
-                userRepository,
+                userService,
                 participantService,
                 settlementAccountService
         );
@@ -412,8 +411,8 @@ class RecurringSettlementServiceTest {
                         .userId(OWNER_ID)
                         .build();
 
-        given(userRepository.findById(OWNER_ID))
-                .willReturn(Optional.of(owner));
+        given(userService.getUser(OWNER_ID))
+                .willReturn(owner);
 
         given(settlementAmountCalculator.calculateEqualAmount(
                 new BigDecimal("450000"),
@@ -498,8 +497,8 @@ class RecurringSettlementServiceTest {
                         .userId(OWNER_ID)
                         .build();
 
-        given(userRepository.findById(OWNER_ID))
-                .willReturn(Optional.of(owner));
+        given(userService.getUser(OWNER_ID))
+                .willReturn(owner);
 
         given(settlementAmountCalculator.calculateEqualAmount(
                 request.getTotalAmount(),

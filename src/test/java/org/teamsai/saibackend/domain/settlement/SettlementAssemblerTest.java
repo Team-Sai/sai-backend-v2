@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.settlement;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
@@ -45,15 +45,11 @@ class SettlementAssemblerTest {
         return participant;
     }
 
-    private PaymentObligationEntity obligation(
+    private PaymentObligationView obligation(
             Long obligationId, Long participantId, long expectedAmount, ObligationStatus status
     ) {
-        PaymentObligationEntity obligation = mock(PaymentObligationEntity.class);
-        lenient().when(obligation.getPaymentObligationId()).thenReturn(obligationId);
-        lenient().when(obligation.getParticipantId()).thenReturn(participantId);
-        lenient().when(obligation.getExpectedAmount()).thenReturn(BigDecimal.valueOf(expectedAmount));
-        lenient().when(obligation.getObligationStatus()).thenReturn(status);
-        return obligation;
+        return new PaymentObligationView(obligationId, participantId, BigDecimal.valueOf(expectedAmount),
+                PaymentStatus.UNPAID, status, null);
     }
 
     private PaymentRecordEntity paymentRecord(long amount, LocalDateTime recordedAt) {
@@ -102,7 +98,7 @@ class SettlementAssemblerTest {
         @DisplayName("결제 기록이 없으면 UNPAID, 전액 남은 금액으로 계산한다")
         void unpaidWhenNoRecords() {
             SettlementParticipant participant = participant(1L, OWNER_ID, "채빈");
-            PaymentObligationEntity obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
+            PaymentObligationView obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
 
             SettlementPaymentObligationResponse result =
                     SettlementAssembler.toObligationResponse(obligation, participant, List.of());
@@ -118,7 +114,7 @@ class SettlementAssemblerTest {
         @DisplayName("일부만 결제되면 PARTIALLY_PAID, 가장 최근 결제일을 사용한다")
         void partiallyPaidUsesLatestPaymentDate() {
             SettlementParticipant participant = participant(1L, OWNER_ID, "채빈");
-            PaymentObligationEntity obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
+            PaymentObligationView obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
             LocalDateTime earlier = LocalDateTime.of(2026, 8, 1, 0, 0);
             LocalDateTime later = LocalDateTime.of(2026, 8, 10, 0, 0);
             List<PaymentRecordEntity> records = List.of(
@@ -139,7 +135,7 @@ class SettlementAssemblerTest {
         @DisplayName("전액 결제되면 PAID, 남은 금액은 0이다")
         void fullyPaid() {
             SettlementParticipant participant = participant(1L, OWNER_ID, "채빈");
-            PaymentObligationEntity obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
+            PaymentObligationView obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
             List<PaymentRecordEntity> records = List.of(paymentRecord(10_000, LocalDateTime.now()));
 
             SettlementPaymentObligationResponse result =

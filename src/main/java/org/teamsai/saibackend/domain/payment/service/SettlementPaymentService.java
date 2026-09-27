@@ -11,11 +11,15 @@ import org.teamsai.saibackend.domain.payment.repository.PaymentObligationReposit
 import org.teamsai.saibackend.domain.payment.type.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SettlementPaymentService {
+
+    private static final int WRITE_OFF_CHUNK_SIZE = 500;
 
     private final PaymentObligationRepository paymentObligationRepository;
     private final PaymentRecordService paymentRecordService;
@@ -121,6 +125,37 @@ public class SettlementPaymentService {
                 );
 
         return savedPaymentObligation.getPaymentObligationId();
+    }
+
+    @Transactional
+    public int markOverdueByParticipantIds(List<Long> participantIds, LocalDateTime overdueSince) {
+        if (participantIds == null || participantIds.isEmpty()) {
+            return 0;
+        }
+
+        var obligations = paymentObligationRepository.findUnpaidByParticipantIds(
+                participantIds,
+                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID),
+                ObligationStatus.ACTIVE
+        );
+        obligations.forEach(obligation -> obligation.markOverdue(overdueSince));
+        return obligations.size();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int writeOffOneBatch(List<Long> obligationIds) {
+        int total = 0;
+        for (int i = 0; i < obligationIds.size(); i += WRITE_OFF_CHUNK_SIZE) {
+            List<Long> chunk = obligationIds.subList(i, Math.min(i + WRITE_OFF_CHUNK_SIZE, obligationIds.size()));
+            List<PaymentObligationEntity> obligations = paymentObligationRepository.findWriteOffTargetsForUpdate(
+                    chunk,
+                    ObligationStatus.ACTIVE,
+                    List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)
+            );
+            obligations.forEach(PaymentObligationEntity::writeOff);
+            total += obligations.size();
+        }
+        return total;
     }
 
     private void validateActiveObligation(PaymentObligationEntity obligation) {
