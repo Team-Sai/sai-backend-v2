@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
@@ -24,7 +24,7 @@ class PaymentObligationQueryServiceTest {
     @Test
     void returnsObligationReadModelWithoutExposingEntity() {
         var service = new PaymentObligationQueryService(repository);
-        var entity = new PaymentObligationEntity(42L, new BigDecimal("120000"));
+        var entity = new PaymentObligation(42L, new BigDecimal("120000"));
         when(repository.findByParticipantIdIn(List.of(42L))).thenReturn(List.of(entity));
 
         var obligations = service.findByParticipantIds(List.of(42L));
@@ -45,8 +45,8 @@ class PaymentObligationQueryServiceTest {
         var statuses = List.of(ObligationStatus.ACTIVE, ObligationStatus.EXCLUDED,
                 ObligationStatus.CANCELLED, ObligationStatus.WRITTEN_OFF);
         when(repository.findLatestByParticipantIdsAndObligationStatuses(List.of(1L, 2L, 3L), statuses))
-                .thenReturn(List.of(new PaymentObligationEntity(2L, new BigDecimal("120000")),
-                        new PaymentObligationEntity(1L, new BigDecimal("80000"))));
+                .thenReturn(List.of(new PaymentObligation(2L, new BigDecimal("120000")),
+                        new PaymentObligation(1L, new BigDecimal("80000"))));
 
         var amounts = service.findLatestExpectedAmountsByParticipantIdsAndStatuses(List.of(1L, 2L, 3L), statuses);
 

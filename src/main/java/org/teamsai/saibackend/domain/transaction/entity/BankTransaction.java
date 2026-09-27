@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class BankTransactionEntity {
+public class BankTransaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -65,7 +65,7 @@ public class BankTransactionEntity {
     private Integer retryCount;
 
     // 신규 거래의 입력값만 받으며, ID와 초기 처리 상태는 외부에서 지정하지 않는다.
-    public BankTransactionEntity(
+    public BankTransaction(
             Long linkedAccountId,
             String externalTransactionId,
             BigDecimal amount,

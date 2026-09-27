@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractChangeRepository;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
@@ -31,7 +31,7 @@ public class ContractChangeQueryService {
         return contract;
     }
 
-    public LoanContractChangeRequestEntity getChangeRequest(Long changeRequestId) {
+    public LoanContractChangeRequest getChangeRequest(Long changeRequestId) {
         return contractChangeRepository.findById(changeRequestId)
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
 
@@ -44,7 +44,7 @@ public class ContractChangeQueryService {
     }
 
     public boolean hasPendingChangeRequest(Long contractId) {
-        List<LoanContractChangeRequestEntity> existingRequests = contractChangeRepository.findByContractId(contractId);
+        List<LoanContractChangeRequest> existingRequests = contractChangeRepository.findByContractId(contractId);
         return existingRequests.stream()
                 .anyMatch(changeRequest -> ChangeRequestStatus.PENDING.equals(changeRequest.getStatus()));
     }

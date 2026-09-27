@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.matching.model.EvaluatedMatchingCandidate;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateQueryRepository;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateRepository;
@@ -41,7 +41,7 @@ public class BankTransactionMatchCandidateService {
 
         LocalDateTime createdAt = LocalDateTime.now();
 
-        List<BankTransactionMatchCandidateEntity> candidates =
+        List<BankTransactionMatchCandidate> candidates =
                 evaluatedCandidates.stream()
                         .map(candidate -> toEntity(
                                 bankTransactionId,
@@ -60,7 +60,7 @@ public class BankTransactionMatchCandidateService {
         }
     }
 
-    public List<BankTransactionMatchCandidateEntity>
+    public List<BankTransactionMatchCandidate>
     findAllByBankTransactionId(Long bankTransactionId) {
         validateBankTransactionId(bankTransactionId);
 
@@ -98,7 +98,7 @@ public class BankTransactionMatchCandidateService {
         );
     }
 
-    public BankTransactionMatchCandidateEntity
+    public BankTransactionMatchCandidate
     findByIdAndBankTransactionId(
             Long matchCandidateId,
             Long bankTransactionId
@@ -132,7 +132,7 @@ public class BankTransactionMatchCandidateService {
                     .toException();
         }
 
-        BankTransactionMatchCandidateEntity candidate = candidateRepository.findAvailableForUpdate(
+        BankTransactionMatchCandidate candidate = candidateRepository.findAvailableForUpdate(
                 matchCandidateId,
                 bankTransactionId,
                 MatchingCandidateStatus.AVAILABLE
@@ -158,12 +158,12 @@ public class BankTransactionMatchCandidateService {
         candidateRepository.deleteAllByBankTransactionId(bankTransactionId);
     }
 
-    private BankTransactionMatchCandidateEntity toEntity(
+    private BankTransactionMatchCandidate toEntity(
             Long bankTransactionId,
             EvaluatedMatchingCandidate evaluatedCandidate,
             LocalDateTime createdAt
     ) {
-        return BankTransactionMatchCandidateEntity.builder()
+        return BankTransactionMatchCandidate.builder()
                 .bankTransactionId(bankTransactionId)
                 .targetType(
                         evaluatedCandidate.candidate().targetType()

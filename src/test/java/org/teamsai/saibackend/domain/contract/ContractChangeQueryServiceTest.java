@@ -10,7 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractChangeRepository;
@@ -59,8 +59,8 @@ class ContractChangeQueryServiceTest {
                 .build();
     }
 
-    private LoanContractChangeRequestEntity changeRequest(ChangeRequestStatus status) {
-        LoanContractChangeRequestEntity entity = new LoanContractChangeRequestEntity(
+    private LoanContractChangeRequest changeRequest(ChangeRequestStatus status) {
+        LoanContractChangeRequest entity = new LoanContractChangeRequest(
                 CONTRACT_ID, USER_ID, "이자율 조정 요청",
                 null, null, null, null, null,
                 status, LocalDateTime.now(), LocalDateTime.now()
@@ -123,7 +123,7 @@ class ContractChangeQueryServiceTest {
             given(contractChangeRepository.findById(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest(ChangeRequestStatus.PENDING)));
 
-            LoanContractChangeRequestEntity result = contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID);
+            LoanContractChangeRequest result = contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID);
 
             assertThat(result.getChangeRequestId()).isEqualTo(CHANGE_REQUEST_ID);
         }

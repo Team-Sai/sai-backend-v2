@@ -13,7 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.dto.request.BankTransactionSearchCondition;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
@@ -68,8 +68,8 @@ class BankTransactionQueryServiceTest {
                 .build();
     }
 
-    private BankTransactionEntity createTransaction(Long bankTransactionId) {
-        BankTransactionEntity transaction = new BankTransactionEntity(
+    private BankTransaction createTransaction(Long bankTransactionId) {
+        BankTransaction transaction = new BankTransaction(
                 LINKED_ACCOUNT_ID, "TX-" + bankTransactionId, BigDecimal.valueOf(30_000),
                 BankTransactionType.DEPOSIT, LocalDateTime.now(),
                 "홍길동", "테스트 입금", LocalDateTime.now()
@@ -93,7 +93,7 @@ class BankTransactionQueryServiceTest {
         void returnsPageResponseForOwnedAccount() {
             LinkedBankAccount linkedAccount = createLinkedAccount();
             BankTransactionSearchCondition condition = defaultCondition();
-            List<BankTransactionEntity> transactions = List.of(
+            List<BankTransaction> transactions = List.of(
                     createTransaction(1L), createTransaction(2L)
             );
 
@@ -199,7 +199,7 @@ class BankTransactionQueryServiceTest {
         @DisplayName("본인 소유 계좌의 거래면 상세 정보를 반환한다")
         void returnsDetailForOwnedAccount() {
             LinkedBankAccount linkedAccount = createLinkedAccount();
-            BankTransactionEntity transaction = createTransaction(BANK_TRANSACTION_ID);
+            BankTransaction transaction = createTransaction(BANK_TRANSACTION_ID);
 
             given(linkedBankAccountService.getLinkedAccount(LINKED_ACCOUNT_ID)).willReturn(linkedAccount);
             given(bankTransactionRepository.findByBankTransactionIdAndLinkedAccountId(BANK_TRANSACTION_ID, LINKED_ACCOUNT_ID))

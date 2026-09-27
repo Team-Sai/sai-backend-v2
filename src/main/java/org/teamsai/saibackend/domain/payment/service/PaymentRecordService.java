@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
@@ -50,8 +50,8 @@ public class PaymentRecordService {
 
         validateNotDuplicateBankTransaction(bankTransactionId);
 
-        PaymentRecordEntity paymentRecord =
-                new PaymentRecordEntity(
+        PaymentRecord paymentRecord =
+                new PaymentRecord(
                         bankTransactionId,
                         paymentTargetType,
                         targetId,
@@ -62,7 +62,7 @@ public class PaymentRecordService {
                 );
 
         try {
-            PaymentRecordEntity savedPaymentRecord =
+            PaymentRecord savedPaymentRecord =
                     paymentRecordRepository.saveAndFlush(paymentRecord);
 
             return savedPaymentRecord.getPaymentRecordId();
@@ -73,7 +73,7 @@ public class PaymentRecordService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentRecordEntity> findConfirmedRecordsByTargetIds(
+    public List<PaymentRecord> findConfirmedRecordsByTargetIds(
             PaymentTargetType paymentTargetType,
             List<Long> targetIds
     ) {

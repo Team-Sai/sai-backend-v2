@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 @Table(name = "payment_obligation")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PaymentObligationEntity {
+public class PaymentObligation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,7 +58,7 @@ public class PaymentObligationEntity {
     @Column(name = "overdue_since")
     private LocalDateTime overdueSince;
 
-    public PaymentObligationEntity(
+    public PaymentObligation(
             Long participantId,
             BigDecimal expectedAmount
     ) {

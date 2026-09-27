@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 
@@ -13,36 +13,36 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PaymentObligationRepository
-        extends JpaRepository<PaymentObligationEntity, Long> {
+        extends JpaRepository<PaymentObligation, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT paymentObligation
-            FROM PaymentObligationEntity paymentObligation
+            FROM PaymentObligation paymentObligation
             WHERE paymentObligation.paymentObligationId =
                   :paymentObligationId
             """)
-    Optional<PaymentObligationEntity> findByIdForUpdate(
+    Optional<PaymentObligation> findByIdForUpdate(
             @Param("paymentObligationId")
             Long paymentObligationId
     );
 
     @Query("""
             SELECT paymentObligation
-            FROM PaymentObligationEntity paymentObligation
+            FROM PaymentObligation paymentObligation
             WHERE paymentObligation.participantId IN :participantIds
               AND paymentObligation.obligationStatus =
                   :obligationStatus
               AND paymentObligation.paymentObligationId IN (
                     SELECT MAX(latestPaymentObligation.paymentObligationId)
-                    FROM PaymentObligationEntity latestPaymentObligation
+                    FROM PaymentObligation latestPaymentObligation
                     WHERE latestPaymentObligation.participantId IN :participantIds
                       AND latestPaymentObligation.obligationStatus =
                           :obligationStatus
                     GROUP BY latestPaymentObligation.participantId
               )
             """)
-    List<PaymentObligationEntity> findLatestByParticipantIds(
+    List<PaymentObligation> findLatestByParticipantIds(
             @Param("participantIds")
             List<Long> participantIds,
 
@@ -52,18 +52,18 @@ public interface PaymentObligationRepository
 
     @Query("""
             SELECT paymentObligation
-            FROM PaymentObligationEntity paymentObligation
+            FROM PaymentObligation paymentObligation
             WHERE paymentObligation.participantId IN :participantIds
               AND paymentObligation.obligationStatus IN :obligationStatuses
               AND paymentObligation.paymentObligationId IN (
                     SELECT MAX(latestPaymentObligation.paymentObligationId)
-                    FROM PaymentObligationEntity latestPaymentObligation
+                    FROM PaymentObligation latestPaymentObligation
                     WHERE latestPaymentObligation.participantId IN :participantIds
                       AND latestPaymentObligation.obligationStatus IN :obligationStatuses
                     GROUP BY latestPaymentObligation.participantId
               )
             """)
-    List<PaymentObligationEntity>
+    List<PaymentObligation>
     findLatestByParticipantIdsAndObligationStatuses(
             @Param("participantIds")
             List<Long> participantIds,
@@ -74,7 +74,7 @@ public interface PaymentObligationRepository
 
     @Query("""
             SELECT paymentObligation
-            FROM PaymentObligationEntity paymentObligation
+            FROM PaymentObligation paymentObligation
             WHERE paymentObligation.participantId IN :participantIds
               AND paymentObligation.paymentStatus IN :paymentStatuses
               AND paymentObligation.obligationStatus =
@@ -82,7 +82,7 @@ public interface PaymentObligationRepository
               AND paymentObligation.overdueSince IS NULL
             """)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    List<PaymentObligationEntity> findUnpaidByParticipantIds(
+    List<PaymentObligation> findUnpaidByParticipantIds(
             @Param("participantIds")
             List<Long> participantIds,
 
@@ -96,7 +96,7 @@ public interface PaymentObligationRepository
 
     @Query("""
             SELECT paymentObligation.paymentObligationId
-            FROM PaymentObligationEntity paymentObligation
+            FROM PaymentObligation paymentObligation
             WHERE paymentObligation.obligationStatus =
                   :obligationStatus
               AND paymentObligation.paymentStatus IN :paymentStatuses
@@ -114,7 +114,7 @@ public interface PaymentObligationRepository
             java.time.LocalDateTime cutoffDateTime
     );
 
-    List<PaymentObligationEntity> findByParticipantIdIn(
+    List<PaymentObligation> findByParticipantIdIn(
             List<Long> participantIds
     );
 
@@ -136,12 +136,12 @@ public interface PaymentObligationRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT paymentObligation
-        FROM PaymentObligationEntity paymentObligation
+        FROM PaymentObligation paymentObligation
         WHERE paymentObligation.paymentObligationId IN :obligationIds
           AND paymentObligation.obligationStatus = :obligationStatus
           AND paymentObligation.paymentStatus IN :paymentStatuses
         """)
-    List<PaymentObligationEntity> findWriteOffTargetsForUpdate(
+    List<PaymentObligation> findWriteOffTargetsForUpdate(
             @Param("obligationIds")
             List<Long> obligationIds,
 
@@ -154,12 +154,12 @@ public interface PaymentObligationRepository
 
     @Query("""
         SELECT paymentObligation
-        FROM PaymentObligationEntity paymentObligation
+        FROM PaymentObligation paymentObligation
         WHERE paymentObligation.participantId IN :participantIds
           AND paymentObligation.obligationStatus IN :obligationStatuses
         ORDER BY paymentObligation.paymentObligationId ASC
         """)
-    List<PaymentObligationEntity> findByParticipantIdsAndObligationStatuses(
+    List<PaymentObligation> findByParticipantIdsAndObligationStatuses(
             @Param("participantIds")
             List<Long> participantIds,
 

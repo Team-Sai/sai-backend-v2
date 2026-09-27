@@ -10,7 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
@@ -47,8 +47,8 @@ class RepaymentScheduleServiceTest {
     @InjectMocks
     private RepaymentScheduleService repaymentScheduleService;
 
-    private RepaymentScheduleEntity buildRow(int sequence, RepaymentScheduleStatus status, String totalPaymentDue) {
-        RepaymentScheduleEntity entity = new RepaymentScheduleEntity(
+    private RepaymentSchedule buildRow(int sequence, RepaymentScheduleStatus status, String totalPaymentDue) {
+        RepaymentSchedule entity = new RepaymentSchedule(
                 1L,
                 sequence,
                 LocalDate.of(2026, 1, 1),
@@ -81,7 +81,7 @@ class RepaymentScheduleServiceTest {
         repaymentScheduleService.generateSchedule(contractId);
 
         verify(repaymentScheduleRepository).saveAll(
-                argThat((List<RepaymentScheduleEntity> list) -> list.size() == 12)
+                argThat((List<RepaymentSchedule> list) -> list.size() == 12)
         );
     }
 
@@ -124,7 +124,7 @@ class RepaymentScheduleServiceTest {
     void markAsPaid_marksScheduleAsPaidAndSaves() {
         Long scheduleId = 5L;
         LocalDateTime paidAt = LocalDateTime.now();
-        RepaymentScheduleEntity schedule = buildRow(1, RepaymentScheduleStatus.PENDING, "800000");
+        RepaymentSchedule schedule = buildRow(1, RepaymentScheduleStatus.PENDING, "800000");
 
         when(repaymentScheduleRepository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(schedule));
 

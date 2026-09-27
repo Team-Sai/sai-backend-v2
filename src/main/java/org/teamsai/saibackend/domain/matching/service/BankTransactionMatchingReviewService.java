@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.dto.response.MatchingReviewProcessResponse;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.support.MatchingReviewValidator;
@@ -43,7 +43,7 @@ public class BankTransactionMatchingReviewService {
                         bankTransactionId
                 );
 
-        BankTransactionMatchCandidateEntity candidate =
+        BankTransactionMatchCandidate candidate =
                 candidateService.findByIdAndBankTransactionId(
                         matchCandidateId,
                         bankTransactionId
@@ -120,7 +120,7 @@ public class BankTransactionMatchingReviewService {
 
     private void applyPayment(
             BankTransactionDetailResponse transaction,
-            BankTransactionMatchCandidateEntity candidate
+            BankTransactionMatchCandidate candidate
     ) {
         if (candidate.getTargetType() == MatchingTargetType.SETTLEMENT) {
             settlementPaymentService.applyManuallyMatchedPayment(

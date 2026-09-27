@@ -10,7 +10,7 @@ import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateQueryRepository;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateRepository;
@@ -79,22 +79,22 @@ class BankTransactionMatchCandidateServiceTest {
                 List.of(settlementCandidate, loanCandidate)
         );
 
-        ArgumentCaptor<List<BankTransactionMatchCandidateEntity>> captor =
+        ArgumentCaptor<List<BankTransactionMatchCandidate>> captor =
                 ArgumentCaptor.forClass(List.class);
         verify(candidateRepository).saveAllAndFlush(captor.capture());
 
-        List<BankTransactionMatchCandidateEntity> savedCandidates =
+        List<BankTransactionMatchCandidate> savedCandidates =
                 captor.getValue();
 
         assertThat(savedCandidates).hasSize(2);
         assertThat(savedCandidates)
                 .extracting(
-                        BankTransactionMatchCandidateEntity::getBankTransactionId,
-                        BankTransactionMatchCandidateEntity::getTargetType,
-                        BankTransactionMatchCandidateEntity::getTargetId,
-                        BankTransactionMatchCandidateEntity::getExpectedRemainingAmount,
-                        BankTransactionMatchCandidateEntity::getAmountMatchType,
-                        BankTransactionMatchCandidateEntity::getCandidateStatus
+                        BankTransactionMatchCandidate::getBankTransactionId,
+                        BankTransactionMatchCandidate::getTargetType,
+                        BankTransactionMatchCandidate::getTargetId,
+                        BankTransactionMatchCandidate::getExpectedRemainingAmount,
+                        BankTransactionMatchCandidate::getAmountMatchType,
+                        BankTransactionMatchCandidate::getCandidateStatus
                 )
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(
@@ -120,7 +120,7 @@ class BankTransactionMatchCandidateServiceTest {
                     assertThat(candidate.getInvalidationReason()).isNull();
                 });
         assertThat(savedCandidates)
-                .extracting(BankTransactionMatchCandidateEntity::getCreatedAt)
+                .extracting(BankTransactionMatchCandidate::getCreatedAt)
                 .doesNotContainNull()
                 .allMatch(createdAt -> createdAt.equals(
                         savedCandidates.get(0).getCreatedAt()
@@ -177,12 +177,12 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void returnsCandidatesForBankTransaction() {
-        BankTransactionMatchCandidateEntity candidate = dto(1L, 100L);
+        BankTransactionMatchCandidate candidate = dto(1L, 100L);
 
         when(candidateRepository.findAllByBankTransactionIdOrderByMatchCandidateIdAsc(100L))
                 .thenReturn(List.of(candidate));
 
-        List<BankTransactionMatchCandidateEntity> result =
+        List<BankTransactionMatchCandidate> result =
                 candidateService.findAllByBankTransactionId(100L);
 
         assertThat(result).containsExactly(candidate);
@@ -264,12 +264,12 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void returnsCandidateBelongingToBankTransaction() {
-        BankTransactionMatchCandidateEntity candidate = dto(1L, 100L);
+        BankTransactionMatchCandidate candidate = dto(1L, 100L);
 
         when(candidateValidationQueryRepository.findByIdAndBankTransactionId(1L, 100L))
                 .thenReturn(Optional.of(candidate));
 
-        BankTransactionMatchCandidateEntity result =
+        BankTransactionMatchCandidate result =
                 candidateService.findByIdAndBankTransactionId(1L, 100L);
 
         assertThat(result).isSameAs(candidate);
@@ -293,7 +293,7 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void invalidatesAvailableCandidate() {
-        BankTransactionMatchCandidateEntity candidate = dto(1L, 100L);
+        BankTransactionMatchCandidate candidate = dto(1L, 100L);
         when(candidateRepository.findAvailableForUpdate(
                 1L, 100L, MatchingCandidateStatus.AVAILABLE
         )).thenReturn(Optional.of(candidate));
@@ -382,11 +382,11 @@ class BankTransactionMatchCandidateServiceTest {
         return new EvaluatedMatchingCandidate(candidate, amountMatchType);
     }
 
-    private BankTransactionMatchCandidateEntity dto(
+    private BankTransactionMatchCandidate dto(
             Long matchCandidateId,
             Long bankTransactionId
     ) {
-        return BankTransactionMatchCandidateEntity.builder()
+        return BankTransactionMatchCandidate.builder()
                 .matchCandidateId(matchCandidateId)
                 .bankTransactionId(bankTransactionId)
                 .targetType(MatchingTargetType.SETTLEMENT)

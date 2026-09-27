@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.contract.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,7 +21,7 @@ public class RepaymentScheduleResponse {
     private RepaymentScheduleStatus status;
     private LocalDateTime paidAt;
 
-    public static RepaymentScheduleResponse from(RepaymentScheduleEntity entity) {
+    public static RepaymentScheduleResponse from(RepaymentSchedule entity) {
         return RepaymentScheduleResponse.builder()
                 .scheduleId(entity.getScheduleId())
                 .sequence(entity.getSequence())

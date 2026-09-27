@@ -25,7 +25,7 @@ import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.global.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
@@ -68,7 +68,7 @@ class RepaymentDueReminderJobIntegrationTest {
             basePackageClasses = {
                     Notification.class,
                     User.class,
-                    RepaymentScheduleEntity.class,
+                    RepaymentSchedule.class,
                     LoanContract.class,
                     LinkedBankAccount.class
             }

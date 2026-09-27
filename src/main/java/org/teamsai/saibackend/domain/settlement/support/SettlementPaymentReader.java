@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
@@ -59,7 +59,7 @@ public class SettlementPaymentReader {
                 .map(PaymentObligationView::paymentObligationId)
                 .toList();
 
-        List<PaymentRecordEntity> paymentRecords =
+        List<PaymentRecord> paymentRecords =
                 paymentRecordService.findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
                         obligationIds
@@ -68,9 +68,9 @@ public class SettlementPaymentReader {
         Map<Long, BigDecimal> paidAmountMap =
                 paymentRecords.stream()
                         .collect(Collectors.groupingBy(
-                                PaymentRecordEntity::getTargetId,
+                                PaymentRecord::getTargetId,
                                 Collectors.mapping(
-                                        PaymentRecordEntity::getAmount,
+                                        PaymentRecord::getAmount,
                                         Collectors.reducing(
                                                 BigDecimal.ZERO,
                                                 BigDecimal::add

@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Table(name = "loan_contract_change_request")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class LoanContractChangeRequestEntity {
+public class LoanContractChangeRequest {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -106,7 +106,7 @@ public class LoanContractChangeRequestEntity {
         }
     }
 
-    public LoanContractChangeRequestEntity(
+    public LoanContractChangeRequest(
             Long contractId,
             Long userId,
             String changeReason,
