@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
@@ -12,6 +13,7 @@ import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettleme
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementParticipantValidator;
 import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -41,6 +43,11 @@ class SettlementValidatorTest {
 
     @Mock
     private SettlementParticipantRepository settlementParticipantRepository;
+
+
+    @Spy
+    private SettlementParticipantValidator participantValidator =
+            new SettlementParticipantValidator();
 
     @InjectMocks
     private SettlementValidator settlementValidator;
@@ -263,39 +270,31 @@ class SettlementValidatorTest {
     @Test
     @DisplayName("참여자 목록에 null이 포함되면 검증에 실패한다")
     void validateCreateRequestFailsWhenParticipantIsNull() {
+        CreateSharedSettlementRequest request = request(
+                Arrays.asList(
+                        participant("SAI_USER_A"),
+                        null
+                )
+        );
 
-        CreateSharedSettlementRequest request =
-                request(
-                        Arrays.asList(
-                                participant("SAI_USER_A"),
-                                null
-                        )
-                );
-
-        assertThatThrownBy(
-                () ->
-                        settlementValidator
-                                .validateCreateRequest(request)
-        ).isInstanceOf(DomainException.class);
+        assertSettlementExceptionThrownBy(
+                () -> settlementValidator.validateCreateRequest(request),
+                SettlementErrorCode.INVALID_SETTLEMENT_PARTICIPANT
+        );
     }
 
 
     @Test
     @DisplayName("참여자 userToken이 비어 있으면 검증에 실패한다")
     void validateCreateRequestFailsWhenUserTokenIsBlank() {
+        CreateSharedSettlementRequest request = request(
+                List.of(participant(" "))
+        );
 
-        CreateSharedSettlementRequest request =
-                request(
-                        List.of(
-                                participant(" ")
-                        )
-                );
-
-        assertThatThrownBy(
-                () ->
-                        settlementValidator
-                                .validateCreateRequest(request)
-        ).isInstanceOf(DomainException.class);
+        assertSettlementExceptionThrownBy(
+                () -> settlementValidator.validateCreateRequest(request),
+                SettlementErrorCode.INVALID_SETTLEMENT_PARTICIPANT
+        );
     }
 
 
@@ -311,11 +310,10 @@ class SettlementValidatorTest {
                         )
                 );
 
-        assertThatThrownBy(
-                () ->
-                        settlementValidator
-                                .validateCreateRequest(request)
-        ).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> settlementValidator.validateCreateRequest(request))
+                .isInstanceOf(DomainException.class)
+                .extracting("errorCode")
+                .isEqualTo(SettlementErrorCode.DUPLICATE_SETTLEMENT_PARTICIPANT);
     }
 
 

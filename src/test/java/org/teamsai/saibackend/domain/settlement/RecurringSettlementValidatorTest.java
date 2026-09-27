@@ -3,7 +3,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
 import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
+import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.support.RecurringSettlementValidator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementParticipantValidator;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.util.List;
@@ -14,7 +16,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RecurringSettlementValidatorTest {
 
     private final RecurringSettlementValidator validator =
-            new RecurringSettlementValidator();
+            new RecurringSettlementValidator(
+                    new SettlementParticipantValidator()
+            );
 
     @Test
     @DisplayName("동일한 참여자를 중복 선택하면 예외가 발생한다")
@@ -27,9 +31,10 @@ class RecurringSettlementValidatorTest {
                         ))
                         .build();
 
-        assertThatThrownBy(() ->
-                validator.validateCreateRequest(request)
-        ).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> validator.validateCreateRequest(request))
+                .isInstanceOf(DomainException.class)
+                .extracting("errorCode")
+                .isEqualTo(SettlementErrorCode.DUPLICATE_SETTLEMENT_PARTICIPANT);
     }
 
     private CreateSettlementParticipantRequest participant(String userToken) {

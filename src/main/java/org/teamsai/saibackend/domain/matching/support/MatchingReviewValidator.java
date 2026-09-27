@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.matching;
+package org.teamsai.saibackend.domain.matching.support;
 
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
@@ -9,7 +9,7 @@ import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 @Component
 public class MatchingReviewValidator {
 
-    public void validate(BankTransactionDetailResponse transaction) {
+    public void validateReviewable(BankTransactionDetailResponse transaction) {
         if (transaction.processingStatus()
                 != BankTransactionProcessingStatus.NEEDS_CHECK
                 || transaction.transactionType()
