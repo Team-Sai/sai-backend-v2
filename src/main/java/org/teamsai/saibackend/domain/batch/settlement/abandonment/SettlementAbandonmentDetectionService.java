@@ -37,7 +37,6 @@ public class SettlementAbandonmentDetectionService {
             detectionFailure = e;
         }
 
-        // Delivery uses its own transactions and must run even if detection failed.
         try {
             deliverPending();
         } catch (RuntimeException deliveryFailure) {
@@ -81,7 +80,6 @@ public class SettlementAbandonmentDetectionService {
                         continue;
                     }
                 } catch (DataIntegrityViolationException e) {
-                    // The failed insert has already rolled back in its own transaction.
                     if (!recorder.exists(settlement.getSettlementId(), referenceDate)) {
                         throw e;
                     }
@@ -127,7 +125,6 @@ public class SettlementAbandonmentDetectionService {
                             alert.getSettlementId(), alert.getReferenceDate(), e);
                 }
             }
-            // Keyset pagination keeps failed records pending without looping or skipping other records.
             var last = pending.get(pending.size() - 1);
             afterId = last.getSettlementId();
             afterDate = last.getReferenceDate();
