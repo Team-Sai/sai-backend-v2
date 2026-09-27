@@ -42,7 +42,7 @@ public class ContractDetailQueryController {
             @ApiResponse(responseCode = "403", description = "계약 당사자가 아님"),
             @ApiResponse(responseCode = "404", description = "계약을 찾을 수 없음")
     })
-    @GetMapping("/api/contracts/{contractId}/contract-detail")
+    @GetMapping("/api/contracts/{contractId}/document")
     public ContractDetailResponse responseDetail(
             @PathVariable Long contractId,
             @AuthenticationPrincipal(expression = "userId") Long userId
