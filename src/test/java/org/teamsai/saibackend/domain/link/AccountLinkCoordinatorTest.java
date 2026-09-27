@@ -511,7 +511,7 @@ class AccountLinkCoordinatorTest {
     }
 
     private void assertIssuanceStopsRetrying(RestClientResponseException failure,
-                                           LinkOperationStore.Status expectedStatus, AccountErrorCode expectedCode) {
+                                             LinkOperationStore.Status expectedStatus, AccountErrorCode expectedCode) {
         when(operations.findUnresolved(1L)).thenAnswer(i -> receipt == null ? List.of() : List.of(receipt));
         when(bank.requestUserKey(eq("name"), eq("token"), anyString())).thenThrow(failure);
 
