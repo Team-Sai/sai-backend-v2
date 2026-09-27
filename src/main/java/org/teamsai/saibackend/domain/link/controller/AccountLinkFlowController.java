@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
-import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinateService;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.service.UserService;
@@ -47,7 +47,7 @@ public class AccountLinkFlowController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final LinkedBankAccountService linkedBankAccountService;
-    private final AccountLinkCoordinator accountLinkCoordinator;
+    private final AccountLinkCoordinateService accountLinkCoordinateService;
     private final UserService userService;
     private final IdentityValidator identityValidator;
 
@@ -68,7 +68,7 @@ public class AccountLinkFlowController {
                 myInfo
         );
 
-        accountLinkCoordinator.recoverUnresolved(userId);
+        accountLinkCoordinateService.recoverUnresolved(userId);
 
         String state =
                 jwtTokenProvider.createLinkStateToken(
@@ -200,7 +200,7 @@ public class AccountLinkFlowController {
             return errorRedirect("계좌 연동 요청이 올바르지 않습니다.", state);
         }
         try {
-            accountLinkCoordinator.completeCallback(userId, state, userKey, ids);
+            accountLinkCoordinateService.completeCallback(userId, state, userKey, ids);
         } catch (DomainException e) {
             log.warn("Account link failed - userId: {}, errorCode: {}", userId, e.getErrorCode());
             return errorRedirect(e.getMessage(), state);

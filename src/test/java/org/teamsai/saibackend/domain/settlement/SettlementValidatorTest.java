@@ -7,8 +7,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
@@ -217,7 +217,7 @@ class SettlementValidatorTest {
     @DisplayName("정상적인 공동정산 생성 요청은 검증을 통과한다")
     void validateCreateRequestSuccess() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(
                         List.of(
                                 participant("SAI_USER_A"),
@@ -248,7 +248,7 @@ class SettlementValidatorTest {
     @DisplayName("참여자가 없으면 공동정산 생성 요청 검증에 실패한다")
     void validateCreateRequestFailsWhenParticipantsAreEmpty() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(List.of());
 
         assertSettlementExceptionThrownBy(
@@ -264,7 +264,7 @@ class SettlementValidatorTest {
     @DisplayName("참여자 목록에 null이 포함되면 검증에 실패한다")
     void validateCreateRequestFailsWhenParticipantIsNull() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(
                         Arrays.asList(
                                 participant("SAI_USER_A"),
@@ -284,7 +284,7 @@ class SettlementValidatorTest {
     @DisplayName("참여자 userToken이 비어 있으면 검증에 실패한다")
     void validateCreateRequestFailsWhenUserTokenIsBlank() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(
                         List.of(
                                 participant(" ")
@@ -303,7 +303,7 @@ class SettlementValidatorTest {
     @DisplayName("동일한 userToken의 참여자가 중복되면 검증에 실패한다")
     void validateCreateRequestFailsWhenParticipantIsDuplicated() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(
                         List.of(
                                 participant("SAI_USER_A"),
@@ -330,21 +330,21 @@ class SettlementValidatorTest {
     }
 
 
-    private CreateSharedSettlementRequest request(
-            List<CreateSettlementParticipantRequest> participants
+    private SharedSettlementCreateRequest request(
+            List<SettlementParticipantCreateRequest> participants
     ) {
 
-        return CreateSharedSettlementRequest.builder()
+        return SharedSettlementCreateRequest.builder()
                 .participants(participants)
                 .build();
     }
 
 
-    private CreateSettlementParticipantRequest participant(
+    private SettlementParticipantCreateRequest participant(
             String userToken
     ) {
 
-        return CreateSettlementParticipantRequest.builder()
+        return SettlementParticipantCreateRequest.builder()
                 .userToken(userToken)
                 .build();
     }

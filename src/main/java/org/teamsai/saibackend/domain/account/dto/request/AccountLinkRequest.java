@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 @Schema(description = "계좌 연동 요청 DTO")
-public record LinkAccountRequest(
+public record AccountLinkRequest(
         @Schema(description = "선택된 계좌 목록")
         @NotEmpty(message = "연동할 계좌를 하나 이상 선택해주세요.")
         @Valid

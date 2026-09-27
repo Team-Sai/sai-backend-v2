@@ -20,7 +20,7 @@ import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionLi
 import org.teamsai.saibackend.domain.batch.common.reader.LinkedAccountSyncTargetReaderFactory;
 import org.teamsai.saibackend.domain.batch.transaction.config.TransactionSyncJobConfig;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
-import org.teamsai.saibackend.domain.transaction.service.TransactionSyncFacade;
+import org.teamsai.saibackend.domain.transaction.service.TransactionSyncMatchService;
 
 import java.net.SocketTimeoutException;
 import java.util.List;
@@ -38,7 +38,7 @@ class TransactionSyncJobConfigTest {
         var next = new LinkedAccountSyncTargetDTO(20L, 2L);
         var failure = retryableFailure();
         fixture.targets(List.of(failed, next));
-        when(fixture.facade.syncAndMatch(1L, 10L, true)).thenThrow(failure);
+        when(fixture.transactionSyncMatchService.syncAndMatch(1L, 10L, true)).thenThrow(failure);
 
         var execution = fixture.execute();
 
@@ -47,8 +47,8 @@ class TransactionSyncJobConfigTest {
             assertThat(step.getProcessSkipCount()).isEqualTo(1);
             assertThat(step.getWriteCount()).isEqualTo(1);
         });
-        verify(fixture.facade, times(3)).syncAndMatch(1L, 10L, true);
-        verify(fixture.facade).syncAndMatch(2L, 20L, true);
+        verify(fixture.transactionSyncMatchService, times(3)).syncAndMatch(1L, 10L, true);
+        verify(fixture.transactionSyncMatchService).syncAndMatch(2L, 20L, true);
         verify(fixture.listener).onSkipInProcess(failed, failure);
         verifyNoMoreInteractions(fixture.listener);
     }
@@ -58,7 +58,7 @@ class TransactionSyncJobConfigTest {
     void completesWithoutSkipWhenRetrySucceeds() throws Exception {
         var fixture = new Fixture();
         fixture.targets(List.of(new LinkedAccountSyncTargetDTO(10L, 1L)));
-        when(fixture.facade.syncAndMatch(1L, 10L, true))
+        when(fixture.transactionSyncMatchService.syncAndMatch(1L, 10L, true))
                 .thenThrow(retryableFailure()).thenReturn(null);
 
         var execution = fixture.execute();
@@ -68,7 +68,7 @@ class TransactionSyncJobConfigTest {
             assertThat(step.getSkipCount()).isZero();
             assertThat(step.getWriteCount()).isEqualTo(1);
         });
-        verify(fixture.facade, times(2)).syncAndMatch(1L, 10L, true);
+        verify(fixture.transactionSyncMatchService, times(2)).syncAndMatch(1L, 10L, true);
         verifyNoInteractions(fixture.listener);
     }
 
@@ -78,7 +78,7 @@ class TransactionSyncJobConfigTest {
         var fixture = new Fixture();
         fixture.targets(List.of(new LinkedAccountSyncTargetDTO(10L, 1L),
                 new LinkedAccountSyncTargetDTO(20L, 2L)));
-        when(fixture.facade.syncAndMatch(1L, 10L, true))
+        when(fixture.transactionSyncMatchService.syncAndMatch(1L, 10L, true))
                 .thenThrow(AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException());
 
         var execution = fixture.execute();
@@ -86,8 +86,8 @@ class TransactionSyncJobConfigTest {
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
         assertThat(execution.getStepExecutions()).singleElement()
                 .satisfies(step -> assertThat(step.getSkipCount()).isZero());
-        verify(fixture.facade).syncAndMatch(1L, 10L, true);
-        verify(fixture.facade, never()).syncAndMatch(2L, 20L, true);
+        verify(fixture.transactionSyncMatchService).syncAndMatch(1L, 10L, true);
+        verify(fixture.transactionSyncMatchService, never()).syncAndMatch(2L, 20L, true);
         verifyNoInteractions(fixture.listener);
     }
 
@@ -98,7 +98,7 @@ class TransactionSyncJobConfigTest {
         var fixture = new Fixture();
         fixture.targets(LongStream.rangeClosed(1, failureCount + 1L)
                 .mapToObj(id -> new LinkedAccountSyncTargetDTO(id, 1L)).toList());
-        when(fixture.facade.syncAndMatch(eq(1L), anyLong(), eq(true)))
+        when(fixture.transactionSyncMatchService.syncAndMatch(eq(1L), anyLong(), eq(true)))
                 .thenAnswer(invocation -> {
                     long accountId = invocation.getArgument(1);
                     if (accountId <= failureCount) {
@@ -114,7 +114,7 @@ class TransactionSyncJobConfigTest {
         assertThat(execution.getStepExecutions()).singleElement()
                 .satisfies(step -> assertThat(step.getProcessSkipCount()).isEqualTo(50));
         verify(fixture.listener, times(50)).onSkipInProcess(any(), any());
-        verify(fixture.facade, failureCount == 50 ? times(1) : never())
+        verify(fixture.transactionSyncMatchService, failureCount == 50 ? times(1) : never())
                 .syncAndMatch(1L, failureCount + 1L, true);
     }
 
@@ -124,7 +124,7 @@ class TransactionSyncJobConfigTest {
 
     private static class Fixture {
         private final ResourcelessJobRepository repository = new ResourcelessJobRepository();
-        private final TransactionSyncFacade facade = mock(TransactionSyncFacade.class);
+        private final TransactionSyncMatchService transactionSyncMatchService = mock(TransactionSyncMatchService.class);
         @SuppressWarnings("unchecked")
         private final JpaPagingItemReader<LinkedAccountSyncTargetDTO> reader = mock(JpaPagingItemReader.class);
         @SuppressWarnings("unchecked")
@@ -141,7 +141,7 @@ class TransactionSyncJobConfigTest {
             when(factory.create("transactionSyncReader")).thenReturn(reader);
             var config = new TransactionSyncJobConfig(repository, new ResourcelessTransactionManager(),
                     mock(LoggingJobExecutionListener.class), factory);
-            var job = config.transactionSyncJob(config.transactionSyncStep(facade, listener));
+            var job = config.transactionSyncJob(config.transactionSyncStep(transactionSyncMatchService, listener));
             var parameters = new JobParameters();
             var instance = repository.createJobInstance(job.getName(), parameters);
             var execution = repository.createJobExecution(instance, parameters, new ExecutionContext());
@@ -159,15 +159,15 @@ class TransactionSyncJobConfigTest {
         JpaPagingItemReader<LinkedAccountSyncTargetDTO> reader = mock(JpaPagingItemReader.class);
         when(factory.create("transactionSyncReader")).thenReturn(reader);
         when(reader.read()).thenReturn(new LinkedAccountSyncTargetDTO(10L, 1L)).thenReturn(null);
-        var facade = mock(TransactionSyncFacade.class);
+        var transactionSyncMatchService = mock(TransactionSyncMatchService.class);
         RuntimeException failure = databaseFailure
                 ? new DataAccessResourceFailureException("database unavailable")
                 : new NullPointerException("programming error");
-        when(facade.syncAndMatch(1L, 10L, true)).thenThrow(failure);
+        when(transactionSyncMatchService.syncAndMatch(1L, 10L, true)).thenThrow(failure);
         var config = new TransactionSyncJobConfig(repository, new ResourcelessTransactionManager(),
                 mock(LoggingJobExecutionListener.class), factory);
         var step = config.transactionSyncStep(
-                facade,
+                transactionSyncMatchService,
                 new BaseSkipListener<
                                         LinkedAccountSyncTargetDTO,
                                         LinkedAccountSyncTargetDTO

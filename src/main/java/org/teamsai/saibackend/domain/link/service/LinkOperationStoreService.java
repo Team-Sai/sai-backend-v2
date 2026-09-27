@@ -11,7 +11,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class LinkOperationStore {
+public class LinkOperationStoreService {
     public enum Status { ISSUE_PENDING, ISSUED, ISSUE_EXPIRED, PROCESSING, COMPLETED, FAILED, CONFIRM_UNKNOWN, COMPENSATION_PENDING,
         RECOVERY_EXPIRED, RECOVERY_CONFLICT, RECONCILIATION_REQUIRED }
     public record Operation(String id, Long userId, String requestHash,

@@ -11,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
@@ -334,7 +334,7 @@ class SettlementParticipantServiceTest {
     )
     void registerParticipantsSuccess() {
 
-        List<CreateSettlementParticipantRequest> participants =
+        List<SettlementParticipantCreateRequest> participants =
                 List.of(
                         participantRequest(FIRST_USER_TOKEN),
                         participantRequest(SECOND_USER_TOKEN)
@@ -505,7 +505,7 @@ class SettlementParticipantServiceTest {
     )
     void registerParticipantInOrder() {
 
-        List<CreateSettlementParticipantRequest> participants =
+        List<SettlementParticipantCreateRequest> participants =
                 List.of(
                         participantRequest(FIRST_USER_TOKEN)
                 );
@@ -612,11 +612,11 @@ class SettlementParticipantServiceTest {
     }
 
 
-    private CreateSettlementParticipantRequest participantRequest(
+    private SettlementParticipantCreateRequest participantRequest(
             String userToken
     ) {
-        CreateSettlementParticipantRequest request =
-                mock(CreateSettlementParticipantRequest.class);
+        SettlementParticipantCreateRequest request =
+                mock(SettlementParticipantCreateRequest.class);
 
         given(
                 request.getUserToken()

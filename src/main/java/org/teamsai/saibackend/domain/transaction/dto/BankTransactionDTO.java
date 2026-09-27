@@ -1,9 +1,9 @@
-package org.teamsai.saibackend.domain.transaction.dto.response;
+package org.teamsai.saibackend.domain.transaction.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public record BankTransactionResponse(
+public record BankTransactionDTO(
         Long transactionId,
         String transactionKey,
         Long accountId,

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoanContractChangeResponse {
+public class ContractChangeRequestResponse {
 
     private Long changeRequestId;
     private Long userId;
@@ -32,8 +32,8 @@ public class LoanContractChangeResponse {
     private String returnReason;
     private String requesterSignature;
 
-    public static LoanContractChangeResponse from(LoanContractChangeRequestEntity entity) {
-        return LoanContractChangeResponse.builder()
+    public static ContractChangeRequestResponse from(LoanContractChangeRequestEntity entity) {
+        return ContractChangeRequestResponse.builder()
                 .changeRequestId(entity.getChangeRequestId())
                 .contractId(entity.getContractId())
                 .userId(entity.getUserId())

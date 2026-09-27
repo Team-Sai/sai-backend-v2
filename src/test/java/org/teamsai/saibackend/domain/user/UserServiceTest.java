@@ -17,8 +17,8 @@ import org.teamsai.saibackend.global.exception.DomainException;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.teamsai.saibackend.domain.link.service.UserLinkLock;
-import org.teamsai.saibackend.domain.link.service.LinkOperationStore;
+import org.teamsai.saibackend.domain.link.service.UserLinkLockService;
+import org.teamsai.saibackend.domain.link.service.LinkOperationStoreService;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doAnswer;
@@ -43,10 +43,10 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private UserLinkLock userLinkLock;
+    private UserLinkLockService userLinkLockService;
 
     @Mock
-    private LinkOperationStore linkOperationStore;
+    private LinkOperationStoreService linkOperationStoreService;
 
     @InjectMocks
     private UserService userService;
@@ -111,13 +111,13 @@ class UserServiceTest {
             doAnswer(invocation -> {
                 Supplier<?> action = invocation.getArgument(1);
                 return action.get();
-            }).when(userLinkLock).execute(eq(USER_ID), any());
+            }).when(userLinkLockService).execute(eq(USER_ID), any());
         }
 
         @Test
         void unresolvedOperationPreventsWithdrawal() {
             executeLockedAction();
-            given(linkOperationStore.hasUnresolved(USER_ID)).willReturn(true);
+            given(linkOperationStoreService.hasUnresolved(USER_ID)).willReturn(true);
 
             assertThatThrownBy(() -> userService.withdraw(USER_ID))
                     .extracting("errorCode")
@@ -129,13 +129,13 @@ class UserServiceTest {
         @Test
         void lockFailurePreventsWithdrawal() {
             doThrow(AccountErrorCode.LINK_IN_PROGRESS.toException())
-                    .when(userLinkLock).execute(eq(USER_ID), any());
+                    .when(userLinkLockService).execute(eq(USER_ID), any());
 
             assertThatThrownBy(() -> userService.withdraw(USER_ID))
                     .extracting("errorCode")
                     .isEqualTo(AccountErrorCode.LINK_IN_PROGRESS);
 
-            verifyNoInteractions(userRepository, linkOperationStore);
+            verifyNoInteractions(userRepository, linkOperationStoreService);
         }
 
         @Test

@@ -4,7 +4,7 @@ import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
@@ -28,11 +28,11 @@ public final class SettlementAssembler {
     private SettlementAssembler() {
     }
 
-    public static CreateRecurringSettlementResponse toCreateRecurringSettlementResponse(
+    public static RecurringSettlementCreateResponse toCreateRecurringSettlementResponse(
             RecurringSettlement recurringSettlement,
             Settlement firstSettlement
     ) {
-        return CreateRecurringSettlementResponse.builder()
+        return RecurringSettlementCreateResponse.builder()
                 .recurringSettlementId(recurringSettlement.getRecurringSettlementId())
                 .firstSettlementId(firstSettlement.getSettlementId())
                 .settlementType(firstSettlement.getSettlementType())

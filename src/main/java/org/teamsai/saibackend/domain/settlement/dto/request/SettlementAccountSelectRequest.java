@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SelectSettlementAccountRequest {
+public class SettlementAccountSelectRequest {
 
     @NotNull(message = "정산 수취 계좌를 선택해 주세요.")
     private Long linkedAccountId;

@@ -10,7 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
-import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -72,18 +72,18 @@ class BankTransactionPersistenceServiceTest {
                 .extracting("errorCode").isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND);
     }
 
-    private BankTransactionResponse createTransactionResponse(
+    private BankTransactionDTO createTransactionResponse(
             Long transactionId, String transactionKey, String transactionType
     ) {
         return createTransactionResponse(transactionId, transactionKey, transactionType,
                 BigDecimal.valueOf(150_000));
     }
 
-    private BankTransactionResponse createTransactionResponse(
+    private BankTransactionDTO createTransactionResponse(
             Long transactionId, String transactionKey, String transactionType,
             BigDecimal balanceAfter
     ) {
-        return new BankTransactionResponse(
+        return new BankTransactionDTO(
                 transactionId,
                 transactionKey,
                 BANK_ACCOUNT_ID,
@@ -114,7 +114,7 @@ class BankTransactionPersistenceServiceTest {
         given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
                 .willReturn(1);
         // 정렬을 일부러 깨서 응답: 리스트 마지막 원소는 12, 실제 최댓값은 13
-        List<BankTransactionResponse> transactions = List.of(
+        List<BankTransactionDTO> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT"),
                 createTransactionResponse(13L, "MOCK-TX-B", "DEPOSIT"),
                 createTransactionResponse(12L, "MOCK-TX-C", "WITHDRAWAL")
@@ -145,7 +145,7 @@ class BankTransactionPersistenceServiceTest {
     void updatesBalanceFromLatestTransaction() {
         given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
                 .willReturn(1);
-        List<BankTransactionResponse> transactions = List.of(
+        List<BankTransactionDTO> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT",
                         BigDecimal.valueOf(120_000)),
                 createTransactionResponse(13L, "MOCK-TX-B", "DEPOSIT",
@@ -165,7 +165,7 @@ class BankTransactionPersistenceServiceTest {
     void skipsBalanceUpdateWhenLatestBalanceIsNull() {
         given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
                 .willReturn(1);
-        List<BankTransactionResponse> transactions = List.of(
+        List<BankTransactionDTO> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT",
                         BigDecimal.valueOf(120_000)),
                 createTransactionResponse(13L, "MOCK-TX-B", "DEPOSIT", null)
@@ -180,7 +180,7 @@ class BankTransactionPersistenceServiceTest {
     @Test
     @DisplayName("거래유형 문자열이 올바르지 않으면 INVALID_BANK_RESPONSE 예외를 던지고 커서는 갱신하지 않는다")
     void throwsInvalidBankResponseWhenTransactionTypeIsUnknown() {
-        List<BankTransactionResponse> transactions = List.of(
+        List<BankTransactionDTO> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT"),
                 createTransactionResponse(12L, "MOCK-TX-B", "UNKNOWN_TYPE") // 잘못된 값
         );
@@ -200,7 +200,7 @@ class BankTransactionPersistenceServiceTest {
     void mapsKnownTransactionTypesCorrectly() {
         given(linkedBankAccountRepository.advanceCursorAndBalance(eq(LINKED_ACCOUNT_ID), any(), any()))
                 .willReturn(1);
-        List<BankTransactionResponse> transactions = List.of(
+        List<BankTransactionDTO> transactions = List.of(
                 createTransactionResponse(1L, "MOCK-TX-A", "DEPOSIT"),
                 createTransactionResponse(2L, "MOCK-TX-B", "WITHDRAWAL")
         );
@@ -219,7 +219,7 @@ class BankTransactionPersistenceServiceTest {
     @Test
     @DisplayName("거래 저장(insertIfAbsent) 중 DB 예외가 발생하면 그대로 전파하고 커서는 갱신하지 않는다")
     void propagatesExceptionWhenInsertFails() {
-        List<BankTransactionResponse> transactions = List.of(
+        List<BankTransactionDTO> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT"),
                 createTransactionResponse(12L, "MOCK-TX-B", "DEPOSIT")
         );
@@ -240,7 +240,7 @@ class BankTransactionPersistenceServiceTest {
     @Test
     @DisplayName("커서·잔액 원자적 갱신 중 DB 예외가 발생하면 그대로 전파한다")
     void propagatesExceptionWhenCursorUpdateFails() {
-        List<BankTransactionResponse> transactions = List.of(
+        List<BankTransactionDTO> transactions = List.of(
                 createTransactionResponse(11L, "MOCK-TX-A", "DEPOSIT")
         );
         DataIntegrityViolationException cursorUpdateFailure =

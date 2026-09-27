@@ -6,7 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
@@ -67,10 +67,10 @@ public class SettlementParticipantService {
     public void registerParticipants(
             Long ownerId,
             Long settlementId,
-            List<CreateSettlementParticipantRequest> participants,
+            List<SettlementParticipantCreateRequest> participants,
             BigDecimal expectedAmount
     ) {
-        for (CreateSettlementParticipantRequest participantRequest : participants) {
+        for (SettlementParticipantCreateRequest participantRequest : participants) {
 
             User participantUser =
                     userService.findRequestTarget(

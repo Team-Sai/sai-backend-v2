@@ -5,8 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.link.service.LinkOperationStore;
-import org.teamsai.saibackend.domain.link.service.UserLinkLock;
+import org.teamsai.saibackend.domain.link.service.LinkOperationStoreService;
+import org.teamsai.saibackend.domain.link.service.UserLinkLockService;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
@@ -18,8 +18,8 @@ import org.teamsai.saibackend.domain.user.repository.UserRepository;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final UserLinkLock userLinkLock;
-    private final LinkOperationStore linkOperationStore;
+    private final UserLinkLockService userLinkLockService;
+    private final LinkOperationStoreService linkOperationStoreService;
 
     public UserResponse getMyInfo(Long userId) {
         User user = getUser(userId);
@@ -29,8 +29,8 @@ public class UserService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void withdraw(Long userId) {
-        userLinkLock.execute(userId, () -> {
-            if (linkOperationStore.hasUnresolved(userId)) {
+        userLinkLockService.execute(userId, () -> {
+            if (linkOperationStoreService.hasUnresolved(userId)) {
                 throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
             }
 

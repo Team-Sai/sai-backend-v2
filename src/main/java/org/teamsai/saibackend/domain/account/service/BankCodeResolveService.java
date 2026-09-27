@@ -1,8 +1,8 @@
-package org.teamsai.saibackend.domain.account.util;
+package org.teamsai.saibackend.domain.account.service;
 
-public class BankCodeResolver {
+public class BankCodeResolveService {
 
-    private BankCodeResolver() {}
+    private BankCodeResolveService() {}
 
     public static String resolveBankName(String bankCode) {
         return switch (bankCode) {

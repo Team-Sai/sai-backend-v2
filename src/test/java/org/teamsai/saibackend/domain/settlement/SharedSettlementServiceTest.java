@@ -7,9 +7,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateSharedSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.SharedSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
@@ -72,7 +72,7 @@ class SharedSettlementServiceTest {
     )
     void createSharedSettlementSuccess() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 createRequest(
                         new BigDecimal("450000"),
                         List.of(
@@ -130,7 +130,7 @@ class SharedSettlementServiceTest {
         });
 
 
-        CreateSharedSettlementResponse response =
+        SharedSettlementCreateResponse response =
                 sharedSettlementService.create(
                         OWNER_ID,
                         request
@@ -247,7 +247,7 @@ class SharedSettlementServiceTest {
     )
     void createSharedSettlementFailsWhenSaveFails() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 createRequest(
                         new BigDecimal("30000"),
                         List.of(
@@ -326,7 +326,7 @@ class SharedSettlementServiceTest {
     )
     void failsWhenSettlementAccountSelectionFails() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 createRequest(
                         new BigDecimal("30000"),
                         List.of(
@@ -428,12 +428,12 @@ class SharedSettlementServiceTest {
     }
 
 
-    private CreateSharedSettlementRequest createRequest(
+    private SharedSettlementCreateRequest createRequest(
             BigDecimal totalAmount,
-            List<CreateSettlementParticipantRequest> participants
+            List<SettlementParticipantCreateRequest> participants
     ) {
 
-        return CreateSharedSettlementRequest
+        return SharedSettlementCreateRequest
                 .builder()
                 .settlementCategory(
                         "여행"
@@ -458,11 +458,11 @@ class SharedSettlementServiceTest {
     }
 
 
-    private CreateSettlementParticipantRequest participant(
+    private SettlementParticipantCreateRequest participant(
             String userToken
     ) {
 
-        return CreateSettlementParticipantRequest
+        return SettlementParticipantCreateRequest
                 .builder()
                 .userToken(
                         userToken

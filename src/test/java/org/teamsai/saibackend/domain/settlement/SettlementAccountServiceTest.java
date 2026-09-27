@@ -11,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.request.SelectSettlementAccountRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementAccountSelectRequest;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementAccount;
@@ -75,7 +75,7 @@ class SettlementAccountServiceTest {
             Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            SelectSettlementAccountRequest request =
+            SettlementAccountSelectRequest request =
                     createRequest(FIRST_LINKED_ACCOUNT_ID);
 
             LinkedBankAccountResponse linkedAccount =
@@ -202,7 +202,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            SelectSettlementAccountRequest request =
+            SettlementAccountSelectRequest request =
                     createRequest(FIRST_LINKED_ACCOUNT_ID);
 
             LinkedBankAccountResponse linkedAccount =
@@ -288,7 +288,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            SelectSettlementAccountRequest request =
+            SettlementAccountSelectRequest request =
                     createRequest(
                             SECOND_LINKED_ACCOUNT_ID
                     );
@@ -417,7 +417,7 @@ class SettlementAccountServiceTest {
             Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            SelectSettlementAccountRequest request =
+            SettlementAccountSelectRequest request =
                     createRequest(
                             FIRST_LINKED_ACCOUNT_ID
                     );
@@ -485,7 +485,7 @@ class SettlementAccountServiceTest {
             Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            SelectSettlementAccountRequest request =
+            SettlementAccountSelectRequest request =
                     createRequest(
                             SECOND_LINKED_ACCOUNT_ID
                     );
@@ -548,7 +548,7 @@ class SettlementAccountServiceTest {
         @DisplayName("존재하지 않는 정산에는 수취 계좌를 설정할 수 없다")
         void selectAccountFailsWhenSettlementDoesNotExist() {
 
-            SelectSettlementAccountRequest request =
+            SettlementAccountSelectRequest request =
                     createRequest(
                             FIRST_LINKED_ACCOUNT_ID
                     );
@@ -593,7 +593,7 @@ class SettlementAccountServiceTest {
             Settlement settlement =
                     createSettlement(OWNER_ID);
 
-            SelectSettlementAccountRequest request =
+            SettlementAccountSelectRequest request =
                     createRequest(
                             FIRST_LINKED_ACCOUNT_ID
                     );
@@ -874,11 +874,11 @@ class SettlementAccountServiceTest {
     }
 
 
-    private SelectSettlementAccountRequest createRequest(
+    private SettlementAccountSelectRequest createRequest(
             Long linkedAccountId
     ) {
 
-        return SelectSettlementAccountRequest.builder()
+        return SettlementAccountSelectRequest.builder()
                 .linkedAccountId(linkedAccountId)
                 .build();
     }

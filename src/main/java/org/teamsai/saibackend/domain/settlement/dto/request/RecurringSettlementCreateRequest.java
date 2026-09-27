@@ -16,7 +16,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateRecurringSettlementRequest {
+public class RecurringSettlementCreateRequest {
     @NotBlank(message = "정산 성격을 입력해 주세요.")
     @Size(max = 50, message = "정산 성격은 50자 이하로 입력해 주세요.")
     private String settlementCategory;
@@ -43,7 +43,7 @@ public class CreateRecurringSettlementRequest {
 
     @Valid
     @NotEmpty(message = "참여자를 한 명 이상 선택해 주세요.")
-    private List<CreateSettlementParticipantRequest> participants;
+    private List<SettlementParticipantCreateRequest> participants;
 
     @AssertTrue(message = "종료일은 시작일보다 빠를 수 없습니다.")
     public boolean isValidPeriod() {

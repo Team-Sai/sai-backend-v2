@@ -7,9 +7,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.request.RecurringSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
@@ -75,7 +75,7 @@ class RecurringSettlementServiceTest {
     @Test
     @DisplayName("정기정산 생성 시 정기 설정과 최초 회차를 생성한다")
     void createRecurringSettlementSuccess() {
-        CreateRecurringSettlementRequest request = createRequest();
+        RecurringSettlementCreateRequest request = createRequest();
 
         BigDecimal perPersonAmount = new BigDecimal("150000");
 
@@ -132,7 +132,7 @@ class RecurringSettlementServiceTest {
                     .build();
         });
 
-        CreateRecurringSettlementResponse response =
+        RecurringSettlementCreateResponse response =
                 recurringSettlementService.create(
                         OWNER_ID,
                         request
@@ -265,7 +265,7 @@ class RecurringSettlementServiceTest {
     @Test
     @DisplayName("정기정산 설정 저장에 실패하면 최초 회차를 생성하지 않는다")
     void createFailsWhenRecurringSettlementInsertFails() {
-        CreateRecurringSettlementRequest request =
+        RecurringSettlementCreateRequest request =
                 createRequest();
 
         User owner =
@@ -308,7 +308,7 @@ class RecurringSettlementServiceTest {
     @Test
     @DisplayName("최초 회차 생성에 실패하면 참여자와 수취 계좌를 생성하지 않는다")
     void createFailsWhenFirstSettlementInsertFails() {
-        CreateRecurringSettlementRequest request =
+        RecurringSettlementCreateRequest request =
                 createRequest();
 
         User owner =
@@ -370,7 +370,7 @@ class RecurringSettlementServiceTest {
     @Test
     @DisplayName("정기정산 요청 검증에 실패하면 어떤 데이터도 생성하지 않는다")
     void createFailsWhenValidationFails() {
-        CreateRecurringSettlementRequest request =
+        RecurringSettlementCreateRequest request =
                 createRequest();
 
         willThrow(
@@ -401,7 +401,7 @@ class RecurringSettlementServiceTest {
     @Test
     @DisplayName("참여자 등록 시 공동정산과 동일한 균등 분배 금액을 전달한다")
     void usesSharedSettlementAmountCalculationPolicy() {
-        CreateRecurringSettlementRequest request =
+        RecurringSettlementCreateRequest request =
                 createRequest();
 
         BigDecimal expectedAmount =
@@ -487,7 +487,7 @@ class RecurringSettlementServiceTest {
     @Test
     @DisplayName("수취 계좌 설정 실패 시 예외를 그대로 전달한다")
     void createFailsWhenSettlementAccountCreationFails() {
-        CreateRecurringSettlementRequest request =
+        RecurringSettlementCreateRequest request =
                 createRequest();
 
         BigDecimal perPersonAmount =
@@ -582,8 +582,8 @@ class RecurringSettlementServiceTest {
                 );
     }
 
-    private CreateRecurringSettlementRequest createRequest() {
-        return CreateRecurringSettlementRequest.builder()
+    private RecurringSettlementCreateRequest createRequest() {
+        return RecurringSettlementCreateRequest.builder()
                 .settlementCategory("OTT·구독")
                 .title("넷플릭스 구독")
                 .totalAmount(new BigDecimal("450000"))
@@ -598,10 +598,10 @@ class RecurringSettlementServiceTest {
                 .build();
     }
 
-    private CreateSettlementParticipantRequest participant(
+    private SettlementParticipantCreateRequest participant(
             String userToken
     ) {
-        return CreateSettlementParticipantRequest.builder()
+        return SettlementParticipantCreateRequest.builder()
                 .userToken(userToken)
                 .build();
     }

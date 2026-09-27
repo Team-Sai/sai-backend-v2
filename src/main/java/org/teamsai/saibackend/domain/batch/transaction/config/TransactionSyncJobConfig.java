@@ -18,7 +18,7 @@ import org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener;
 import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.batch.common.reader.LinkedAccountSyncTargetReaderFactory;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
-import org.teamsai.saibackend.domain.transaction.service.TransactionSyncFacade;
+import org.teamsai.saibackend.domain.transaction.service.TransactionSyncMatchService;
 
 @Slf4j
 @Configuration
@@ -40,7 +40,7 @@ public class TransactionSyncJobConfig {
 
     @Bean
     public Step transactionSyncStep(
-            TransactionSyncFacade transactionSyncFacade,
+            TransactionSyncMatchService transactionSyncMatchService,
             BaseSkipListener<
                                 LinkedAccountSyncTargetDTO,
                                 LinkedAccountSyncTargetDTO
@@ -50,7 +50,7 @@ public class TransactionSyncJobConfig {
                 .<LinkedAccountSyncTargetDTO, LinkedAccountSyncTargetDTO>chunk(50)
                 .transactionManager(transactionManager)
                 .reader(transactionSyncReader())
-                .processor(processor(transactionSyncFacade))
+                .processor(processor(transactionSyncMatchService))
                 .writer(noOpWriter())
                 .faultTolerant()
                 .retry(RetryableBankTransactionFetchException.class)
@@ -67,10 +67,10 @@ public class TransactionSyncJobConfig {
     }
 
     private ItemProcessor<LinkedAccountSyncTargetDTO, LinkedAccountSyncTargetDTO> processor(
-            TransactionSyncFacade transactionSyncFacade) {
+            TransactionSyncMatchService transactionSyncMatchService) {
 
         return target -> {
-            transactionSyncFacade.syncAndMatch(
+            transactionSyncMatchService.syncAndMatch(
                     target.userId(),
                     target.linkedAccountId(),
                     true

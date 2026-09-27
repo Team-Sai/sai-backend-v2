@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEn
 import org.teamsai.saibackend.domain.contract.service.ContractChangeQueryService;
 import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimator;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
-import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
 import org.teamsai.saibackend.domain.contract.service.ChangeRequestDetailQueryService;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -110,7 +110,7 @@ class ChangeRequestDetailQueryServiceTest {
         given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID))
                 .willReturn(createChangeRequest());
 
-        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getRequesterName()).isEqualTo("김민수");
         assertThat(result.getStatus()).isEqualTo("승인 대기 중");
@@ -156,7 +156,7 @@ class ChangeRequestDetailQueryServiceTest {
         given(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).willReturn(contract);
         given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeRequest);
 
-        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getNewMaturityDate()).isEqualTo(contract.getMaturityDate());
     }
@@ -184,7 +184,7 @@ class ChangeRequestDetailQueryServiceTest {
         when(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
         when(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
-        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getRequesterName()).isEqualTo(contract.getDebtorName());
     }
@@ -201,7 +201,7 @@ class ChangeRequestDetailQueryServiceTest {
         when(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
         when(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
-        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getReturnReason()).isEqualTo("이율이 너무 높습니다");
     }

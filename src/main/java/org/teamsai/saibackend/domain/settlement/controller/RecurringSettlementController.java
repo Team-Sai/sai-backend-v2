@@ -8,8 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.request.RecurringSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.service.RecurringSettlementService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
@@ -29,15 +29,15 @@ public class RecurringSettlementController {
             description = "정기정산을 등록하고 최초 정산 회차를 생성합니다."
     )
     @PostMapping
-    public ResponseEntity<CreateRecurringSettlementResponse>
+    public ResponseEntity<RecurringSettlementCreateResponse>
     createRecurringSettlement(
             @AuthenticationPrincipal CustomUserDetails userDetails,
 
             @Valid
-            @RequestBody CreateRecurringSettlementRequest request
+            @RequestBody RecurringSettlementCreateRequest request
     ) {
 
-        CreateRecurringSettlementResponse response =
+        RecurringSettlementCreateResponse response =
                 recurringSettlementService.create(
                         userDetails.getUserId(),
                         request

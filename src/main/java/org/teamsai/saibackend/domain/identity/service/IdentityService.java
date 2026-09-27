@@ -9,7 +9,7 @@ import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityCompleteResponse;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityPrepareResponse;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
@@ -142,7 +142,7 @@ public class IdentityService {
                     .toException();
         }
 
-        PortOneIdentityResponse portOneResponse =
+        PortOneIdentityDTO portOneResponse =
                 portOneIdentityService.getIdentityVerification(
                         identityVerificationId
                 );

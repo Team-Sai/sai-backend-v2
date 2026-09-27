@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateSettlementParticipantRequest {
+public class SettlementParticipantCreateRequest {
 
     @NotBlank(message = "참여할 회원코드를 입력해 주세요.")
     private String userToken;

@@ -15,7 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRejectRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractChangeResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractChangeRequestResponse;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 
@@ -47,7 +47,7 @@ public class ContractChangeController {
     })
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/api/contracts/{contractId}/change-requests")
-    public LoanContractChangeResponse requestChange(
+    public ContractChangeRequestResponse requestChange(
             @PathVariable Long contractId,
             @Valid @RequestBody ContractChangeRequest request,
             @AuthenticationPrincipal(expression = "userId") Long userId
@@ -68,7 +68,7 @@ public class ContractChangeController {
             @ApiResponse(responseCode = "409", description = "이미 처리된 요청임")
     })
     @PatchMapping("/api/contracts/{contractId}/change-requests/{changeRequestId}/reject")
-    public LoanContractChangeResponse rejectChange(
+    public ContractChangeRequestResponse rejectChange(
             @PathVariable Long contractId,
             @PathVariable Long changeRequestId,
             @Valid @RequestBody ContractChangeRejectRequest request,
@@ -90,7 +90,7 @@ public class ContractChangeController {
     })
     @PatchMapping(value = "/api/contracts/{contractId}/change-requests/{changeRequestId}/signature",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public LoanContractChangeResponse submitRequesterSignature(
+    public ContractChangeRequestResponse submitRequesterSignature(
             @PathVariable Long contractId,
             @PathVariable Long changeRequestId,
             @RequestParam("signature") MultipartFile signature,

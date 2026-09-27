@@ -13,7 +13,7 @@ import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityCompleteResponse;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityPrepareResponse;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
@@ -222,7 +222,7 @@ class IdentityServiceTest {
 
             User user = createUser();
 
-            PortOneIdentityResponse response =
+            PortOneIdentityDTO response =
                     createVerifiedPortOneResponse();
 
             LocalDateTime verifiedAt =
@@ -322,12 +322,12 @@ class IdentityServiceTest {
             Identity identity =
                     createRequestedIdentity(USER_ID);
 
-            PortOneIdentityResponse response =
-                    new PortOneIdentityResponse(
+            PortOneIdentityDTO response =
+                    new PortOneIdentityDTO(
                             VERIFICATION_ID,
                             "FAILED",
                             null,
-                            new PortOneIdentityResponse.Failure(
+                            new PortOneIdentityDTO.Failure(
                                     "인증 실패",
                                     "PG-001",
                                     "사용자 인증 실패"
@@ -427,7 +427,7 @@ class IdentityServiceTest {
 
             User user = createUser();
 
-            PortOneIdentityResponse response =
+            PortOneIdentityDTO response =
                     createVerifiedPortOneResponse();
 
             given(
@@ -490,12 +490,12 @@ class IdentityServiceTest {
             Identity identity =
                     createRequestedIdentity(USER_ID);
 
-            PortOneIdentityResponse response =
-                    new PortOneIdentityResponse(
+            PortOneIdentityDTO response =
+                    new PortOneIdentityDTO(
                             VERIFICATION_ID,
                             "FAILED",
                             null,
-                            new PortOneIdentityResponse.Failure(
+                            new PortOneIdentityDTO.Failure(
                                     "인증 실패",
                                     "PG-001",
                                     "사용자 인증 실패"
@@ -593,7 +593,7 @@ class IdentityServiceTest {
 
             User user = createUser();
 
-            PortOneIdentityResponse response =
+            PortOneIdentityDTO response =
                     createVerifiedPortOneResponse();
 
             given(
@@ -800,12 +800,12 @@ class IdentityServiceTest {
             Identity identity =
                     createRequestedIdentity(USER_ID);
 
-            PortOneIdentityResponse response =
-                    new PortOneIdentityResponse(
+            PortOneIdentityDTO response =
+                    new PortOneIdentityDTO(
                             VERIFICATION_ID,
                             "FAILED",
                             null,
-                            new PortOneIdentityResponse
+                            new PortOneIdentityDTO
                                     .Failure(
                                     "인증 실패",
                                     "PG-001",
@@ -885,8 +885,8 @@ class IdentityServiceTest {
             Identity identity =
                     createRequestedIdentity(USER_ID);
 
-            PortOneIdentityResponse response =
-                    new PortOneIdentityResponse(
+            PortOneIdentityDTO response =
+                    new PortOneIdentityDTO(
                             VERIFICATION_ID,
                             "READY",
                             null,
@@ -948,7 +948,7 @@ class IdentityServiceTest {
 
             User user = createUser();
 
-            PortOneIdentityResponse response =
+            PortOneIdentityDTO response =
                     createVerifiedPortOneResponse();
 
             DomainException mismatchException =
@@ -1029,7 +1029,7 @@ class IdentityServiceTest {
             Identity identity =
                     createRequestedIdentity(USER_ID);
 
-            PortOneIdentityResponse response =
+            PortOneIdentityDTO response =
                     createVerifiedPortOneResponse();
 
             given(
@@ -1204,12 +1204,12 @@ class IdentityServiceTest {
                 .build();
     }
 
-    private PortOneIdentityResponse
+    private PortOneIdentityDTO
     createVerifiedPortOneResponse() {
-        return new PortOneIdentityResponse(
+        return new PortOneIdentityDTO(
                 VERIFICATION_ID,
                 "VERIFIED",
-                new PortOneIdentityResponse
+                new PortOneIdentityDTO
                         .VerifiedCustomer(
                         USER_NAME,
                         BIRTH_DATE,

@@ -3,8 +3,8 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
@@ -34,14 +34,14 @@ public class SettlementValidator {
         }
     }
 
-    public void validateCreateRequest(CreateSharedSettlementRequest request) {
+    public void validateCreateRequest(SharedSettlementCreateRequest request) {
         if (request == null) {
             throw SettlementErrorCode
                     .INVALID_SETTLEMENT_REQUEST
                     .toException();
         }
 
-        List<CreateSettlementParticipantRequest> participants =
+        List<SettlementParticipantCreateRequest> participants =
                 request.getParticipants();
 
         if (participants == null || participants.isEmpty()) {
@@ -53,10 +53,10 @@ public class SettlementValidator {
         validateDuplicateParticipants(participants);
     }
 
-    private void validateDuplicateParticipants(List<CreateSettlementParticipantRequest> participants) {
+    private void validateDuplicateParticipants(List<SettlementParticipantCreateRequest> participants) {
         Set<String> userTokens = new HashSet<>();
 
-        for (CreateSettlementParticipantRequest participant
+        for (SettlementParticipantCreateRequest participant
                 : participants) {
 
             if (participant == null

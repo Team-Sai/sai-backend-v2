@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
 import org.teamsai.saibackend.domain.link.controller.AccountLinkFlowController;
-import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinateService;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.jwt.*;
 import java.util.List;
@@ -35,7 +35,7 @@ class AccountLinkFlowControllerTest {
     LinkedBankAccountService linkedBankAccountService;
 
     @MockitoBean
-    AccountLinkCoordinator coordinator;
+    AccountLinkCoordinateService coordinator;
 
     @MockitoBean
     UserService userService;
