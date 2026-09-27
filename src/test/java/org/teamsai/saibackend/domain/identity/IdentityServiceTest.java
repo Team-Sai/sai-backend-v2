@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
 import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityCompleteResponse;
@@ -18,8 +19,9 @@ import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.identity.service.IdentityStatusService;
-import org.teamsai.saibackend.domain.identity.service.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.service.PortOneIdentityService;
+import org.teamsai.saibackend.domain.identity.support.IdentityFailureReasonFormatter;
+import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -36,10 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("IdentityService 단위 테스트")
@@ -75,6 +74,9 @@ class IdentityServiceTest {
     @Mock
     private IdentityStatusService identityStatusService;
 
+    @Mock
+    private IdentityFailureReasonFormatter failureReasonFormatter;
+
     private IdentityService identityService;
 
     @BeforeEach
@@ -85,6 +87,7 @@ class IdentityServiceTest {
                 portOneIdentityService,
                 identityValidator,
                 identityStatusService,
+                failureReasonFormatter,
                 STORE_ID,
                 CHANNEL_KEY,
                 VALID_MINUTES
@@ -179,6 +182,16 @@ class IdentityServiceTest {
                     new IdentityPrepareRequest(
                             IdentityPurpose.LOAN_CONTRACT
                     );
+
+            doThrow(
+                    IdentityErrorCode
+                            .UNAUTHENTICATED_USER
+                            .toException()
+            ).when(
+                    identityValidator
+            ).validateUserId(
+                    null
+            );
 
             assertIdentityError(
                     () -> identityService.prepare(
@@ -347,6 +360,22 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
+                    failureReasonFormatter.createFailureReason(
+                            response
+                    )
+            ).willReturn(
+                    "인증 실패 | PG-001 | 사용자 인증 실패"
+            );
+
+            given(
+                    failureReasonFormatter.truncateFailureReason(
+                            "인증 실패 | PG-001 | 사용자 인증 실패"
+                    )
+            ).willReturn(
+                    "인증 실패 | PG-001 | 사용자 인증 실패"
+            );
+
+            given(
                     identityStatusService.updateFailed(
                             VERIFICATION_ID,
                             "인증 실패 | PG-001 | 사용자 인증 실패"
@@ -497,7 +526,21 @@ class IdentityServiceTest {
                                     VERIFICATION_ID
                             )
             ).willReturn(response);
+            given(
+                    failureReasonFormatter.createFailureReason(
+                            response
+                    )
+            ).willReturn(
+                    "인증 실패 | PG-001 | 사용자 인증 실패"
+            );
 
+            given(
+                    failureReasonFormatter.truncateFailureReason(
+                            "인증 실패 | PG-001 | 사용자 인증 실패"
+                    )
+            ).willReturn(
+                    "인증 실패 | PG-001 | 사용자 인증 실패"
+            );
             given(
                     identityStatusService.updateFailed(
                             VERIFICATION_ID,
@@ -659,6 +702,17 @@ class IdentityServiceTest {
                     Optional.of(identity)
             );
 
+            doThrow(
+                    IdentityErrorCode
+                            .IDENTITY_VERIFICATION_FORBIDDEN
+                            .toException()
+            ).when(
+                    identityValidator
+            ).validateOwner(
+                    identity,
+                    USER_ID
+            );
+
             assertIdentityError(
                     () -> identityService.complete(
                             USER_ID,
@@ -670,7 +724,6 @@ class IdentityServiceTest {
 
             verifyNoInteractions(
                     portOneIdentityService,
-                    identityValidator,
                     userRepository
             );
         }
@@ -737,7 +790,6 @@ class IdentityServiceTest {
 
             verifyNoInteractions(
                     portOneIdentityService,
-                    identityValidator,
                     userRepository
             );
         }
@@ -776,7 +828,21 @@ class IdentityServiceTest {
                                     VERIFICATION_ID
                             )
             ).willReturn(response);
+            given(
+                    failureReasonFormatter.createFailureReason(
+                            response
+                    )
+            ).willReturn(
+                    "인증 실패 | PG-001 | 사용자 인증 실패"
+            );
 
+            given(
+                    failureReasonFormatter.truncateFailureReason(
+                            "인증 실패 | PG-001 | 사용자 인증 실패"
+                    )
+            ).willReturn(
+                    "인증 실패 | PG-001 | 사용자 인증 실패"
+            );
             given(
                     identityStatusService.updateFailed(
                             VERIFICATION_ID,
@@ -918,7 +984,13 @@ class IdentityServiceTest {
                             user,
                             response.verifiedCustomer()
                     );
-
+            given(
+                    failureReasonFormatter.truncateFailureReason(
+                            "IDENTITY_INFORMATION_MISMATCH"
+                    )
+            ).willReturn(
+                    "IDENTITY_INFORMATION_MISMATCH"
+            );
             given(
                     identityStatusService.updateFailed(
                             VERIFICATION_ID,
@@ -1056,6 +1128,31 @@ class IdentityServiceTest {
                             IdentityPurpose.LOAN_CONTRACT
                     )
             ).willReturn(0);
+
+            assertIdentityError(
+                    () -> identityService.consume(
+                            USER_ID,
+                            VERIFICATION_ID,
+                            IdentityPurpose.LOAN_CONTRACT
+                    ),
+                    IdentityErrorCode
+                            .IDENTITY_VERIFICATION_CONSUME_FAILED
+            );
+        }
+        @Test
+        @DisplayName("동시 소비 중 락 획득에 실패하면 인증 사용 실패로 처리한다")
+        void consumeFailsWhenLockCannotBeAcquired() {
+            given(
+                    identityRepository.consume(
+                            VERIFICATION_ID,
+                            USER_ID,
+                            IdentityPurpose.LOAN_CONTRACT
+                    )
+            ).willThrow(
+                    new CannotAcquireLockException(
+                            "lock acquisition failed"
+                    )
+            );
 
             assertIdentityError(
                     () -> identityService.consume(
