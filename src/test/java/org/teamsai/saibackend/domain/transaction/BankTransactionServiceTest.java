@@ -12,7 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
@@ -38,7 +38,7 @@ class BankTransactionServiceTest {
     private BankTransactionRepository bankTransactionRepository;
 
     @Mock
-    private LinkedBankAccountRepository linkedBankAccountRepository;
+    private LinkedBankAccountService linkedBankAccountService;
 
     @Mock
     private EntityManager entityManager;
@@ -56,7 +56,7 @@ class BankTransactionServiceTest {
     void getsOwnedTransactionDetailForUpdate() {
         LinkedBankAccount account = LinkedBankAccount.builder().userId(7L).build();
         BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
-        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.of(account));
+        given(linkedBankAccountService.getLinkedAccount(1L)).willReturn(account);
         given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(101L, 1L))
                 .willReturn(Optional.of(transaction));
 
@@ -72,7 +72,7 @@ class BankTransactionServiceTest {
     @DisplayName("타인 계좌의 거래는 잠금 조회하지 않는다")
     void rejectsOtherUsersTransactionForUpdate() {
         LinkedBankAccount account = LinkedBankAccount.builder().userId(8L).build();
-        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.of(account));
+        given(linkedBankAccountService.getLinkedAccount(1L)).willReturn(account);
 
         assertThatThrownBy(() -> bankTransactionService.getOwnedTransactionDetailForUpdate(7L, 1L, 101L))
                 .isInstanceOfSatisfying(DomainException.class,
@@ -84,7 +84,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("연결 계좌가 없으면 거래를 조회하지 않는다")
     void rejectsMissingAccountForUpdate() {
-        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.empty());
+        given(linkedBankAccountService.getLinkedAccount(1L)).willThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException());
 
         assertThatThrownBy(() -> bankTransactionService.getOwnedTransactionDetailForUpdate(7L, 1L, 101L))
                 .isInstanceOfSatisfying(DomainException.class,

@@ -16,8 +16,7 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,7 +36,7 @@ public class RecurringSettlementService {
 
     private final SettlementAccountService settlementAccountService;
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @Transactional
     public CreateRecurringSettlementResponse create(
@@ -45,10 +44,7 @@ public class RecurringSettlementService {
     ){
         recurringSettlementValidator.validateCreateRequest(request);
 
-        User owner = userRepository.findById(ownerId)
-                .orElseThrow(
-                        UserErrorCode.USER_NOT_FOUND::toException
-                );
+        User owner = userService.getUser(ownerId);
 
         BigDecimal perPersonAmount =
                 settlementAmountCalculator.calculateEqualAmount(

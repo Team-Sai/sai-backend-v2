@@ -1,110 +1,133 @@
 package org.teamsai.saibackend.domain.account;
+
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.teamsai.saibackend.domain.link.controller.AccountLinkFlowController;
-import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
-import org.teamsai.saibackend.domain.user.service.UserService;
-import org.teamsai.saibackend.global.jwt.*;
-import java.util.List;
-import java.util.Optional;
+import org.teamsai.saibackend.domain.link.dto.response.AccountLinkCallbackResult;
+import org.teamsai.saibackend.domain.link.service.AccountLinkFlowService;
+import org.teamsai.saibackend.domain.user.entity.User;
+import org.teamsai.saibackend.global.jwt.JwtAuthenticationEntryPoint;
+import org.teamsai.saibackend.global.jwt.JwtAuthenticationFilter;
+import org.teamsai.saibackend.global.jwt.JwtTokenProvider;
+import org.teamsai.saibackend.global.security.CustomUserDetails;
+
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 @WebMvcTest(AccountLinkFlowController.class)
-@AutoConfigureMockMvc(addFilters=false)
-@TestPropertySource(properties={"sai.mock-bank.base-url=http://localhost:8081",
-        "sai.backend.base-url=http://localhost:8080","app.frontend.base-url=http://localhost:5173"})
+@AutoConfigureMockMvc(addFilters = false)
+@TestPropertySource(properties = {
+        "app.frontend.base-url=http://localhost:5173"
+})
 class AccountLinkFlowControllerTest {
+
     @Autowired
     MockMvc mvc;
 
+    @Autowired
+    AccountLinkFlowController controller;
+
+    @MockitoBean
+    AccountLinkFlowService accountLinkFlowService;
+
+    // 보안 설정에서 사용하는 Mock은 유지한다.
     @MockitoBean
     JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    LinkedBankAccountService linkedBankAccountService;
-
-    @MockitoBean
-    AccountLinkCoordinator coordinator;
-
-    @MockitoBean
-    UserService userService;
-
-    @MockitoBean
-    IdentityValidator identityValidator;
 
     @MockitoBean
     JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @MockitoBean
     JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    @Test void startRecoversBeforeIssuingNewState() {
-        var user = org.teamsai.saibackend.domain.user.entity.User.builder()
-                .userId(1L).name("name").birthDate(java.time.LocalDate.of(2000, 1, 1)).build();
-        when(userService.getUser(1L)).thenReturn(user);
-        when(jwtTokenProvider.createLinkStateToken(1L, user.getName(), user.getBirthDate()))
-                .thenReturn("fresh-state");
-        var controller = new AccountLinkFlowController(jwtTokenProvider, linkedBankAccountService,
-                coordinator, userService, identityValidator);
-        org.springframework.test.util.ReflectionTestUtils.setField(controller, "mockBankBaseUrl", "http://localhost:8081");
-        org.springframework.test.util.ReflectionTestUtils.setField(controller, "backendBaseUrl", "http://localhost:8080");
 
-        controller.startLink(new org.teamsai.saibackend.global.security.CustomUserDetails(user));
+    @Test
+    void startReturnsRedirectUrl() {
+        User user = User.builder()
+                .userId(1L)
+                .build();
 
-        var order = inOrder(coordinator, jwtTokenProvider);
-        order.verify(coordinator).recoverUnresolved(1L);
-        order.verify(jwtTokenProvider).createLinkStateToken(1L, user.getName(), user.getBirthDate());
+        String redirectUrl = "http://localhost:8081/link/start?state=state";
+
+        when(accountLinkFlowService.startLink(1L))
+                .thenReturn(redirectUrl);
+
+        var response = controller.startLink(new CustomUserDetails(user));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody())
+                .isEqualTo(Map.of("redirectUrl", redirectUrl));
+
+        verify(accountLinkFlowService).startLink(1L);
     }
 
-    @Test void failedRecoveryPreventsNewLinkState() {
-        var user = org.teamsai.saibackend.domain.user.entity.User.builder().userId(1L).build();
-        when(userService.getUser(1L)).thenReturn(user);
-        doThrow(AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException())
-                .when(coordinator).recoverUnresolved(1L);
-        var controller = new AccountLinkFlowController(jwtTokenProvider, linkedBankAccountService,
-                coordinator, userService, identityValidator);
+    @Test
+    void successfulCallbackRedirects() throws Exception {
+        when(accountLinkFlowService.completeCallback("state", "key", "1, 2,1"))
+                .thenReturn(AccountLinkCallbackResult.completed());
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.startLink(
-                        new org.teamsai.saibackend.global.security.CustomUserDetails(user)))
-                .extracting("errorCode").isEqualTo(AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
-        verifyNoInteractions(jwtTokenProvider);
+        mvc.perform(get("/accounts/link/callback")
+                        .param("state", "state")
+                        .param("userKey", "key")
+                        .param("accountIds", "1, 2,1"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "http://localhost:5173/link/complete?success=true&state=state"
+                ));
+
+        verify(accountLinkFlowService)
+                .completeCallback("state", "key", "1, 2,1");
     }
 
-    @Test void validCallbackParsesAndRedirects() throws Exception {
-        when(jwtTokenProvider.getUserIdFromLinkState("state")).thenReturn(Optional.of(1L));
-        mvc.perform(get("/accounts/link/callback").param("state","state").param("userKey","key")
-                        .param("accountIds","1, 2,1")).andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("http://localhost:5173/link/complete?success=true&state=state"));
-        verify(coordinator).completeCallback(1L,"state","key",List.of(1L,2L,1L));
+    @Test
+    void failedCallbackRedirectsWithErrorMessage() throws Exception {
+        String message = "연동키 복구 기한이 만료되어 상태 확인이 필요합니다.";
+
+        when(accountLinkFlowService.completeCallback("state", "key", "1"))
+                .thenReturn(AccountLinkCallbackResult.failed(message));
+
+        String expectedUrl = UriComponentsBuilder
+                .fromUriString("http://localhost:5173/link/complete")
+                .queryParam("success", false)
+                .queryParam("state", "state")
+                .queryParam("errorMessage", message)
+                .build()
+                .encode()
+                .toUriString();
+
+        mvc.perform(get("/accounts/link/callback")
+                        .param("state", "state")
+                        .param("userKey", "key")
+                        .param("accountIds", "1"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(expectedUrl));
+
+        verify(accountLinkFlowService)
+                .completeCallback("state", "key", "1");
     }
-    @Test void invalidStateDoesNotChangeBank() throws Exception {
-        when(jwtTokenProvider.getUserIdFromLinkState("bad")).thenReturn(Optional.empty());
-        mvc.perform(get("/accounts/link/callback").param("state","bad").param("userKey","key")
-                .param("accountIds","1")).andExpect(header().string("Location", org.hamcrest.Matchers.containsString("?success=false&")));
-        verifyNoInteractions(coordinator);
-    }
-    @ParameterizedTest @ValueSource(strings={"",", ,","abc","0","-1"})
-    void invalidAccountIdsDoNotChangeBank(String ids) throws Exception {
-        when(jwtTokenProvider.getUserIdFromLinkState("state")).thenReturn(Optional.of(1L));
-        mvc.perform(get("/accounts/link/callback").param("state","state").param("userKey","key")
-                .param("accountIds",ids)).andExpect(header().string("Location", org.hamcrest.Matchers.containsString("?success=false&")));
-        verifyNoInteractions(coordinator);
-    }
-    @Test void domainFailureRedirects() throws Exception {
-        when(jwtTokenProvider.getUserIdFromLinkState("state")).thenReturn(Optional.of(1L));
-        doThrow(AccountErrorCode.LINK_IN_PROGRESS.toException()).when(coordinator)
-                .completeCallback(1L,"state","key",List.of(1L));
-        mvc.perform(get("/accounts/link/callback").param("state","state").param("userKey","key")
-                .param("accountIds","1")).andExpect(header().string("Location", org.hamcrest.Matchers.containsString("?success=false&")));
+
+    @Test
+    void missingAccountIdsArePassedAsNull() throws Exception {
+        when(accountLinkFlowService.completeCallback("state", "key", null))
+                .thenReturn(AccountLinkCallbackResult.failed(
+                        "선택된 계좌가 없습니다."
+                ));
+
+        mvc.perform(get("/accounts/link/callback")
+                        .param("state", "state")
+                        .param("userKey", "key"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(accountLinkFlowService)
+                .completeCallback("state", "key", null);
     }
 }

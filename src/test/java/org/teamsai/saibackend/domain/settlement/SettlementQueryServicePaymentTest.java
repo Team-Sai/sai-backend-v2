@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
@@ -89,7 +89,7 @@ class SettlementQueryServicePaymentTest {
                         "참여자"
                 );
 
-        PaymentObligationEntity o1 =
+        PaymentObligationView o1 =
                 obligation(
                         1001L,
                         101L,
@@ -97,7 +97,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentObligationEntity o2 =
+        PaymentObligationView o2 =
                 obligation(
                         1002L,
                         102L,
@@ -181,7 +181,7 @@ class SettlementQueryServicePaymentTest {
                         "채권자"
                 );
 
-        PaymentObligationEntity o1 =
+        PaymentObligationView o1 =
                 obligation(
                         1001L,
                         101L,
@@ -189,7 +189,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentObligationEntity o2 =
+        PaymentObligationView o2 =
                 obligation(
                         1002L,
                         101L,
@@ -197,7 +197,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentObligationEntity o3 =
+        PaymentObligationView o3 =
                 obligation(
                         1003L,
                         101L,
@@ -205,7 +205,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentObligationEntity o4 =
+        PaymentObligationView o4 =
                 obligation(
                         1004L,
                         101L,
@@ -283,7 +283,7 @@ class SettlementQueryServicePaymentTest {
                         "채권자"
                 );
 
-        PaymentObligationEntity obligation =
+        PaymentObligationView obligation =
                 obligation(
                         1001L,
                         101L,
@@ -346,7 +346,7 @@ class SettlementQueryServicePaymentTest {
                         "채권자"
                 );
 
-        PaymentObligationEntity obligation =
+        PaymentObligationView obligation =
                 obligation(
                         1001L,
                         101L,
@@ -452,7 +452,7 @@ class SettlementQueryServicePaymentTest {
                         "참여자"
                 );
 
-        PaymentObligationEntity obligation =
+        PaymentObligationView obligation =
                 obligation(
                         1001L,
                         101L,
@@ -564,7 +564,7 @@ class SettlementQueryServicePaymentTest {
                         "홍길동"
                 );
 
-        PaymentObligationEntity obligation =
+        PaymentObligationView obligation =
                 obligation(
                         100L,
                         101L,
@@ -639,7 +639,7 @@ class SettlementQueryServicePaymentTest {
                         "홍길동"
                 );
 
-        PaymentObligationEntity obligation =
+        PaymentObligationView obligation =
                 obligation(
                         100L,
                         101L,
@@ -725,7 +725,7 @@ class SettlementQueryServicePaymentTest {
 
     private void preparePaymentHistoryStatus(
             List<SettlementParticipant> participants,
-            List<PaymentObligationEntity> obligations,
+            List<PaymentObligationView> obligations,
             List<PaymentRecordEntity> paymentRecords
     ) {
         Settlement settlement =
@@ -757,7 +757,7 @@ class SettlementQueryServicePaymentTest {
 
     private SettlementPaymentData paymentData(
             List<SettlementParticipant> participants,
-            List<PaymentObligationEntity> obligations,
+            List<PaymentObligationView> obligations,
             List<PaymentRecordEntity> paymentRecords
     ) {
         Map<Long, BigDecimal> paidAmountMap =
@@ -846,52 +846,14 @@ class SettlementQueryServicePaymentTest {
         return participant;
     }
 
-    private PaymentObligationEntity obligation(
+    private PaymentObligationView obligation(
             Long obligationId,
             Long participantId,
             long expectedAmount,
             ObligationStatus obligationStatus
     ) {
-        PaymentObligationEntity obligation =
-                mock(
-                        PaymentObligationEntity.class
-                );
-
-        lenient()
-                .when(
-                        obligation.getPaymentObligationId()
-                )
-                .thenReturn(
-                        obligationId
-                );
-
-        lenient()
-                .when(
-                        obligation.getParticipantId()
-                )
-                .thenReturn(
-                        participantId
-                );
-
-        lenient()
-                .when(
-                        obligation.getExpectedAmount()
-                )
-                .thenReturn(
-                        BigDecimal.valueOf(
-                                expectedAmount
-                        )
-                );
-
-        lenient()
-                .when(
-                        obligation.getObligationStatus()
-                )
-                .thenReturn(
-                        obligationStatus
-                );
-
-        return obligation;
+        return new PaymentObligationView(obligationId, participantId, BigDecimal.valueOf(expectedAmount),
+                org.teamsai.saibackend.domain.payment.type.PaymentStatus.UNPAID, obligationStatus, null);
     }
 
     private PaymentRecordEntity paymentRecord(

@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.settlement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
@@ -179,7 +179,7 @@ public class SettlementQueryService {
         SettlementPaymentData paymentData =
                 settlementPaymentReader.read(settlementId);
 
-        List<PaymentObligationEntity> obligations =
+        List<PaymentObligationView> obligations =
                 getPaymentTargetObligations(
                         paymentData.obligations()
                 );
@@ -198,11 +198,11 @@ public class SettlementQueryService {
         Map<Long, String> payerNameByObligationId =
                 obligations.stream()
                         .collect(Collectors.toMap(
-                                PaymentObligationEntity::getPaymentObligationId,
+                                PaymentObligationView::paymentObligationId,
                                 obligation -> {
                                     SettlementParticipant participant =
                                             participantMap.get(
-                                                    obligation.getParticipantId()
+                                                    obligation.participantId()
                                             );
 
                                     return participant != null
@@ -252,7 +252,7 @@ public class SettlementQueryService {
     private List<SettlementPaymentObligationResponse> buildPaymentObligationResponses(
             SettlementPaymentData paymentData
     ) {
-        List<PaymentObligationEntity> obligations =
+        List<PaymentObligationView> obligations =
                 getPaymentTargetObligations(
                         paymentData.obligations()
                 );
@@ -279,10 +279,10 @@ public class SettlementQueryService {
                         SettlementAssembler.toObligationResponse(
                                 obligation,
                                 participantMap.get(
-                                        obligation.getParticipantId()
+                                        obligation.participantId()
                                 ),
                                 paymentRecordMap.getOrDefault(
-                                        obligation.getPaymentObligationId(),
+                                        obligation.paymentObligationId(),
                                         List.of()
                                 )
                         )
@@ -290,14 +290,14 @@ public class SettlementQueryService {
                 .toList();
     }
 
-    private List<PaymentObligationEntity> getPaymentTargetObligations(
-            List<PaymentObligationEntity> obligations
+    private List<PaymentObligationView> getPaymentTargetObligations(
+            List<PaymentObligationView> obligations
     ) {
         return obligations.stream()
                 .filter(obligation ->
-                        obligation.getObligationStatus()
+                        obligation.obligationStatus()
                                 == ObligationStatus.ACTIVE
-                                || obligation.getObligationStatus()
+                                || obligation.obligationStatus()
                                 == ObligationStatus.WRITTEN_OFF
                 )
                 .toList();

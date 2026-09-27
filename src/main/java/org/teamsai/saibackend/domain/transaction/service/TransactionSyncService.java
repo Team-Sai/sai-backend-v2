@@ -8,7 +8,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.user.service.UserService;
@@ -23,7 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TransactionSyncService {
 
-    private final LinkedBankAccountRepository linkedBankAccountRepository;
+    private final LinkedBankAccountService linkedBankAccountService;
     private final MockBankClient mockBankClient;
     private final UserService userService;
     private final BankTransactionPersistenceService bankTransactionPersistenceService;
@@ -34,15 +34,13 @@ public class TransactionSyncService {
     **/
 
     public int syncTransactions(Long userId, Long linkedAccountId) {
-        LinkedBankAccount linkedAccount = linkedBankAccountRepository.findById(linkedAccountId)
-                .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
+        LinkedBankAccount linkedAccount = linkedBankAccountService.getLinkedAccount(linkedAccountId);
 
         validateOwnership(userId, linkedAccount);
 
         String userKey = userService.getUserKeyByUserId(linkedAccount.getUserId());
 
-        Long lastSyncedId = linkedBankAccountRepository.
-                            findLastSyncedTransactionIdById(linkedAccountId);
+        Long lastSyncedId = linkedBankAccountService.getLastSyncedTransactionId(linkedAccountId);
         long afterTransactionId = lastSyncedId == null ? 0L : lastSyncedId;
 
         List<BankTransactionResponse> transactions = fetchTransactions(
@@ -111,4 +109,3 @@ public class TransactionSyncService {
         return false;
     }
 }
- 

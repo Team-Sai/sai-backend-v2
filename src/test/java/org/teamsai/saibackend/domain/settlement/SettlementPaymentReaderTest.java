@@ -6,12 +6,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
+import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
-import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentData;
@@ -35,10 +34,10 @@ class SettlementPaymentReaderTest {
     private SettlementParticipantRepository settlementParticipantRepository;
 
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
+    private PaymentObligationQueryService paymentObligationQueryService;
 
     @Mock
-    private PaymentRecordRepository paymentRecordRepository;
+    private PaymentRecordService paymentRecordService;
 
     @InjectMocks
     private SettlementPaymentReader settlementPaymentReader;
@@ -73,8 +72,8 @@ class SettlementPaymentReaderTest {
                 .isEmpty();
 
         verifyNoInteractions(
-                paymentObligationRepository,
-                paymentRecordRepository
+                paymentObligationQueryService,
+                paymentRecordService
         );
     }
 
@@ -96,7 +95,7 @@ class SettlementPaymentReaderTest {
         );
 
         given(
-                paymentObligationRepository.findByParticipantIdIn(
+                paymentObligationQueryService.findByParticipantIds(
                         List.of(101L)
                 )
         ).willReturn(
@@ -121,7 +120,7 @@ class SettlementPaymentReaderTest {
                 .isEmpty();
 
         verifyNoInteractions(
-                paymentRecordRepository
+                paymentRecordService
         );
     }
 
@@ -133,12 +132,12 @@ class SettlementPaymentReaderTest {
                         101L
                 );
 
-        PaymentObligationEntity o1 =
+        PaymentObligationView o1 =
                 obligation(
                         1001L
                 );
 
-        PaymentObligationEntity o2 =
+        PaymentObligationView o2 =
                 obligation(
                         1002L
                 );
@@ -171,7 +170,7 @@ class SettlementPaymentReaderTest {
         );
 
         given(
-                paymentObligationRepository.findByParticipantIdIn(
+                paymentObligationQueryService.findByParticipantIds(
                         List.of(101L)
                 )
         ).willReturn(
@@ -179,10 +178,9 @@ class SettlementPaymentReaderTest {
         );
 
         given(
-                paymentRecordRepository.findConfirmedByTargetIds(
+                paymentRecordService.findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
-                        List.of(1001L, 1002L),
-                        RecordStatus.CONFIRMED
+                        List.of(1001L, 1002L)
                 )
         ).willReturn(
                 List.of(r1, r2, r3)
@@ -214,11 +212,10 @@ class SettlementPaymentReaderTest {
                 "7000"
         );
 
-        verify(paymentRecordRepository)
-                .findConfirmedByTargetIds(
+        verify(paymentRecordService)
+                .findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
-                        List.of(1001L, 1002L),
-                        RecordStatus.CONFIRMED
+                        List.of(1001L, 1002L)
                 );
     }
 
@@ -237,19 +234,12 @@ class SettlementPaymentReaderTest {
         return participant;
     }
 
-    private PaymentObligationEntity obligation(
+    private PaymentObligationView obligation(
             Long obligationId
     ) {
-        PaymentObligationEntity obligation =
-                mock(PaymentObligationEntity.class);
-
-        when(
-                obligation.getPaymentObligationId()
-        ).thenReturn(
-                obligationId
-        );
-
-        return obligation;
+        return new PaymentObligationView(obligationId, 101L, BigDecimal.ZERO,
+                org.teamsai.saibackend.domain.payment.type.PaymentStatus.UNPAID,
+                org.teamsai.saibackend.domain.payment.type.ObligationStatus.ACTIVE, null);
     }
 
     private PaymentRecordEntity paymentRecord(
