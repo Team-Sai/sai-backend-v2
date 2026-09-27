@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
@@ -21,14 +21,14 @@ public class SettlementWriteOffBatchService {
 
     private static final int WRITE_OFF_DAYS_AFTER_OVERDUE = 30;
 
-    private final PaymentObligationRepository paymentObligationRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
     private final SettlementCloseService settlementCloseService;
     private final SettlementWriteOffTransactionExecutor writeOffTransactionExecutor;
 
     @Transactional
     public WriteOffResult writeOffSettlementObligations(LocalDate baseDate) {
         LocalDateTime cutoff = baseDate.minusDays(WRITE_OFF_DAYS_AFTER_OVERDUE).atStartOfDay();
-        List<Long> candidateIds = paymentObligationRepository.findWriteOffCandidateIds(
+        List<Long> candidateIds = paymentObligationQueryService.findWriteOffCandidateIds(
                 ObligationStatus.ACTIVE,
                 List.of(
                         PaymentStatus.UNPAID,
@@ -47,7 +47,7 @@ public class SettlementWriteOffBatchService {
             return new WriteOffResult(0, 0);
         }
 
-        List<Long> affectedSettlementIds = paymentObligationRepository.findSettlementIdsByObligationIds(candidateIds);
+        List<Long> affectedSettlementIds = paymentObligationQueryService.findSettlementIdsByObligationIds(candidateIds);
         int closedCount = 0;
         for (Long settlementId : affectedSettlementIds) {
             try {

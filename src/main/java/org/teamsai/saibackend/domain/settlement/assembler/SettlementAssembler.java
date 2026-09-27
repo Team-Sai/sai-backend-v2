@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.settlement.assembler;
 
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
@@ -45,7 +45,7 @@ public final class SettlementAssembler {
     }
 
     public static SettlementPaymentObligationResponse toObligationResponse(
-            PaymentObligationEntity obligation,
+            PaymentObligationView obligation,
             SettlementParticipant participant,
             List<PaymentRecordEntity> records
     ) {
@@ -58,24 +58,24 @@ public final class SettlementAssembler {
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
 
-        BigDecimal remainingAmount = obligation.getExpectedAmount()
+        BigDecimal remainingAmount = obligation.expectedAmount()
                 .subtract(paidAmount)
                 .max(BigDecimal.ZERO);
 
-        PaymentStatus paymentStatus = calculatePaymentStatus(obligation.getExpectedAmount(), paidAmount);
+        PaymentStatus paymentStatus = calculatePaymentStatus(obligation.expectedAmount(), paidAmount);
 
         return SettlementPaymentObligationResponse.builder()
-                .paymentObligationId(obligation.getPaymentObligationId())
-                .participantId(obligation.getParticipantId())
+                .paymentObligationId(obligation.paymentObligationId())
+                .participantId(obligation.participantId())
                 .userId(participant.getUser().getUserId())
                 .participantName(participant.getUser().getName())
-                .expectedAmount(obligation.getExpectedAmount())
+                .expectedAmount(obligation.expectedAmount())
                 .paidAmount(paidAmount)
                 .remainingAmount(remainingAmount)
                 .latestPaymentAt(latestPaymentAt)
                 .paymentStatus(paymentStatus)
-                .obligationStatus(obligation.getObligationStatus())
-                .overdueSince(obligation.getOverdueSince())
+                .obligationStatus(obligation.obligationStatus())
+                .overdueSince(obligation.overdueSince())
                 .build();
     }
 

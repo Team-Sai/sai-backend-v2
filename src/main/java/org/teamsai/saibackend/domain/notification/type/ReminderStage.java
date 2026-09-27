@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.notification.type;
 
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
@@ -28,8 +28,8 @@ public enum ReminderStage {
 
     public String title() { return title; }
 
-    public String contentFor(Settlement settlement, PaymentObligationEntity obligation) {
-        String statusNote = obligation.getPaymentStatus() == PaymentStatus.PARTIALLY_PAID
+    public String contentFor(Settlement settlement, PaymentObligationView obligation) {
+        String statusNote = obligation.paymentStatus() == PaymentStatus.PARTIALLY_PAID
                 ? "남은 금액을 마저 납부해주세요."
                 : "납부해주세요.";
         return switch (this) {

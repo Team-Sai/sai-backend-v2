@@ -5,7 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SettlementWriteOffBatchServiceTest {
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
+    private PaymentObligationQueryService paymentObligationQueryService;
     @Mock
     private SettlementCloseService settlementCloseService;
     @Mock
@@ -32,7 +32,7 @@ class SettlementWriteOffBatchServiceTest {
         @Test
         void 상각_대상이_없으면_0_0을_반환하고_후속로직을_호출하지_않는다() {
             // given
-            when(paymentObligationRepository.findWriteOffCandidateIds(
+            when(paymentObligationQueryService.findWriteOffCandidateIds(
                     eq(ObligationStatus.ACTIVE),
                     eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)),
                     any()))
@@ -43,7 +43,7 @@ class SettlementWriteOffBatchServiceTest {
             assertThat(result.obligationCount()).isZero();
             assertThat(result.closedSettlementCount()).isZero();
             verifyNoInteractions(writeOffTransactionExecutor);
-            verify(paymentObligationRepository, never()).findSettlementIdsByObligationIds(anyList());
+            verify(paymentObligationQueryService, never()).findSettlementIdsByObligationIds(anyList());
             verifyNoInteractions(settlementCloseService);
         }
         @Test
@@ -51,13 +51,13 @@ class SettlementWriteOffBatchServiceTest {
             // given
             List<Long> candidateIds = List.of(1L, 2L, 3L);
             List<Long> settlementIds = List.of(100L, 200L);
-            when(paymentObligationRepository.findWriteOffCandidateIds(
+            when(paymentObligationQueryService.findWriteOffCandidateIds(
                     eq(ObligationStatus.ACTIVE),
                     eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)),
                     any()))
                     .thenReturn(candidateIds);
             when(writeOffTransactionExecutor.writeOffOneBatch(candidateIds)).thenReturn(3);
-            when(paymentObligationRepository.findSettlementIdsByObligationIds(candidateIds))
+            when(paymentObligationQueryService.findSettlementIdsByObligationIds(candidateIds))
                     .thenReturn(settlementIds);
             when(settlementCloseService.autoCloseIfAllResolved(100L)).thenReturn(true);
             when(settlementCloseService.autoCloseIfAllResolved(200L)).thenReturn(false);
@@ -74,7 +74,7 @@ class SettlementWriteOffBatchServiceTest {
         void 실제_상각건수가_0이면_정산_조회_자체를_스킵한다() {
             // given: 후보는 있었지만 동시성 등으로 실제 UPDATE된 row가 0건인 경우
             List<Long> candidateIds = List.of(1L, 2L);
-            when(paymentObligationRepository.findWriteOffCandidateIds(
+            when(paymentObligationQueryService.findWriteOffCandidateIds(
                     eq(ObligationStatus.ACTIVE),
                     eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)),
                     any()))
@@ -85,7 +85,7 @@ class SettlementWriteOffBatchServiceTest {
             // then
             assertThat(result.obligationCount()).isZero();
             assertThat(result.closedSettlementCount()).isZero();
-            verify(paymentObligationRepository, never()).findSettlementIdsByObligationIds(anyList());
+            verify(paymentObligationQueryService, never()).findSettlementIdsByObligationIds(anyList());
             verifyNoInteractions(settlementCloseService);
         }
         @Test
@@ -93,13 +93,13 @@ class SettlementWriteOffBatchServiceTest {
             // given
             List<Long> candidateIds = List.of(1L);
             List<Long> settlementIds = List.of(100L, 200L, 300L);
-            when(paymentObligationRepository.findWriteOffCandidateIds(
+            when(paymentObligationQueryService.findWriteOffCandidateIds(
                     eq(ObligationStatus.ACTIVE),
                     eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)),
                     any()))
                     .thenReturn(candidateIds);
             when(writeOffTransactionExecutor.writeOffOneBatch(candidateIds)).thenReturn(1);
-            when(paymentObligationRepository.findSettlementIdsByObligationIds(candidateIds))
+            when(paymentObligationQueryService.findSettlementIdsByObligationIds(candidateIds))
                     .thenReturn(settlementIds);
             when(settlementCloseService.autoCloseIfAllResolved(100L)).thenReturn(true);
             when(settlementCloseService.autoCloseIfAllResolved(200L))

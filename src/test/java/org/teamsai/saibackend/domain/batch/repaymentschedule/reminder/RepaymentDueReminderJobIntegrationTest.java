@@ -28,6 +28,9 @@ import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
+import org.teamsai.saibackend.domain.contract.service.LoanContractService;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.notification.entity.Notification;
 import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -40,7 +43,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = {
         RepaymentDueReminderJobConfig.class,
         RepaymentDueReminderService.class,
-        org.teamsai.saibackend.domain.batch.repaymentschedule.reminder.ReminderNotificationSender.class,
+        RepaymentScheduleService.class,
+        ReminderNotificationSender.class,
         org.teamsai.saibackend.domain.batch.common.config.BatchInfraConfig.class,
         LoggingJobExecutionListener.class,
         org.teamsai.saibackend.domain.batch.common.listener.BaseSkipListener.class,
@@ -73,6 +77,30 @@ class RepaymentDueReminderJobIntegrationTest {
             "org.teamsai.saibackend.domain.notification",
     })
     static class TestSliceConfig {
+
+        @Bean
+        LoanContractService loanContractService(
+                LoanContractRepository repository,
+                jakarta.persistence.EntityManager entityManager,
+                org.springframework.context.ApplicationEventPublisher eventPublisher,
+                org.teamsai.saibackend.domain.notification.service.NotificationService notificationService
+        ) {
+            return new LoanContractService(
+                    repository,
+                    org.mockito.Mockito.mock(org.teamsai.saibackend.domain.contract.service.LoanContractFileService.class),
+                    org.mockito.Mockito.mock(org.teamsai.saibackend.domain.contract.service.ContractAccountService.class),
+                    org.mockito.Mockito.mock(org.teamsai.saibackend.domain.user.service.UserService.class),
+                    org.mockito.Mockito.mock(org.teamsai.saibackend.domain.identity.service.IdentityService.class),
+                    eventPublisher,
+                    notificationService,
+                    entityManager
+            );
+        }
+
+        @Bean
+        RepaymentScheduleGenerator repaymentScheduleGenerator() {
+            return org.mockito.Mockito.mock(RepaymentScheduleGenerator.class);
+        }
 
         @Bean
         SlackNotifier slackNotifier() {

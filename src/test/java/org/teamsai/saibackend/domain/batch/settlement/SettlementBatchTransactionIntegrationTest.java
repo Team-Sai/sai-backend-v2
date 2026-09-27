@@ -17,9 +17,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
@@ -74,7 +73,7 @@ class SettlementBatchTransactionIntegrationTest {
                 + "VALUES (?, ?, ?, 'test', 'batch-test', '2000-01-01')",
                 USER_ID, unique, unique + "@example.com");
         var participants = mock(SettlementParticipantRepository.class);
-        var obligations = mock(PaymentObligationRepository.class);
+        var obligations = mock(PaymentObligationQueryService.class);
         var settlement = mock(Settlement.class);
         when(settlement.getSettlementId()).thenReturn(FIRST_ALERT);
         when(settlement.getTitle()).thenReturn("transaction isolation");
@@ -87,7 +86,7 @@ class SettlementBatchTransactionIntegrationTest {
                 .thenReturn(List.of(participant));
         // A null reference ID violates the real notification table constraint.
         var targets = List.of(obligation(1L), obligation(null), obligation(3L));
-        when(obligations.findLatestByParticipantIds(List.of(1L), ObligationStatus.ACTIVE))
+        when(obligations.findLatestActiveByParticipantIds(List.of(1L)))
                 .thenReturn(targets);
         var sender = new SettlementReminderSender(participants, obligations, notificationService);
 
@@ -117,11 +116,11 @@ class SettlementBatchTransactionIntegrationTest {
                 Integer.class, FIRST_ALERT, SECOND_ALERT)).isEqualTo(2);
     }
 
-    private PaymentObligationEntity obligation(Long id) {
-        var obligation = mock(PaymentObligationEntity.class);
-        when(obligation.getParticipantId()).thenReturn(1L);
-        when(obligation.getPaymentObligationId()).thenReturn(id);
-        when(obligation.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
+    private PaymentObligationView obligation(Long id) {
+        var obligation = mock(PaymentObligationView.class);
+        when(obligation.participantId()).thenReturn(1L);
+        when(obligation.paymentObligationId()).thenReturn(id);
+        when(obligation.paymentStatus()).thenReturn(PaymentStatus.UNPAID);
         return obligation;
     }
 }
