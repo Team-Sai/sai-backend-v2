@@ -1,0 +1,66 @@
+package org.teamsai.saibackend.domain.batch.writeoff;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
+import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class SettlementWriteOffBatchService {
+
+    private static final int WRITE_OFF_DAYS_AFTER_OVERDUE = 30;
+
+    private final PaymentObligationQueryService paymentObligationQueryService;
+    private final SettlementCloseService settlementCloseService;
+    private final SettlementWriteOffTransactionExecutor writeOffTransactionExecutor;
+
+    @Transactional
+    public WriteOffResult writeOffSettlementObligations(LocalDate baseDate) {
+        LocalDateTime cutoff = baseDate.minusDays(WRITE_OFF_DAYS_AFTER_OVERDUE).atStartOfDay();
+        List<Long> candidateIds = paymentObligationQueryService.findWriteOffCandidateIds(
+                ObligationStatus.ACTIVE,
+                List.of(
+                        PaymentStatus.UNPAID,
+                        PaymentStatus.PARTIALLY_PAID
+                ),
+                cutoff
+        );
+        if (candidateIds.isEmpty()) {
+            return new WriteOffResult(0, 0);
+        }
+
+        int actuallyWrittenOff = writeOffTransactionExecutor.writeOffOneBatch(candidateIds);
+        log.info("정산 결제의무 상각 처리, 후보 {}건 중 {}건 실제 처리", candidateIds.size(), actuallyWrittenOff);
+
+        if (actuallyWrittenOff == 0) {
+            return new WriteOffResult(0, 0);
+        }
+
+        List<Long> affectedSettlementIds = paymentObligationQueryService.findSettlementIdsByObligationIds(candidateIds);
+        int closedCount = 0;
+        for (Long settlementId : affectedSettlementIds) {
+            try {
+                boolean closed = settlementCloseService.autoCloseIfAllResolved(settlementId);
+                log.info("자동종결 결과 settlementId={}, closed={}", settlementId, closed);
+                if (closed) {
+                    closedCount++;
+                }
+            } catch (Exception e) {
+                log.error("정산 자동종결 실패, 다음 정산 계속 진행 settlementId={}", settlementId, e);
+            }
+        }
+        return new WriteOffResult(actuallyWrittenOff, closedCount);
+    }
+
+}

@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.matching.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
+import org.teamsai.saibackend.global.notification.SlackNotifier;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.type.RetryPolicy;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
