@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
-import org.teamsai.saibackend.domain.settlement.service.OverdueSettlementService;
+import org.teamsai.saibackend.domain.batch.settlement.overdue.OverdueSettlementService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

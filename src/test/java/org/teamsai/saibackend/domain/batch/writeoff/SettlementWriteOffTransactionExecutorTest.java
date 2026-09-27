@@ -1,0 +1,83 @@
+package org.teamsai.saibackend.domain.batch.writeoff;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.teamsai.saibackend.domain.batch.writeoff.SettlementWriteOffTransactionExecutor;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
+
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class SettlementWriteOffTransactionExecutorTest {
+
+    @Mock
+    private PaymentObligationRepository paymentObligationRepository;
+    @InjectMocks
+    private SettlementWriteOffTransactionExecutor writeOffTransactionExecutor;
+
+    @Test
+    void 건수500_초과시_500건_단위로_청크를_나누어_호출한다() {
+        // given: 1200건 -> 500 / 500 / 200 세 번 호출되어야 함
+        List<Long> ids = LongStream.rangeClosed(1, 1200).boxed().collect(Collectors.toList());
+        when(paymentObligationRepository.findWriteOffTargetsForUpdate(
+                anyList(),
+                eq(ObligationStatus.ACTIVE),
+                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
+        ))
+                .thenAnswer(invocation -> ((List<Long>) invocation.getArgument(0))
+                        .stream()
+                        .map(id -> mock(PaymentObligationEntity.class))
+                        .toList());
+        // when
+        int total = writeOffTransactionExecutor.writeOffOneBatch(ids);
+        // then
+        assertThat(total).isEqualTo(1200);
+        ArgumentCaptor<List<Long>> captor = ArgumentCaptor.forClass(List.class);
+        verify(paymentObligationRepository, times(3)).findWriteOffTargetsForUpdate(
+                captor.capture(),
+                eq(ObligationStatus.ACTIVE),
+                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
+        );
+        List<List<Long>> chunks = captor.getAllValues();
+        assertThat(chunks).hasSize(3);
+        assertThat(chunks.get(0)).hasSize(500);
+        assertThat(chunks.get(1)).hasSize(500);
+        assertThat(chunks.get(2)).hasSize(200);
+    }
+
+    @Test
+    void 정확히_500건이면_한_번만_호출된다() {
+        List<Long> ids = LongStream.rangeClosed(1, 500).boxed().collect(Collectors.toList());
+        when(paymentObligationRepository.findWriteOffTargetsForUpdate(
+                anyList(),
+                eq(ObligationStatus.ACTIVE),
+                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
+        ))
+                .thenAnswer(invocation -> ((List<Long>) invocation.getArgument(0))
+                        .stream()
+                        .map(id -> mock(PaymentObligationEntity.class))
+                        .toList());
+        int total = writeOffTransactionExecutor.writeOffOneBatch(ids);
+        assertThat(total).isEqualTo(500);
+        verify(paymentObligationRepository, times(1)).findWriteOffTargetsForUpdate(
+                anyList(),
+                eq(ObligationStatus.ACTIVE),
+                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
+        );
+    }
+
+}

@@ -14,7 +14,7 @@ import org.springframework.test.context.jdbc.Sql;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
-import org.teamsai.saibackend.domain.settlement.service.RecurringSettlementGenerationService;
+import org.teamsai.saibackend.domain.batch.settlement.recurring.RecurringSettlementGenerationService;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
 

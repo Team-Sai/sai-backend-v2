@@ -3,8 +3,6 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
@@ -28,7 +26,9 @@ public class SettlementReminderSender {
     private final PaymentObligationRepository paymentObligationRepository;
     private final NotificationService notificationService;
 
-    public int sendForSettlement(Settlement settlement, ReminderStage stage) {
+    public record DeliveryResult(int processedCount, int failedCount) {}
+
+    public DeliveryResult sendForSettlement(Settlement settlement, ReminderStage stage) {
         List<SettlementParticipant> activeParticipants =
                 participantRepository.findBySettlementIdAndStatus(
                         settlement.getSettlementId(),
@@ -36,7 +36,7 @@ public class SettlementReminderSender {
                 );
 
         if (activeParticipants.isEmpty()) {
-            return 0;
+            return new DeliveryResult(0, 0);
         }
 
         Map<Long, Long> userIdByParticipantId = activeParticipants.stream()
@@ -58,6 +58,7 @@ public class SettlementReminderSender {
                         .toList();
 
         int sent = 0;
+        int failed = 0;
         for (PaymentObligationEntity obligation : unresolvedObligations) {
             Long userId = userIdByParticipantId.get(obligation.getParticipantId());
             if (userId == null) {
@@ -68,15 +69,15 @@ public class SettlementReminderSender {
                 sendOneReminder(userId, obligation, settlement, stage);
                 sent++;
             } catch (Exception e) {
+                failed++;
                 log.error("리마인드 발송 실패 paymentObligationId={}", obligation.getPaymentObligationId(), e);
             }
         }
-        return sent;
+        return new DeliveryResult(sent, failed);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void sendOneReminder(Long userId, PaymentObligationEntity obligation, Settlement settlement, ReminderStage stage) {
-        notificationService.createIfAbsent(
+    private void sendOneReminder(Long userId, PaymentObligationEntity obligation, Settlement settlement, ReminderStage stage) {
+        notificationService.createIfAbsentInNewTransaction(
                 userId,
                 stage.type(),
                 stage.title(),
