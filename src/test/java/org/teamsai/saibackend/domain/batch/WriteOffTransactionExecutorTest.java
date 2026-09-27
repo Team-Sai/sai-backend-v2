@@ -2,16 +2,12 @@ package org.teamsai.saibackend.domain.batch;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.batch.service.WriteOffTransactionExecutor;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
+import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,61 +21,30 @@ import static org.mockito.Mockito.*;
 class WriteOffTransactionExecutorTest {
 
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
+    private SettlementPaymentService settlementPaymentService;
     @Mock
     private RepaymentScheduleService repaymentScheduleService;
     @InjectMocks
     private WriteOffTransactionExecutor writeOffTransactionExecutor;
 
     @Test
-    void 건수500_초과시_500건_단위로_청크를_나누어_호출한다() {
-        // given: 1200건 -> 500 / 500 / 200 세 번 호출되어야 함
+    void 정산_상각은_배치전체를_결제서비스에_위임한다() {
         List<Long> ids = LongStream.rangeClosed(1, 1200).boxed().collect(Collectors.toList());
-        when(paymentObligationRepository.findWriteOffTargetsForUpdate(
-                anyList(),
-                eq(ObligationStatus.ACTIVE),
-                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
-        ))
-                .thenAnswer(invocation -> ((List<Long>) invocation.getArgument(0))
-                        .stream()
-                        .map(id -> mock(PaymentObligationEntity.class))
-                        .toList());
+        when(settlementPaymentService.writeOffOneBatch(ids)).thenReturn(900);
         // when
         int total = writeOffTransactionExecutor.writeOffOneBatch(ids);
         // then
-        assertThat(total).isEqualTo(1200);
-        ArgumentCaptor<List<Long>> captor = ArgumentCaptor.forClass(List.class);
-        verify(paymentObligationRepository, times(3)).findWriteOffTargetsForUpdate(
-                captor.capture(),
-                eq(ObligationStatus.ACTIVE),
-                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
-        );
-        List<List<Long>> chunks = captor.getAllValues();
-        assertThat(chunks).hasSize(3);
-        assertThat(chunks.get(0)).hasSize(500);
-        assertThat(chunks.get(1)).hasSize(500);
-        assertThat(chunks.get(2)).hasSize(200);
+        assertThat(total).isEqualTo(900);
+        verify(settlementPaymentService).writeOffOneBatch(ids);
     }
 
     @Test
     void 정확히_500건이면_한_번만_호출된다() {
         List<Long> ids = LongStream.rangeClosed(1, 500).boxed().collect(Collectors.toList());
-        when(paymentObligationRepository.findWriteOffTargetsForUpdate(
-                anyList(),
-                eq(ObligationStatus.ACTIVE),
-                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
-        ))
-                .thenAnswer(invocation -> ((List<Long>) invocation.getArgument(0))
-                        .stream()
-                        .map(id -> mock(PaymentObligationEntity.class))
-                        .toList());
+        when(settlementPaymentService.writeOffOneBatch(anyList())).thenReturn(500);
         int total = writeOffTransactionExecutor.writeOffOneBatch(ids);
         assertThat(total).isEqualTo(500);
-        verify(paymentObligationRepository, times(1)).findWriteOffTargetsForUpdate(
-                anyList(),
-                eq(ObligationStatus.ACTIVE),
-                eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))
-        );
+        verify(settlementPaymentService, times(1)).writeOffOneBatch(anyList());
     }
 
     @Test

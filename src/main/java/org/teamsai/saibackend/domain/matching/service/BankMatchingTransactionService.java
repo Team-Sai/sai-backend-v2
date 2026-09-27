@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
@@ -29,7 +29,7 @@ import java.util.List;
 public class BankMatchingTransactionService {
 
     private final MatchingCandidateRepository matchingCandidateRepository;
-    private final PaymentObligationRepository paymentObligationRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
     private final AutoMatchingService autoMatchingService;
     private final BankTransactionService bankTransactionService;
     private final BankTransactionMatchCandidateService candidateService;
@@ -133,7 +133,7 @@ public class BankMatchingTransactionService {
                     .toList();
             if (!settlementObligationIds.isEmpty()) {
                 List<Long> settlementIds =
-                        paymentObligationRepository.findSettlementIdsByObligationIds(settlementObligationIds);
+                        paymentObligationQueryService.findSettlementIdsByObligationIds(settlementObligationIds);
                 boolean hasUnresolvedSettlement = settlementIds.stream()
                         .anyMatch(settlementId ->
                                 !paymentStatusChecker.areAllObligationsResolved(settlementId));

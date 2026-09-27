@@ -38,13 +38,6 @@ public class LoanContractQueryController {
             summary = "차용증 상세 조회",
             description = "로그인이 된 사용자가 차용증 ID로 차용증 상세 내용을 조회합니다."
     )
-    @GetMapping(value = "/api/contracts/{contractId}/listdetails")
-    public LoanContractResponse getContractDetails(
-            @PathVariable Long contractId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        return contractService.findContract(contractId, userDetails.getUserId());
-    }
 
     @GetMapping("/api/contracts/{contractId}")
     public LoanContractResponse getContract(

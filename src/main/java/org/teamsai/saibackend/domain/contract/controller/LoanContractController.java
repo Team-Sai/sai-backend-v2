@@ -42,7 +42,7 @@ public class LoanContractController {
             @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자"),
             @ApiResponse(responseCode = "404", description = "잘못된 입력값 요청")
     })
-    @PostMapping("/api/contracts/write")
+    @PostMapping("/api/contracts")
     public Long createContract(
             @Valid @RequestBody LoanContractRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails

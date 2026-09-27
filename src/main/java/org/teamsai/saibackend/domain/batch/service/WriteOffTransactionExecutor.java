@@ -6,10 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
-import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
+import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,32 +18,11 @@ public class WriteOffTransactionExecutor {
 
     private static final int CHUNK_SIZE = 500;
 
-    private final PaymentObligationRepository paymentObligationRepository;
+    private final SettlementPaymentService settlementPaymentService;
     private final RepaymentScheduleService repaymentScheduleService;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int writeOffOneBatch(List<Long> obligationIds) {
-        int total = 0;
-
-        for (List<Long> chunk : partition(obligationIds, CHUNK_SIZE)) {
-            List<PaymentObligationEntity> obligations =
-                    paymentObligationRepository.findWriteOffTargetsForUpdate(
-                            chunk,
-                            ObligationStatus.ACTIVE,
-                            List.of(
-                                    PaymentStatus.UNPAID,
-                                    PaymentStatus.PARTIALLY_PAID
-                            )
-                    );
-
-            for (PaymentObligationEntity obligation : obligations) {
-                obligation.writeOff();
-            }
-
-            total += obligations.size();
-        }
-
-        return total;
+        return settlementPaymentService.writeOffOneBatch(obligationIds);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

@@ -83,7 +83,7 @@ Promise.all([
         `/api/contracts/${contractId}/schedules`
     ),
     authFetch(
-        `/api/contracts/${contractId}/contract-detail`
+        `/api/contracts/${contractId}/document`
     )
 ])
     .then(([scheduleRes, contractRes]) => {
