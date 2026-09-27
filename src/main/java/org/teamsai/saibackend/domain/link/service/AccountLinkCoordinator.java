@@ -90,10 +90,17 @@ public class AccountLinkCoordinator {
             if (existingKey != null) {
                 return new UserKeyResponse(existingKey);
             }
-            String operationId = UUID.randomUUID().toString();
-            operations.beginIssue(operationId, userId);
-            return new UserKeyResponse(resumeIssuance(new LinkOperationStore.Operation(
-                    operationId, userId, "ISSUE", null, null, ISSUE_PENDING)));
+            // At most one automatic restart for a newly issued operation.
+            for (int attempt = 0; attempt < 2; attempt++) {
+                String operationId = UUID.randomUUID().toString();
+                operations.beginIssue(operationId, userId);
+                var result = resumeIssuance(new LinkOperationStore.Operation(
+                        operationId, userId, "ISSUE", null, null, ISSUE_PENDING));
+                if (!result.expired()) {
+                    return new UserKeyResponse(result.key());
+                }
+            }
+            throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
         });
     }
 
@@ -124,7 +131,9 @@ public class AccountLinkCoordinator {
         if (operation.status() == RECOVERY_CONFLICT) {
             throw AccountErrorCode.LINK_RECOVERY_CONFLICT.toException();
         }
-        if (operation.status() != CONFIRM_UNKNOWN && operation.status() != COMPENSATION_PENDING) {
+        if (operation.status() != PROCESSING
+                && operation.status() != CONFIRM_UNKNOWN
+                && operation.status() != COMPENSATION_PENDING) {
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
         try {
@@ -163,7 +172,9 @@ public class AccountLinkCoordinator {
         runPersisted(operation, ids);
     }
 
-    private String resumeIssuance(LinkOperationStore.Operation operation) {
+    private record IssuanceResult(boolean expired, String key) {}
+
+    private IssuanceResult resumeIssuance(LinkOperationStore.Operation operation) {
         if (!Objects.equals(users.findUserKeyByUserId(operation.userId()), operation.previousKey())) {
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
@@ -176,6 +187,11 @@ public class AccountLinkCoordinator {
             } catch (RestClientResponseException e) {
                 int status = e.getStatusCode().value();
                 String code = bankErrorCode(e);
+
+                if (status == 409 && "KEY_ISSUANCE_EXPIRED".equals(code)) {
+                    operations.markIssueExpired(operation.id());
+                    return new IssuanceResult(true, null);
+                }
 
                 boolean retryable =
                         e.getStatusCode().is5xxServerError()
@@ -216,7 +232,7 @@ public class AccountLinkCoordinator {
         } catch (RuntimeException e) {
             throw AccountErrorCode.LOCAL_KEY_SAVE_FAILED.toException();
         }
-        return operation.newKey();
+        return new IssuanceResult(false, operation.newKey());
     }
 
     private void runPersisted(LinkOperationStore.Operation operation, List<Long> ids) {
