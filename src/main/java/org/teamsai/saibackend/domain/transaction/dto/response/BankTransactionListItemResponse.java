@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.transaction.dto.response;
 
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
@@ -17,7 +17,7 @@ public record BankTransactionListItemResponse(
         String memo
 ) {
     public static BankTransactionListItemResponse from(
-            BankTransactionEntity entity
+            BankTransaction entity
     ) {
         return new BankTransactionListItemResponse(
                 entity.getBankTransactionId(),

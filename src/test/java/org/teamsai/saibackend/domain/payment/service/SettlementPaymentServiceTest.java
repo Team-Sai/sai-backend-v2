@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
@@ -41,14 +41,14 @@ class SettlementPaymentServiceTest {
         var service = new SettlementPaymentService(paymentObligationRepository, paymentRecordService);
         List<Long> ids = LongStream.rangeClosed(1, 1200).boxed().toList();
         List<List<Long>> queriedChunks = new ArrayList<>();
-        List<PaymentObligationEntity> targets = new ArrayList<>();
+        List<PaymentObligation> targets = new ArrayList<>();
         given(paymentObligationRepository.findWriteOffTargetsForUpdate(
                 anyList(), eq(ObligationStatus.ACTIVE),
                 eq(List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID))))
                 .willAnswer(invocation -> {
                     List<Long> chunk = invocation.getArgument(0);
                     queriedChunks.add(List.copyOf(chunk));
-                    var target = new PaymentObligationEntity(chunk.get(0), BigDecimal.TEN);
+                    var target = new PaymentObligation(chunk.get(0), BigDecimal.TEN);
                     targets.add(target);
                     return List.of(target);
                 });
@@ -65,7 +65,7 @@ class SettlementPaymentServiceTest {
     void writesOffExactly500CandidatesWithOneQuery() {
         var service = new SettlementPaymentService(paymentObligationRepository, paymentRecordService);
         List<Long> ids = LongStream.rangeClosed(1, 500).boxed().toList();
-        var target = new PaymentObligationEntity(1L, BigDecimal.TEN);
+        var target = new PaymentObligation(1L, BigDecimal.TEN);
         given(paymentObligationRepository.findWriteOffTargetsForUpdate(
                 ids, ObligationStatus.ACTIVE,
                 List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)))
@@ -99,8 +99,8 @@ class SettlementPaymentServiceTest {
     @Test
     void marksAllActiveUnpaidTargetsOverdue() {
         var service = new SettlementPaymentService(paymentObligationRepository, paymentRecordService);
-        var first = new PaymentObligationEntity(1L, BigDecimal.TEN);
-        var second = new PaymentObligationEntity(2L, BigDecimal.TEN);
+        var first = new PaymentObligation(1L, BigDecimal.TEN);
+        var second = new PaymentObligation(2L, BigDecimal.TEN);
         second.changePaymentStatus(PaymentStatus.PARTIALLY_PAID);
         var since = LocalDateTime.of(2026, 2, 2, 0, 0);
         given(paymentObligationRepository.findUnpaidByParticipantIds(
@@ -138,8 +138,8 @@ class SettlementPaymentServiceTest {
                         paymentObligationRepository,
                         paymentRecordService
                 );
-        PaymentObligationEntity obligation =
-                new PaymentObligationEntity(
+        PaymentObligation obligation =
+                new PaymentObligation(
                         20L,
                         new BigDecimal("100000")
                 );
@@ -178,8 +178,8 @@ class SettlementPaymentServiceTest {
                         paymentObligationRepository,
                         paymentRecordService
                 );
-        PaymentObligationEntity obligation =
-                new PaymentObligationEntity(
+        PaymentObligation obligation =
+                new PaymentObligation(
                         20L,
                         new BigDecimal("100000")
                 );

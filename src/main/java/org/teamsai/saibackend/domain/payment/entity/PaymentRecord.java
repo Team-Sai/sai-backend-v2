@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PaymentRecordEntity {
+public class PaymentRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -63,7 +63,7 @@ public class PaymentRecordEntity {
     @Column(name = "memo", length = 500)
     private String memo;
 
-    public PaymentRecordEntity(
+    public PaymentRecord(
             Long bankTransactionId,
             PaymentTargetType paymentTargetType,
             Long targetId,

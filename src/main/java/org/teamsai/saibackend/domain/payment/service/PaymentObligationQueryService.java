@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
@@ -55,8 +55,8 @@ public class PaymentObligationQueryService {
                 .findLatestByParticipantIdsAndObligationStatuses(participantIds, statuses)
                 .stream()
                 .collect(Collectors.toMap(
-                        PaymentObligationEntity::getParticipantId,
-                        PaymentObligationEntity::getExpectedAmount
+                        PaymentObligation::getParticipantId,
+                        PaymentObligation::getExpectedAmount
                 ));
     }
 

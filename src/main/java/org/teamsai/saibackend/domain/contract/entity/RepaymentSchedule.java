@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Table(name = "repayment_schedule")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class RepaymentScheduleEntity {
+public class RepaymentSchedule {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -65,7 +65,7 @@ public class RepaymentScheduleEntity {
         this.status = RepaymentScheduleStatus.WRITTEN_OFF;
     }
 
-    public RepaymentScheduleEntity(
+    public RepaymentSchedule(
             Long contractId,
             Integer sequence,
             LocalDate dueDate,

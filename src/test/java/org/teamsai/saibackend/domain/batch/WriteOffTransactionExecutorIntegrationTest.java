@@ -16,13 +16,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.batch.service.WriteOffTransactionExecutor;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
@@ -59,8 +59,8 @@ class WriteOffTransactionExecutorIntegrationTest {
     )
     @EntityScan(
             basePackageClasses = {
-                    RepaymentScheduleEntity.class,
-                    PaymentObligationEntity.class,
+                    RepaymentSchedule.class,
+                    PaymentObligation.class,
                     LoanContract.class,
                     LinkedBankAccount.class,
                     User.class

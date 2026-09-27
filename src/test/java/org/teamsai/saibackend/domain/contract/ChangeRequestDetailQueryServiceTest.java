@@ -11,7 +11,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeQueryService;
 import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimator;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
@@ -47,7 +47,7 @@ class ChangeRequestDetailQueryServiceTest {
     @InjectMocks
     private ChangeRequestDetailQueryService changeRequestDetailService;
 
-    private LoanContractChangeRequestEntity buildChangeRequest(
+    private LoanContractChangeRequest buildChangeRequest(
             Long changeRequestId,
             Long contractId,
             Long userId,
@@ -60,7 +60,7 @@ class ChangeRequestDetailQueryServiceTest {
             String returnReason,
             LocalDateTime createdAt
     ) {
-        LoanContractChangeRequestEntity entity = new LoanContractChangeRequestEntity(
+        LoanContractChangeRequest entity = new LoanContractChangeRequest(
                 contractId,
                 userId,
                 changeReason,
@@ -80,7 +80,7 @@ class ChangeRequestDetailQueryServiceTest {
         return entity;
     }
 
-    private LoanContractChangeRequestEntity createChangeRequestWithDifferentContractId() {
+    private LoanContractChangeRequest createChangeRequestWithDifferentContractId() {
         return buildChangeRequest(
                 CHANGE_REQUEST_ID, 999L, null, ChangeRequestStatus.PENDING,
                 null, null, null, null, null, null, LocalDateTime.now()
@@ -134,7 +134,7 @@ class ChangeRequestDetailQueryServiceTest {
                 .build();
     }
 
-    private LoanContractChangeRequestEntity createChangeRequest() {
+    private LoanContractChangeRequest createChangeRequest() {
         return buildChangeRequest(
                 CHANGE_REQUEST_ID, CONTRACT_ID, USER_ID, ChangeRequestStatus.PENDING,
                 LocalDate.of(2026, 12, 31), BigDecimal.valueOf(4.2), "EQUAL_PRINCIPAL_AND_INTEREST", 15,
@@ -147,7 +147,7 @@ class ChangeRequestDetailQueryServiceTest {
     void getDetail_fallsBackToCurrentMaturityDate_whenNewMaturityDateIsNull() {
         LoanContractResponse contract = createContract();
 
-        LoanContractChangeRequestEntity changeRequest = buildChangeRequest(
+        LoanContractChangeRequest changeRequest = buildChangeRequest(
                 CHANGE_REQUEST_ID, CONTRACT_ID, USER_ID, ChangeRequestStatus.PENDING,
                 null, BigDecimal.valueOf(4.2), "EQUAL_PRINCIPAL_AND_INTEREST", 15,
                 "자금 사정으로 인한 연장 요청", null, LocalDateTime.now()
@@ -176,7 +176,7 @@ class ChangeRequestDetailQueryServiceTest {
     @DisplayName("채무자가 요청자면 requesterName이 채무자 이름으로 결정된다")
     void getDetail_requesterIsDebtor() {
         LoanContractResponse contract = createContract();
-        LoanContractChangeRequestEntity changeRequest = buildChangeRequest(
+        LoanContractChangeRequest changeRequest = buildChangeRequest(
                 CHANGE_REQUEST_ID, CONTRACT_ID, contract.getDebtorId(), ChangeRequestStatus.PENDING,
                 null, null, null, null, null, null, LocalDateTime.now()
         );
@@ -193,7 +193,7 @@ class ChangeRequestDetailQueryServiceTest {
     @DisplayName("반려 사유(returnReason)가 응답에 그대로 채워진다")
     void getDetail_includesReturnReason() {
         LoanContractResponse contract = createContract();
-        LoanContractChangeRequestEntity changeRequest = buildChangeRequest(
+        LoanContractChangeRequest changeRequest = buildChangeRequest(
                 CHANGE_REQUEST_ID, CONTRACT_ID, contract.getCreditorId(), ChangeRequestStatus.REJECTED,
                 null, null, null, null, null, "이율이 너무 높습니다", LocalDateTime.now()
         );

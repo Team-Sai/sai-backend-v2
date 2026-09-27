@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
@@ -22,7 +22,7 @@ import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentData;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentReader;
 import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
 import java.util.List;
@@ -268,10 +268,10 @@ public class SettlementQueryService {
                                 participant -> participant
                         ));
 
-        Map<Long, List<PaymentRecordEntity>> paymentRecordMap =
+        Map<Long, List<PaymentRecord>> paymentRecordMap =
                 paymentData.paymentRecords().stream()
                         .collect(Collectors.groupingBy(
-                                PaymentRecordEntity::getTargetId
+                                PaymentRecord::getTargetId
                         ));
 
         return obligations.stream()
@@ -304,10 +304,10 @@ public class SettlementQueryService {
     }
 
     private SettlementPaymentHistoryResponse toPaymentHistoryResponse(
-            PaymentRecordEntity record,
+            PaymentRecord record,
             Map<Long, String> payerNameByObligationId
     ) {
-        BankTransactionEntity transaction =
+        BankTransaction transaction =
                 bankTransactionService
                         .findById(
                                 record.getBankTransactionId()

@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
@@ -34,14 +34,14 @@ public class RepaymentDueReminderService {
                 baseDate
         );
 
-        List<RepaymentScheduleEntity> schedules = repaymentScheduleService
+        List<RepaymentSchedule> schedules = repaymentScheduleService
                 .findDueSchedules(targetDates, RepaymentScheduleStatus.PENDING);
 
         int processed = 0;
         int skipped = 0;
         int failed = 0;
 
-        for (RepaymentScheduleEntity schedule : schedules) {
+        for (RepaymentSchedule schedule : schedules) {
             NotificationStage stage = resolveStage(schedule.getDueDate(), baseDate);
             if (stage == null) {
                 continue;

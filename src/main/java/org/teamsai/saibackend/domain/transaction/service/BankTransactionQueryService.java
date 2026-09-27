@@ -12,7 +12,7 @@ import org.teamsai.saibackend.domain.transaction.dto.request.BankTransactionSear
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionListItemResponse;
 import org.teamsai.saibackend.domain.transaction.dto.response.PageResponse;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQueryRepository;
@@ -68,7 +68,7 @@ public class BankTransactionQueryService {
                 Math.toIntExact(condition.size())
         );
 
-        Page<BankTransactionEntity> transactions =
+        Page<BankTransaction> transactions =
                 bankTransactionQueryRepository.search(
                         linkedAccountId,
                         condition.processingStatus(),
@@ -100,7 +100,7 @@ public class BankTransactionQueryService {
     ) {
         validateOwnership(userId, linkedAccountId);
 
-        BankTransactionEntity transaction = bankTransactionRepository
+        BankTransaction transaction = bankTransactionRepository
                 .findByBankTransactionIdAndLinkedAccountId(
                         bankTransactionId,
                         linkedAccountId

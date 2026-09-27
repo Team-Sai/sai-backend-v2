@@ -35,7 +35,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class BankTransactionMatchCandidateEntity {
+public class BankTransactionMatchCandidate {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
