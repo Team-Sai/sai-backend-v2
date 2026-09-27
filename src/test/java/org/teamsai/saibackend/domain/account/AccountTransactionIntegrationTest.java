@@ -93,7 +93,7 @@ class AccountTransactionIntegrationTest {
                 LinkOperationStore.Status.PROCESSING));
         operations.mark(state, status);
 
-        userService.withdraw(userId);
+        coordinator.withdrawUser(userId);
 
         assertThat(users.existsById(userId)).isFalse();
         assertThat(operations.find(state)).hasValueSatisfying(operation -> {
@@ -110,7 +110,7 @@ class AccountTransactionIntegrationTest {
                 LinkOperationStore.Status.PROCESSING));
         operations.mark(state, status);
 
-        assertError(() -> userService.withdraw(userId), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+        assertError(() -> coordinator.withdrawUser(userId), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
 
         assertThat(users.existsById(userId)).isTrue();
         assertThat(operations.find(state)).hasValueSatisfying(operation ->

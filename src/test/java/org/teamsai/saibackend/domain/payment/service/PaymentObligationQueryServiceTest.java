@@ -5,8 +5,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,6 +20,24 @@ import static org.mockito.Mockito.*;
 class PaymentObligationQueryServiceTest {
     @Mock
     private PaymentObligationRepository repository;
+
+    @Test
+    void returnsObligationReadModelWithoutExposingEntity() {
+        var service = new PaymentObligationQueryService(repository);
+        var entity = new PaymentObligationEntity(42L, new BigDecimal("120000"));
+        when(repository.findByParticipantIdIn(List.of(42L))).thenReturn(List.of(entity));
+
+        var obligations = service.findByParticipantIds(List.of(42L));
+
+        assertThat(obligations).containsExactly(new PaymentObligationView(
+                entity.getPaymentObligationId(),
+                42L,
+                new BigDecimal("120000"),
+                entity.getPaymentStatus(),
+                entity.getObligationStatus(),
+                entity.getOverdueSince()
+        ));
+    }
 
     @Test
     void mapsLatestAmountsByParticipantRegardlessOfResultOrder() {

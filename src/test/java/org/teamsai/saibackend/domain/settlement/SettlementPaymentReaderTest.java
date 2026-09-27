@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
@@ -132,12 +132,12 @@ class SettlementPaymentReaderTest {
                         101L
                 );
 
-        PaymentObligationEntity o1 =
+        PaymentObligationView o1 =
                 obligation(
                         1001L
                 );
 
-        PaymentObligationEntity o2 =
+        PaymentObligationView o2 =
                 obligation(
                         1002L
                 );
@@ -234,19 +234,12 @@ class SettlementPaymentReaderTest {
         return participant;
     }
 
-    private PaymentObligationEntity obligation(
+    private PaymentObligationView obligation(
             Long obligationId
     ) {
-        PaymentObligationEntity obligation =
-                mock(PaymentObligationEntity.class);
-
-        when(
-                obligation.getPaymentObligationId()
-        ).thenReturn(
-                obligationId
-        );
-
-        return obligation;
+        return new PaymentObligationView(obligationId, 101L, BigDecimal.ZERO,
+                org.teamsai.saibackend.domain.payment.type.PaymentStatus.UNPAID,
+                org.teamsai.saibackend.domain.payment.type.ObligationStatus.ACTIVE, null);
     }
 
     private PaymentRecordEntity paymentRecord(

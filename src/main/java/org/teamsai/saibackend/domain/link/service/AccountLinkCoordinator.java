@@ -38,6 +38,16 @@ public class AccountLinkCoordinator {
     private final MockBankClient bank;
     private final LinkOperationStore operations;
 
+    public void withdrawUser(Long userId) {
+        lock.execute(userId, () -> {
+            if (operations.hasUnresolved(userId)) {
+                throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
+            }
+            users.deleteUser(userId);
+            return null;
+        });
+    }
+
     public List<LinkedBankAccount> linkSelectedAccounts(Long userId, LinkAccountRequest request) {
         return lock.execute(userId, () -> {
             requireResolved(userId);

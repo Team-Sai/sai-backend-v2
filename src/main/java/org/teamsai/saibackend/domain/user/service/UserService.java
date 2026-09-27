@@ -5,9 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.link.service.LinkOperationStore;
-import org.teamsai.saibackend.domain.link.service.UserLinkLock;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
@@ -21,8 +18,6 @@ import java.util.Optional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final UserLinkLock userLinkLock;
-    private final LinkOperationStore linkOperationStore;
     private final EntityManager entityManager;
 
     public UserResponse getMyInfo(Long userId) {
@@ -32,18 +27,10 @@ public class UserService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void withdraw(Long userId) {
-        userLinkLock.execute(userId, () -> {
-            if (linkOperationStore.hasUnresolved(userId)) {
-                throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
-            }
-
-            User user = userRepository.findById(userId)
-                    .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
-
-            userRepository.delete(user);
-            return null;
-        });
+    public void deleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserErrorCode.USER_NOT_FOUND::toException);
+        userRepository.delete(user);
     }
 
     @Transactional(readOnly = true)

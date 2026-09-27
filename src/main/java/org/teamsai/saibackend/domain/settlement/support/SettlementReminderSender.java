@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
@@ -48,36 +48,36 @@ public class SettlementReminderSender {
                 .map(SettlementParticipant::getParticipantId)
                 .toList();
 
-        List<PaymentObligationEntity> unresolvedObligations =
+        List<PaymentObligationView> unresolvedObligations =
                 paymentObligationQueryService.findLatestActiveByParticipantIds(participantIds).stream()
-                        .filter(o -> o.getPaymentStatus().isUnresolved())
+                        .filter(o -> o.paymentStatus().isUnresolved())
                         .toList();
 
         int sent = 0;
-        for (PaymentObligationEntity obligation : unresolvedObligations) {
-            Long userId = userIdByParticipantId.get(obligation.getParticipantId());
+        for (PaymentObligationView obligation : unresolvedObligations) {
+            Long userId = userIdByParticipantId.get(obligation.participantId());
             if (userId == null) {
-                log.warn("참여자-사용자 매핑 실패 participantId={}", obligation.getParticipantId());
+                log.warn("참여자-사용자 매핑 실패 participantId={}", obligation.participantId());
                 continue;
             }
             try {
                 sendOneReminder(userId, obligation, settlement, stage);
                 sent++;
             } catch (Exception e) {
-                log.error("리마인드 발송 실패 paymentObligationId={}", obligation.getPaymentObligationId(), e);
+                log.error("리마인드 발송 실패 paymentObligationId={}", obligation.paymentObligationId(), e);
             }
         }
         return sent;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void sendOneReminder(Long userId, PaymentObligationEntity obligation, Settlement settlement, ReminderStage stage) {
+    public void sendOneReminder(Long userId, PaymentObligationView obligation, Settlement settlement, ReminderStage stage) {
         notificationService.createIfAbsent(
                 userId,
                 stage.type(),
                 stage.title(),
                 stage.contentFor(settlement, obligation),
-                obligation.getPaymentObligationId(),  // referenceId — obligation 단위로 dedup
+                obligation.paymentObligationId(),  // referenceId — obligation 단위로 dedup
                 settlement.getSettlementId()           // secondaryReferenceId — 참고용
         );
     }

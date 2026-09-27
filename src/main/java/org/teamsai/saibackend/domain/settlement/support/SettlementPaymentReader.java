@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
 import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
@@ -41,7 +41,7 @@ public class SettlementPaymentReader {
                 .map(SettlementParticipant::getParticipantId)
                 .toList();
 
-        List<PaymentObligationEntity> obligations =
+        List<PaymentObligationView> obligations =
                 paymentObligationQueryService.findByParticipantIds(
                         participantIds
                 );
@@ -56,7 +56,7 @@ public class SettlementPaymentReader {
         }
 
         List<Long> obligationIds = obligations.stream()
-                .map(PaymentObligationEntity::getPaymentObligationId)
+                .map(PaymentObligationView::paymentObligationId)
                 .toList();
 
         List<PaymentRecordEntity> paymentRecords =

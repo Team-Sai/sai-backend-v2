@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.payment.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
@@ -21,21 +22,25 @@ public class PaymentObligationQueryService {
 
     private final PaymentObligationRepository paymentObligationRepository;
 
-    public List<PaymentObligationEntity> findByParticipantIds(List<Long> participantIds) {
+    public List<PaymentObligationView> findByParticipantIds(List<Long> participantIds) {
         if (participantIds == null || participantIds.isEmpty()) {
             return List.of();
         }
-        return paymentObligationRepository.findByParticipantIdIn(participantIds);
+        return paymentObligationRepository.findByParticipantIdIn(participantIds).stream()
+                .map(PaymentObligationView::from)
+                .toList();
     }
 
-    public List<PaymentObligationEntity> findLatestActiveByParticipantIds(List<Long> participantIds) {
+    public List<PaymentObligationView> findLatestActiveByParticipantIds(List<Long> participantIds) {
         if (participantIds == null || participantIds.isEmpty()) {
             return List.of();
         }
         return paymentObligationRepository.findLatestByParticipantIds(
                 participantIds,
                 ObligationStatus.ACTIVE
-        );
+        ).stream()
+                .map(PaymentObligationView::from)
+                .toList();
     }
 
     public Map<Long, BigDecimal> findLatestExpectedAmountsByParticipantIdsAndStatuses(

@@ -8,7 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
+import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
@@ -56,12 +57,9 @@ class SettlementReminderSenderTest {
         return participant;
     }
 
-    private PaymentObligationEntity obligation(Long obligationId, Long participantId, PaymentStatus status) {
-        PaymentObligationEntity entity = mock(PaymentObligationEntity.class);
-        lenient().when(entity.getPaymentObligationId()).thenReturn(obligationId);
-        lenient().when(entity.getParticipantId()).thenReturn(participantId);
-        lenient().when(entity.getPaymentStatus()).thenReturn(status);
-        return entity;
+    private PaymentObligationView obligation(Long obligationId, Long participantId, PaymentStatus status) {
+        return new PaymentObligationView(obligationId, participantId, java.math.BigDecimal.ZERO,
+                status, ObligationStatus.ACTIVE, null);
     }
 
     @Nested
@@ -94,13 +92,8 @@ class SettlementReminderSenderTest {
                     SettlementParticipantStatus.ACTIVE
             )).thenReturn(List.of(p1));
 
-            PaymentObligationEntity unresolvedOb = mock(PaymentObligationEntity.class);
-            when(unresolvedOb.getParticipantId()).thenReturn(10L);
-            when(unresolvedOb.getPaymentObligationId()).thenReturn(500L);
-            when(unresolvedOb.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
-
-            PaymentObligationEntity resolvedOb = mock(PaymentObligationEntity.class);
-            when(resolvedOb.getPaymentStatus()).thenReturn(PaymentStatus.PAID);
+            PaymentObligationView unresolvedOb = obligation(500L, 10L, PaymentStatus.UNPAID);
+            PaymentObligationView resolvedOb = obligation(501L, 10L, PaymentStatus.PAID);
 
             when(paymentObligationQueryService.findLatestActiveByParticipantIds(List.of(10L)))
                     .thenReturn(List.of(unresolvedOb, resolvedOb));
@@ -127,9 +120,7 @@ class SettlementReminderSenderTest {
             )).thenReturn(List.of(p1));
 
             // obligation의 participantId가 activeParticipants에 없는 20L (매핑 실패 상황)
-            PaymentObligationEntity orphanOb = mock(PaymentObligationEntity.class);
-            when(orphanOb.getParticipantId()).thenReturn(20L);
-            when(orphanOb.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
+            PaymentObligationView orphanOb = obligation(500L, 20L, PaymentStatus.UNPAID);
 
             when(paymentObligationQueryService.findLatestActiveByParticipantIds(List.of(10L)))
                     .thenReturn(List.of(orphanOb));
@@ -154,15 +145,8 @@ class SettlementReminderSenderTest {
                     SettlementParticipantStatus.ACTIVE
             )).thenReturn(List.of(p1, p2));
 
-            PaymentObligationEntity ob1 = mock(PaymentObligationEntity.class);
-            when(ob1.getParticipantId()).thenReturn(10L);
-            when(ob1.getPaymentObligationId()).thenReturn(500L);
-            when(ob1.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
-
-            PaymentObligationEntity ob2 = mock(PaymentObligationEntity.class);
-            when(ob2.getParticipantId()).thenReturn(11L);
-            when(ob2.getPaymentObligationId()).thenReturn(501L);
-            when(ob2.getPaymentStatus()).thenReturn(PaymentStatus.UNPAID);
+            PaymentObligationView ob1 = obligation(500L, 10L, PaymentStatus.UNPAID);
+            PaymentObligationView ob2 = obligation(501L, 11L, PaymentStatus.UNPAID);
 
             when(paymentObligationQueryService.findLatestActiveByParticipantIds(List.of(10L, 11L)))
                     .thenReturn(List.of(ob1, ob2));

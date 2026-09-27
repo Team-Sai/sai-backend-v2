@@ -43,6 +43,35 @@ class AccountLinkCoordinatorTest {
     }
 
     @Test
+    void withdrawalDeletesUserUnderLinkLockWhenNoOperationIsUnresolved() {
+        coordinator.withdrawUser(1L);
+
+        verify(lock).execute(eq(1L), any());
+        verify(operations).hasUnresolved(1L);
+        verify(users).deleteUser(1L);
+    }
+
+    @Test
+    void unresolvedOperationPreventsWithdrawal() {
+        when(operations.hasUnresolved(1L)).thenReturn(true);
+
+        assertError(() -> coordinator.withdrawUser(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+
+        verify(users, never()).deleteUser(anyLong());
+    }
+
+    @Test
+    void lockFailurePreventsWithdrawal() {
+        doThrow(AccountErrorCode.LINK_IN_PROGRESS.toException())
+                .when(lock).execute(eq(1L), any());
+
+        assertError(() -> coordinator.withdrawUser(1L), AccountErrorCode.LINK_IN_PROGRESS);
+
+        verifyNoInteractions(operations);
+        verify(users, never()).deleteUser(anyLong());
+    }
+
+    @Test
     void keyRequestNetworkFailureIsTranslatedBeforeConfirm() {
         when(bank.requestUserKey("name", "token")).thenThrow(new RestClientException("offline"));
         assertError(() -> coordinator.issueOrGetUserKey(1L), AccountErrorCode.BANK_SERVER_UNAVAILABLE);
