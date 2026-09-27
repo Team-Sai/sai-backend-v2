@@ -543,4 +543,45 @@ class AccountLinkCoordinatorTest {
         server.verify();
         return failure;
     }
+
+    @Test
+    void expiredLostResponseIsClosedBeforeNewOperationIsIssued() {
+        receipt = new LinkOperationStore.Operation("expired-id", 1L, "ISSUE", null, null, ISSUE_PENDING);
+        when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
+        when(bank.requestUserKey("name", "token", "expired-id"))
+                .thenThrow(issuanceHttpFailure(409, "{\"code\":\"KEY_ISSUANCE_EXPIRED\"}"));
+        when(bank.requestUserKey(eq("name"), eq("token"), argThat(id -> !id.equals("expired-id"))))
+                .thenReturn("replacement");
+
+        assertThat(coordinator.issueOrGetUserKey(1L).userKey()).isEqualTo("replacement");
+
+        var order = inOrder(operations, bank);
+        order.verify(bank).requestUserKey("name", "token", "expired-id");
+        order.verify(operations).markIssueExpired("expired-id");
+        order.verify(operations).beginIssue(argThat(id -> !id.equals("expired-id")), eq(1L));
+        verify(bank).confirmUserKey("replacement", receipt.id());
+        verify(bank, never()).confirmUserKey(anyString(), eq("expired-id"));
+    }
+
+    @Test
+    void repeatedExpiryHasBoundedRestarts() {
+        when(bank.requestUserKey(eq("name"), eq("token"), anyString()))
+                .thenThrow(issuanceHttpFailure(409, "{\"code\":\"KEY_ISSUANCE_EXPIRED\"}"));
+        assertError(() -> coordinator.issueOrGetUserKey(1L), AccountErrorCode.BANK_SERVER_UNAVAILABLE);
+        var ids = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(operations, times(2)).markIssueExpired(ids.capture());
+        assertThat(ids.getAllValues()).doesNotHaveDuplicates();
+        verify(operations, times(2)).beginIssue(anyString(), eq(1L));
+        verify(bank, never()).confirmUserKey(anyString(), anyString());
+    }
+
+    @Test
+    void failedExpiryWritePreventsNewIssuance() {
+        when(bank.requestUserKey(eq("name"), eq("token"), anyString()))
+                .thenThrow(issuanceHttpFailure(409, "{\"code\":\"KEY_ISSUANCE_EXPIRED\"}"));
+        doThrow(new IllegalStateException("database unavailable")).when(operations).markIssueExpired(anyString());
+        assertThatThrownBy(() -> coordinator.issueOrGetUserKey(1L)).isInstanceOf(IllegalStateException.class);
+        verify(operations, times(1)).beginIssue(anyString(), eq(1L));
+        verify(bank, never()).confirmUserKey(anyString(), anyString());
+    }
 }

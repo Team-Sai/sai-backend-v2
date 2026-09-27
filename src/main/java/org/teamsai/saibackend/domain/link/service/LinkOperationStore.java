@@ -12,7 +12,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class LinkOperationStore {
-    public enum Status { ISSUE_PENDING, ISSUED, PROCESSING, COMPLETED, FAILED, CONFIRM_UNKNOWN, COMPENSATION_PENDING,
+    public enum Status { ISSUE_PENDING, ISSUED, ISSUE_EXPIRED, PROCESSING, COMPLETED, FAILED, CONFIRM_UNKNOWN, COMPENSATION_PENDING,
         RECOVERY_EXPIRED, RECOVERY_CONFLICT, RECONCILIATION_REQUIRED }
     public record Operation(String id, Long userId, String requestHash,
                             String previousKey, String newKey, Status status) {}
@@ -30,14 +30,14 @@ public class LinkOperationStore {
     public boolean hasUnresolved(Long userId) {
         return jdbc.queryForObject("""
                 SELECT COUNT(*) FROM account_link_operation
-                WHERE user_id = ? AND status NOT IN ('COMPLETED', 'FAILED')
+                WHERE user_id = ? AND status NOT IN ('COMPLETED', 'FAILED', 'ISSUE_EXPIRED')
                 """, Long.class, userId) > 0;
     }
 
     public List<Operation> findUnresolved(Long userId) {
         return jdbc.query("""
                 SELECT * FROM account_link_operation
-                WHERE user_id = ? AND status NOT IN ('COMPLETED', 'FAILED')
+                WHERE user_id = ? AND status NOT IN ('COMPLETED', 'FAILED', 'ISSUE_EXPIRED')
                 ORDER BY created_at, operation_id
                 """, (rs, row) -> new Operation(rs.getString("operation_id"), rs.getLong("user_id"),
                 rs.getString("request_hash"), rs.getString("previous_user_key"),
@@ -70,6 +70,16 @@ public class LinkOperationStore {
                 SET new_user_key = ?, request_hash = ?, status = 'ISSUED', updated_at = CURRENT_TIMESTAMP(6)
                 WHERE operation_id = ? AND status = 'ISSUE_PENDING'
                 """, key, requestHash, id) != 1) {
+            throw new IllegalStateException("발급 대기 중인 연동 작업을 찾을 수 없습니다.");
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markIssueExpired(String id) {
+        if (jdbc.update("""
+                UPDATE account_link_operation SET status = 'ISSUE_EXPIRED', updated_at = CURRENT_TIMESTAMP(6)
+                WHERE operation_id = ? AND status = 'ISSUE_PENDING'
+                """, id) != 1) {
             throw new IllegalStateException("발급 대기 중인 연동 작업을 찾을 수 없습니다.");
         }
     }
