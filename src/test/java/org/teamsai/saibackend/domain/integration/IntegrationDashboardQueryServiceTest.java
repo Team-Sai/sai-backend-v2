@@ -2,7 +2,8 @@ package org.teamsai.saibackend.domain.integration;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.BeforeEach;
+import org.teamsai.saibackend.domain.integration.reader.IntegrationDashboardDataReader;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
@@ -46,8 +47,14 @@ class IntegrationDashboardQueryServiceTest {
     @Mock
     private SettlementQueryService settlementQueryService;
 
-    @InjectMocks
     private IntegrationDashboardQueryService integrationDashboardQueryService;
+
+    @BeforeEach
+    void setUp() {
+        integrationDashboardQueryService = new IntegrationDashboardQueryService(
+                new IntegrationDashboardDataReader(contractDashboardQueryService, settlementQueryService)
+        );
+    }
 
     @Test
     void includesLoanReceivableAndPayableAmounts() {

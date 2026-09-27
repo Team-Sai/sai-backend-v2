@@ -13,8 +13,11 @@ import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRe
 import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
 import org.teamsai.saibackend.domain.contract.type.ContractDashboardStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
-import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardAssembler;
-import org.teamsai.saibackend.domain.integration.assembler.IntegrationDashboardAssembler.SettlementContext;
+import org.teamsai.saibackend.domain.integration.calculator.DashboardSummaryCalculator;
+import org.teamsai.saibackend.domain.integration.calculator.DashboardAttentionCalculator;
+import org.teamsai.saibackend.domain.integration.assembler.DashboardRecentTransactionAssembler;
+import org.teamsai.saibackend.domain.integration.assembler.DashboardCalendarAssembler;
+import org.teamsai.saibackend.domain.integration.model.SettlementDashboardContext;
 import org.teamsai.saibackend.domain.integration.dto.response.DashboardAttentionItemResponse;
 import org.teamsai.saibackend.domain.integration.dto.response.DashboardCalendarDayResponse;
 import org.teamsai.saibackend.domain.integration.dto.response.DashboardMonthlySummaryResponse;
@@ -36,8 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
-@DisplayName("IntegrationDashboardAssembler 단위 테스트")
-class IntegrationDashboardAssemblerTest {
+@DisplayName("IntegrationDashboardComponents 단위 테스트")
+class IntegrationDashboardComponentsTest {
 
     private static final Long USER_ID = 1L;
     private static final Long OTHER_USER_ID = 2L;
@@ -93,7 +96,7 @@ class IntegrationDashboardAssemblerTest {
 
     @Nested
     @DisplayName("정산 컨텍스트 조립")
-    class ToSettlementContext {
+    class ToSettlementDashboardContext {
 
         @Test
         @DisplayName("OWNER는 전체 잔액/예상액을 그대로 사용한다")
@@ -104,7 +107,7 @@ class IntegrationDashboardAssemblerTest {
                     obligation(OTHER_USER_ID, BigDecimal.valueOf(10_000), BigDecimal.valueOf(7_000))
             );
 
-            SettlementContext context = IntegrationDashboardAssembler.toSettlementContext(settlement, status, USER_ID);
+            SettlementDashboardContext context = SettlementDashboardContext.from(settlement, status, USER_ID);
 
             assertThat(context.roleRemainingAmount()).isEqualByComparingTo("7000");
             assertThat(context.originalRoleAmount()).isEqualByComparingTo("10000");
@@ -121,7 +124,7 @@ class IntegrationDashboardAssemblerTest {
                     obligation(OTHER_USER_ID, BigDecimal.valueOf(5_000), BigDecimal.valueOf(5_000))
             );
 
-            SettlementContext context = IntegrationDashboardAssembler.toSettlementContext(settlement, status, USER_ID);
+            SettlementDashboardContext context = SettlementDashboardContext.from(settlement, status, USER_ID);
 
             assertThat(context.roleRemainingAmount()).isEqualByComparingTo("4000");
             assertThat(context.originalRoleAmount()).isEqualByComparingTo("6000");
@@ -134,7 +137,7 @@ class IntegrationDashboardAssemblerTest {
             SettlementListResponse settlement = settlement(3L, "빈 정산", "MEMBER", "IN_PROGRESS", LocalDate.now(), LocalDateTime.now());
             SettlementPaymentStatusResponse status = SettlementPaymentStatusResponse.builder().build();
 
-            SettlementContext context = IntegrationDashboardAssembler.toSettlementContext(settlement, status, USER_ID);
+            SettlementDashboardContext context = SettlementDashboardContext.from(settlement, status, USER_ID);
 
             assertThat(context.roleRemainingAmount()).isEqualByComparingTo("0");
             assertThat(context.originalRoleAmount()).isEqualByComparingTo("0");
@@ -152,14 +155,14 @@ class IntegrationDashboardAssemblerTest {
                     .totalLentAmount(BigDecimal.valueOf(12_000_000))
                     .totalBorrowedAmount(BigDecimal.valueOf(1_000_000))
                     .build();
-            List<SettlementContext> settlements = List.of(
-                    new SettlementContext(settlement(1L, "A", "OWNER", "IN_PROGRESS", LocalDate.now(), LocalDateTime.now()),
+            List<SettlementDashboardContext> settlements = List.of(
+                    new SettlementDashboardContext(settlement(1L, "A", "OWNER", "IN_PROGRESS", LocalDate.now(), LocalDateTime.now()),
                             BigDecimal.valueOf(3_000), BigDecimal.valueOf(3_000)),
-                    new SettlementContext(settlement(2L, "B", "MEMBER", "IN_PROGRESS", LocalDate.now(), LocalDateTime.now()),
+                    new SettlementDashboardContext(settlement(2L, "B", "MEMBER", "IN_PROGRESS", LocalDate.now(), LocalDateTime.now()),
                             BigDecimal.valueOf(2_000), BigDecimal.valueOf(2_000))
             );
 
-            var result = IntegrationDashboardAssembler.toAmountSummary(loanSummary, settlements);
+            var result = DashboardSummaryCalculator.toAmountSummary(loanSummary, settlements);
 
             assertThat(result.getReceivable().getLoanAmount()).isEqualByComparingTo("12000000");
             assertThat(result.getReceivable().getSettlementAmount()).isEqualByComparingTo("3000");
@@ -177,7 +180,7 @@ class IntegrationDashboardAssemblerTest {
                     .totalBorrowedAmount(null)
                     .build();
 
-            var result = IntegrationDashboardAssembler.toAmountSummary(loanSummary, List.of());
+            var result = DashboardSummaryCalculator.toAmountSummary(loanSummary, List.of());
 
             assertThat(result.getReceivable().getTotalAmount()).isEqualByComparingTo("5000");
             assertThat(result.getPayable().getTotalAmount()).isEqualByComparingTo("0");
@@ -203,13 +206,13 @@ class IntegrationDashboardAssemblerTest {
                     .build();
             ContractDashboardResponse contractDashboard = ContractDashboardResponse.builder().contracts(List.of(loan)).build();
 
-            SettlementContext settlementContext = new SettlementContext(
+            SettlementDashboardContext settlementContext = new SettlementDashboardContext(
                     settlement(2L, "정산", "OWNER", "IN_PROGRESS", LocalDate.now(), newer),
                     BigDecimal.valueOf(500), BigDecimal.valueOf(2_000)
             );
 
             List<DashboardRecentTransactionResponse> result =
-                    IntegrationDashboardAssembler.toRecentTransactions(contractDashboard, List.of(settlementContext));
+                    DashboardRecentTransactionAssembler.toRecentTransactions(contractDashboard, List.of(settlementContext));
 
             assertThat(result).hasSize(2);
             assertThat(result.get(0).getType()).isEqualTo(PaymentTargetType.SETTLEMENT);
@@ -232,7 +235,7 @@ class IntegrationDashboardAssemblerTest {
             ContractDashboardResponse contractDashboard = ContractDashboardResponse.builder().contracts(loans).build();
 
             List<DashboardRecentTransactionResponse> result =
-                    IntegrationDashboardAssembler.toRecentTransactions(contractDashboard, List.of());
+                    DashboardRecentTransactionAssembler.toRecentTransactions(contractDashboard, List.of());
 
             assertThat(result).hasSize(5);
             assertThat(result.get(0).getTargetId()).isEqualTo(7L);
@@ -244,7 +247,7 @@ class IntegrationDashboardAssemblerTest {
             ContractDashboardResponse contractDashboard = ContractDashboardResponse.builder().contracts(null).build();
 
             List<DashboardRecentTransactionResponse> result =
-                    IntegrationDashboardAssembler.toRecentTransactions(contractDashboard, List.of());
+                    DashboardRecentTransactionAssembler.toRecentTransactions(contractDashboard, List.of());
 
             assertThat(result).isEmpty();
         }
@@ -264,13 +267,13 @@ class IntegrationDashboardAssemblerTest {
             var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, dueDate, RepaymentScheduleStatus.PENDING)
             ));
-            List<SettlementContext> settlements = List.of(new SettlementContext(
+            List<SettlementDashboardContext> settlements = List.of(new SettlementDashboardContext(
                     settlement(2L, "정산", "OWNER", "IN_PROGRESS", dueDate, LocalDateTime.now()),
                     BigDecimal.valueOf(1_000), BigDecimal.valueOf(1_000)
             ));
 
             List<DashboardCalendarDayResponse> result =
-                    IntegrationDashboardAssembler.toCalendarDays(loanSchedules, settlements, yearMonth, USER_ID);
+                    DashboardCalendarAssembler.toCalendarDays(loanSchedules, settlements, yearMonth, USER_ID);
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getDate()).isEqualTo(dueDate);
@@ -282,16 +285,16 @@ class IntegrationDashboardAssemblerTest {
         @DisplayName("이미 마감된 정산이나 잔액 0인 정산은 제외한다")
         void excludesClosedOrZeroRemainingSettlements() {
             LocalDate dueDate = LocalDate.of(2026, 8, 15);
-            SettlementContext closed = new SettlementContext(
+            SettlementDashboardContext closed = new SettlementDashboardContext(
                     settlement(1L, "종료된 정산", "OWNER", "CLOSED", dueDate, LocalDateTime.now()),
                     BigDecimal.valueOf(1_000), BigDecimal.valueOf(1_000)
             );
-            SettlementContext zeroRemaining = new SettlementContext(
+            SettlementDashboardContext zeroRemaining = new SettlementDashboardContext(
                     settlement(2L, "완납된 정산", "OWNER", "IN_PROGRESS", dueDate, LocalDateTime.now()),
                     BigDecimal.ZERO, BigDecimal.valueOf(1_000)
             );
 
-            List<DashboardCalendarDayResponse> result = IntegrationDashboardAssembler.toCalendarDays(
+            List<DashboardCalendarDayResponse> result = DashboardCalendarAssembler.toCalendarDays(
                     List.of(), List.of(closed, zeroRemaining), YearMonth.from(dueDate), USER_ID
             );
 
@@ -311,12 +314,12 @@ class IntegrationDashboardAssemblerTest {
             var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, date, RepaymentScheduleStatus.PENDING)
             ));
-            SettlementContext settlementContext = new SettlementContext(
+            SettlementDashboardContext settlementContext = new SettlementDashboardContext(
                     settlement(2L, "AAA 정산", "OWNER", "IN_PROGRESS", date, LocalDateTime.now()),
                     BigDecimal.valueOf(1_000), BigDecimal.valueOf(1_000)
             );
 
-            List<DashboardCalendarItemResponse> result = IntegrationDashboardAssembler.toCalendarDayDetail(
+            List<DashboardCalendarItemResponse> result = DashboardCalendarAssembler.toCalendarDayDetail(
                     loanSchedules, List.of(settlementContext), date, USER_ID
             );
 
@@ -337,7 +340,7 @@ class IntegrationDashboardAssemblerTest {
                     contract, schedule(10L, date, RepaymentScheduleStatus.PENDING)
             ));
 
-            List<DashboardCalendarItemResponse> result = IntegrationDashboardAssembler.toCalendarDayDetail(
+            List<DashboardCalendarItemResponse> result = DashboardCalendarAssembler.toCalendarDayDetail(
                     loanSchedules, List.of(), date, USER_ID
             );
 
@@ -356,7 +359,7 @@ class IntegrationDashboardAssemblerTest {
                     contract, schedule(10L, otherDate, RepaymentScheduleStatus.PENDING)
             ));
 
-            List<DashboardCalendarItemResponse> result = IntegrationDashboardAssembler.toCalendarDayDetail(
+            List<DashboardCalendarItemResponse> result = DashboardCalendarAssembler.toCalendarDayDetail(
                     loanSchedules, List.of(), date, USER_ID
             );
 
@@ -376,13 +379,13 @@ class IntegrationDashboardAssemblerTest {
             var loanSchedules = List.of(new ContractDashboardQueryService.LoanScheduleContext(
                     contract, schedule(10L, today.plusDays(2), RepaymentScheduleStatus.PENDING)
             ));
-            SettlementContext settlementContext = new SettlementContext(
+            SettlementDashboardContext settlementContext = new SettlementDashboardContext(
                     settlement(2L, "정산", "OWNER", "IN_PROGRESS", today.plusDays(1), LocalDateTime.now()),
                     BigDecimal.valueOf(1_000), BigDecimal.valueOf(1_000)
             );
 
             List<DashboardAttentionItemResponse> result =
-                    IntegrationDashboardAssembler.toAttentionItems(loanSchedules, List.of(settlementContext));
+                    DashboardAttentionCalculator.toAttentionItems(loanSchedules, List.of(settlementContext));
 
             assertThat(result).hasSize(2);
             assertThat(result.get(0).getType()).isEqualTo(DashboardAttentionType.SETTLEMENT_DUE_SOON);
@@ -401,7 +404,7 @@ class IntegrationDashboardAssemblerTest {
             ));
 
             List<DashboardAttentionItemResponse> result =
-                    IntegrationDashboardAssembler.toAttentionItems(loanSchedules, List.of());
+                    DashboardAttentionCalculator.toAttentionItems(loanSchedules, List.of());
 
             assertThat(result).isEmpty();
         }
@@ -420,13 +423,13 @@ class IntegrationDashboardAssemblerTest {
                     new ContractDashboardQueryService.LoanScheduleContext(contract, schedule(1L, yearMonth.atDay(1), RepaymentScheduleStatus.PAID)),
                     new ContractDashboardQueryService.LoanScheduleContext(contract, schedule(2L, yearMonth.atDay(2), RepaymentScheduleStatus.PENDING))
             );
-            SettlementContext closedSettlement = new SettlementContext(
+            SettlementDashboardContext closedSettlement = new SettlementDashboardContext(
                     settlement(2L, "정산", "OWNER", "CLOSED", yearMonth.atDay(3), LocalDateTime.now()),
                     BigDecimal.ZERO, BigDecimal.valueOf(1_000)
             );
 
             DashboardMonthlySummaryResponse result =
-                    IntegrationDashboardAssembler.toMonthlySummary(loanSchedules, List.of(closedSettlement), yearMonth);
+                    DashboardSummaryCalculator.toMonthlySummary(loanSchedules, List.of(closedSettlement), yearMonth);
 
             assertThat(result.getCompletedTransactionCount()).isEqualTo(2);
             assertThat(result.getInProgressLoanRepaymentCount()).isEqualTo(1);
@@ -438,7 +441,7 @@ class IntegrationDashboardAssemblerTest {
         @DisplayName("이번 달 거래가 없으면 완료율은 0이다")
         void returnsZeroRateWhenNoTransactions() {
             DashboardMonthlySummaryResponse result =
-                    IntegrationDashboardAssembler.toMonthlySummary(List.of(), List.of(), YearMonth.of(2026, 8));
+                    DashboardSummaryCalculator.toMonthlySummary(List.of(), List.of(), YearMonth.of(2026, 8));
 
             assertThat(result.getTransactionCompletionRate()).isEqualByComparingTo("0");
             assertThat(result.getCompletedTransactionCount()).isEqualTo(0);
@@ -454,7 +457,7 @@ class IntegrationDashboardAssemblerTest {
             ));
 
             DashboardMonthlySummaryResponse result =
-                    IntegrationDashboardAssembler.toMonthlySummary(loanSchedules, List.of(), yearMonth);
+                    DashboardSummaryCalculator.toMonthlySummary(loanSchedules, List.of(), yearMonth);
 
             assertThat(result.getInProgressLoanRepaymentCount()).isEqualTo(0);
         }
