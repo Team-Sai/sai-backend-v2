@@ -21,7 +21,7 @@
     window.location.href = "/contract";
   });
 
-  authFetch(`/api/contracts/${contractId}/listdetails`, {
+  authFetch(`/api/contracts/${contractId}`, {
     method: "GET",
     headers: {
       Accept: "application/json"

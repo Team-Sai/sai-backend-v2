@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.dto.response.LinkableAccountResponse;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
@@ -42,11 +43,12 @@ public class MockBankClient {
         return body;
     }
 
-    public String requestUserKey(String name, String userToken) {
-        MockBankLinkRequest request = new MockBankLinkRequest(name, userToken);
+    public String requestUserKey(String name, String userToken, String operationId) {
+        MockBankLinkRequest request = new MockBankLinkRequest(name, userToken, operationId);
 
         MockBankLinkResponse response = restClient.post()
                 .uri("/api/mock-bank/link")
+                .header("X-Internal-Api-Key", internalApiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
                 .retrieve()
@@ -55,24 +57,38 @@ public class MockBankClient {
         return requireBody(response).userKey();
     }
 
-    public void recoverUserKey(String userToken, String currentUserKey, String previousUserKey) {
-        restClient.post()
-                .uri("/api/link/recover-key")
-                .header("X-Internal-Api-Key", internalApiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new RecoverKeyRequest(userToken, currentUserKey, previousUserKey))
-                .retrieve()
-                .toBodilessEntity();
+    public void recoverUserKey(String userToken, String currentUserKey, String previousUserKey, String operationId) {
+        try {
+            restClient.post()
+                    .uri("/api/link/recover-key")
+                    .header("X-Internal-Api-Key", internalApiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(new RecoverKeyRequest(userToken, currentUserKey, previousUserKey, operationId))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() != 409) throw e;
+            BankRecoveryError error = null;
+            try {
+                error = e.getResponseBodyAs(BankRecoveryError.class);
+            } catch (RuntimeException ignored) {
+                // 오류 응답을 해석하지 못하면 error는 null로 유지
+            }
+            var reason = error != null && "KEY_RECOVERY_EXPIRED".equals(error.code())
+                    ? BankKeyRecoveryException.Reason.EXPIRED : BankKeyRecoveryException.Reason.CONFLICT;
+            throw new BankKeyRecoveryException(reason, e);
+        }
     }
 
-    private record RecoverKeyRequest(String userToken, String currentUserKey, String previousUserKey) {}
+    private record BankRecoveryError(String code) {}
+    private record RecoverKeyRequest(String userToken, String currentUserKey, String previousUserKey, String operationId) {}
 
-    public void confirmUserKey(String userKey) {
+    public void confirmUserKey(String userKey, String operationId) {
         restClient.post()
                 .uri("/api/link/confirm-key")
                 .header("X-Internal-Api-Key", internalApiKey)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new UserKeyRequest(userKey))
+                .body(new ConfirmKeyRequest(userKey, operationId))
                 .retrieve()
                 .toBodilessEntity();
     }
@@ -88,6 +104,7 @@ public class MockBankClient {
     }
 
     private record UserKeyRequest(String userKey) {}
+    private record ConfirmKeyRequest(String userKey, String operationId) {}
 
     public List<LinkableAccountResponse> getAccountsByUserKey(String userKey) {
         return requireBody(
@@ -122,6 +139,6 @@ public class MockBankClient {
         return requireBody(response);
     }
 
-    private record MockBankLinkRequest(String name, String userToken) {}
+    private record MockBankLinkRequest(String name, String userToken, String operationId) {}
     private record MockBankLinkResponse(String userKey, String issuedAt) {}
 }
