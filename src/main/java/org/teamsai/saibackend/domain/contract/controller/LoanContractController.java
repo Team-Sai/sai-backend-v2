@@ -8,13 +8,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveStatus;
@@ -23,64 +19,19 @@ import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.request.LoanContractRequest;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.service.ContractChangeService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
-
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 @Tag(
         name = "차용증 API",
         description = "차용증 작성과 저장, 채무자에게 전송 API"
 )
-@Controller
+@RestController
 @RequiredArgsConstructor
 @Slf4j
 public class LoanContractController {
 
     private final LoanContractService contractService;
-    private final ContractChangeService contractChangeService;
     private final ArchiveService archiveService;
-
-    @Operation(hidden = true)
-    @GetMapping("/contracts/new")
-    public String contractFormPage() {
-        return "contract/contract-form";
-    }
-
-    @Operation(hidden = true)
-    @GetMapping("/contracts/signature")
-    public String contractSignaturePage() {
-        return "contract/contract-signature";
-    }
-
-    @Operation(hidden = true)
-    @GetMapping("/contracts/{contractId}/approve")
-    public String contractDebtorApprovePage(
-            @PathVariable Long contractId,
-            Model model
-    ) {
-        model.addAttribute("contractId", contractId);
-        return "contract/contract-debtor-form";
-    }
-
-    @Operation(hidden = true)
-    @GetMapping("/contracts/{contractId}/approve/signature")
-    public String contractDebtorSignaturePage(
-            @PathVariable Long contractId,
-            Model model
-    ) {
-        model.addAttribute("contractId", contractId);
-        return "contract/contract-debtor-signature";
-    }
-
-    @Operation(hidden = true)
-    @GetMapping("/notifications")
-    public String notificationCenterPage() {
-        return "notification/notification-center";
-    }
-
 
     @Operation(
             summary = "차용증 최초 생성",
@@ -91,7 +42,6 @@ public class LoanContractController {
             @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자"),
             @ApiResponse(responseCode = "404", description = "잘못된 입력값 요청")
     })
-    @ResponseBody
     @PostMapping("/api/contracts/write")
     public Long createContract(
             @Valid @RequestBody LoanContractRequest request,
@@ -104,7 +54,6 @@ public class LoanContractController {
             summary = "채권자 전자서명 제출 및 전송",
             description = "채권자가 수기로 남긴 서명 이미지를 저장하고, 상태를 대기(PENDING)로 변경하여 채무자에게 전송합니다."
     )
-    @ResponseBody
     @PatchMapping(value = "/api/contracts/{contractId}/signature", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ContractStatus submitSignature(
             @PathVariable Long contractId,
@@ -126,7 +75,6 @@ public class LoanContractController {
             @ApiResponse(responseCode = "404", description = "차용증을 찾을 수 없음"),
             @ApiResponse(responseCode = "409", description = "이미 채무자가 연결되었거나 채권자 본인이 채무자로 연결을 시도함")
     })
-    @ResponseBody
     @PatchMapping("/api/contracts/{contractId}/debtor")
     public void linkDebtor(
             @PathVariable Long contractId,
@@ -143,7 +91,6 @@ public class LoanContractController {
             @ApiResponse(responseCode = "200", description = "서명 제출 성공"),
             @ApiResponse(responseCode = "400", description = "본인인증이 완료되지 않았거나 유효하지 않음"),
     })
-    @ResponseBody
     @PatchMapping(value = "/api/contracts/{contractId}/approve", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ContractStatus approveByDebtor(
             @PathVariable Long contractId,
@@ -157,61 +104,6 @@ public class LoanContractController {
     }
 
     @Operation(
-            summary = "차용증 상세 조회",
-            description = "로그인이 된 사용자가 차용증 ID로 차용증 상세 내용을 조회합니다."
-    )
-    @ResponseBody
-    @GetMapping(value = "/api/contracts/{contractId}/listdetails")
-    public LoanContractResponse getContractDetails(
-            @PathVariable Long contractId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        return contractService.findContract(contractId, userDetails.getUserId());
-    }
-
-    @ResponseBody
-    @GetMapping("/api/contracts/{contractId}")
-    public LoanContractResponse getContract(
-            @PathVariable Long contractId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        return contractService.findContract(contractId, userDetails.getUserId());
-    }
-
-    @Operation(
-            summary = "차용증 보관함 PDF 조회",
-            description = "이전에 저장된 차용증 PDF 파일이 있으면 그 파일을 그대로 내려줍니다. 저장된 파일이 없으면 404를 반환합니다."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "404", description = "저장된 PDF가 없음"),
-            @ApiResponse(responseCode = "403", description = "해당 차용증에 대한 접근 권한이 없음")
-    })
-    @GetMapping("/api/contracts/{contractId}/pdf")
-    public ResponseEntity<Resource> getContractPdf(
-            @PathVariable Long contractId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        contractService.findContract(contractId, userDetails.getUserId());
-
-        List<org.teamsai.saibackend.domain.archive.entity.ArchiveFile> savedFiles =
-                archiveService.findFilesByReference(ArchiveStatus.CONTRACT, contractId);
-        if (savedFiles.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        org.teamsai.saibackend.domain.archive.entity.ArchiveFile latestFile = savedFiles.get(0);
-        Resource resource = archiveService.loadFileAsResource(latestFile.getSavedFilename());
-
-        String encodedFilename = URLEncoder.encode(latestFile.getOriginalFilename(), StandardCharsets.UTF_8).replace("+", "%20");
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.valueOf("application/pdf"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
-                .body(resource);
-    }
-
-    @Operation(
             summary = "차용증 보관함 PDF 저장",
             description = "클라이언트에서 생성한 차용증 PDF를 보관합니다. 계약이 완료(COMPLETED) 상태가 아니면 저장하지 않습니다."
     )
@@ -220,7 +112,6 @@ public class LoanContractController {
             @ApiResponse(responseCode = "403", description = "해당 차용증에 대한 접근 권한이 없음")
     })
     @PostMapping("/api/contracts/{contractId}/pdf")
-    @ResponseBody
     public ResponseEntity<Void> saveContractPdf(
             @PathVariable Long contractId,
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -233,41 +124,5 @@ public class LoanContractController {
         }
 
         return ResponseEntity.ok().build();
-    }
-
-    @Operation(hidden = true)
-    @GetMapping("/contracts/{contractId}/change-approval")
-    public String contractChangeApprovalPage(
-            @PathVariable Long contractId,
-            Model model
-    ) {
-        model.addAttribute("contractId", contractId);
-        return "contract/contract-approval-form";
-    }
-
-    @Operation(hidden = true)
-    @GetMapping("/contracts/{contractId}/change-approval/signature")
-    public String contractChangeApprovalSignaturePage(
-            @PathVariable Long contractId,
-            Model model
-    ) {
-        model.addAttribute("contractId", contractId);
-        return "contract/contract-approval-signature";
-    }
-
-    @Operation(
-            summary = "계약 변경 승인 및 전자서명 제출",
-            description = "계약 변경 요청받은 상대방(요청자 본인은 불가)이 본인인증 완료 후 서명을 제출하면, 역할(채권자/채무자)에 맞는 서명란에 반영하고 계약을 완료 처리합니다."
-    )
-    @ResponseBody
-    @PatchMapping(value = "/api/contracts/{contractId}/change-approval", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ContractStatus approveChange(
-            @PathVariable Long contractId,
-            @Parameter(description = "전자서명 이미지 파일") @RequestParam("signature") MultipartFile signature,
-            @Parameter(description = "본인인증 요청 식별값", example = "identity-verification-a1b2c3d4")
-            @RequestParam String identityVerificationId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        return contractChangeService.approveChange(contractId, userDetails.getUserId(), signature, identityVerificationId);
     }
 }

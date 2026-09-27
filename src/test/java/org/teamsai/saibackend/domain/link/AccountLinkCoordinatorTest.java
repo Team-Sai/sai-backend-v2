@@ -176,13 +176,91 @@ class AccountLinkCoordinatorTest {
     }
 
     @Test
-    void processingNeedsExplicitReconciliationWithoutCallingBank() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", "old", "new", PROCESSING);
-        when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
-        assertError(() -> coordinator.recoverUnresolved(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
-        verifyNoInteractions(bank);
-        verify(operations, never()).mark(anyString(), any());
+    void processingRecoveryRestoresBankBeforeMarkingFailed() {
+        receipt = new LinkOperationStore.Operation(
+                "id", 1L, "hash", "old", "new", PROCESSING
+        );
+
+        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(operations.findUnresolved(1L))
+                .thenReturn(List.of(receipt));
+        when(operations.hasUnresolved(1L))
+                .thenAnswer(invocation -> receipt.status() != FAILED);
+
+        coordinator.recoverUnresolved(1L);
+
+        var order = inOrder(bank, operations);
+        order.verify(bank).recoverUserKey(
+                "token", "new", "old", "id"
+        );
+        order.verify(operations).mark("id", FAILED);
+
+        assertThat(receipt.status()).isEqualTo(FAILED);
+        verifyNoInteractions(persistence);
+    }
+
+    @Test
+    void failedConfirmIntentWriteCanBeRecovered() {
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(operations)
+                .mark(anyString(), eq(CONFIRM_UNKNOWN));
+
+        assertThatThrownBy(() ->
+                coordinator.completeCallback(
+                        1L, "state", "new", List.of(1L)
+                )
+        ).isInstanceOf(IllegalStateException.class);
+
         assertThat(receipt.status()).isEqualTo(PROCESSING);
+        verifyNoInteractions(bank, persistence);
+
+        String operationId = receipt.id();
+
+        when(operations.findUnresolved(1L))
+                .thenReturn(List.of(receipt));
+        when(operations.hasUnresolved(1L))
+                .thenAnswer(invocation -> receipt.status() != FAILED);
+
+        coordinator.recoverUnresolved(1L);
+
+        verify(bank).recoverUserKey(
+                "token", "new", null, operationId
+        );
+        assertThat(receipt.status()).isEqualTo(FAILED);
+        verifyNoInteractions(persistence);
+    }
+
+    @Test
+    void processingRecoveryCanBeRetriedAfterNetworkFailure() {
+        receipt = new LinkOperationStore.Operation(
+                "id", 1L, "hash", "old", "new", PROCESSING
+        );
+
+        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(operations.findUnresolved(1L))
+                .thenReturn(List.of(receipt));
+        when(operations.hasUnresolved(1L))
+                .thenAnswer(invocation -> receipt.status() != FAILED);
+
+        doThrow(new RestClientException("temporary network failure"))
+                .doNothing()
+                .when(bank)
+                .recoverUserKey("token", "new", "old", "id");
+
+        assertError(
+                () -> coordinator.recoverUnresolved(1L),
+                AccountErrorCode.BANK_SERVER_UNAVAILABLE
+        );
+
+        assertThat(receipt.status()).isEqualTo(PROCESSING);
+        verify(operations, never()).mark("id", FAILED);
+
+        // 두 번째 은행 호출은 성공한다.
+        coordinator.recoverUnresolved(1L);
+
+        assertThat(receipt.status()).isEqualTo(FAILED);
+        verify(bank, times(2))
+                .recoverUserKey("token", "new", "old", "id");
     }
 
     @Test
@@ -433,7 +511,7 @@ class AccountLinkCoordinatorTest {
     }
 
     private void assertIssuanceStopsRetrying(RestClientResponseException failure,
-                                           LinkOperationStore.Status expectedStatus, AccountErrorCode expectedCode) {
+                                             LinkOperationStore.Status expectedStatus, AccountErrorCode expectedCode) {
         when(operations.findUnresolved(1L)).thenAnswer(i -> receipt == null ? List.of() : List.of(receipt));
         when(bank.requestUserKey(eq("name"), eq("token"), anyString())).thenThrow(failure);
 
@@ -464,5 +542,46 @@ class AccountLinkCoordinatorTest {
                 .uri("/api/mock-bank/link").retrieve().toBodilessEntity());
         server.verify();
         return failure;
+    }
+
+    @Test
+    void expiredLostResponseIsClosedBeforeNewOperationIsIssued() {
+        receipt = new LinkOperationStore.Operation("expired-id", 1L, "ISSUE", null, null, ISSUE_PENDING);
+        when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
+        when(bank.requestUserKey("name", "token", "expired-id"))
+                .thenThrow(issuanceHttpFailure(409, "{\"code\":\"KEY_ISSUANCE_EXPIRED\"}"));
+        when(bank.requestUserKey(eq("name"), eq("token"), argThat(id -> !id.equals("expired-id"))))
+                .thenReturn("replacement");
+
+        assertThat(coordinator.issueOrGetUserKey(1L).userKey()).isEqualTo("replacement");
+
+        var order = inOrder(operations, bank);
+        order.verify(bank).requestUserKey("name", "token", "expired-id");
+        order.verify(operations).markIssueExpired("expired-id");
+        order.verify(operations).beginIssue(argThat(id -> !id.equals("expired-id")), eq(1L));
+        verify(bank).confirmUserKey("replacement", receipt.id());
+        verify(bank, never()).confirmUserKey(anyString(), eq("expired-id"));
+    }
+
+    @Test
+    void repeatedExpiryHasBoundedRestarts() {
+        when(bank.requestUserKey(eq("name"), eq("token"), anyString()))
+                .thenThrow(issuanceHttpFailure(409, "{\"code\":\"KEY_ISSUANCE_EXPIRED\"}"));
+        assertError(() -> coordinator.issueOrGetUserKey(1L), AccountErrorCode.BANK_SERVER_UNAVAILABLE);
+        var ids = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(operations, times(2)).markIssueExpired(ids.capture());
+        assertThat(ids.getAllValues()).doesNotHaveDuplicates();
+        verify(operations, times(2)).beginIssue(anyString(), eq(1L));
+        verify(bank, never()).confirmUserKey(anyString(), anyString());
+    }
+
+    @Test
+    void failedExpiryWritePreventsNewIssuance() {
+        when(bank.requestUserKey(eq("name"), eq("token"), anyString()))
+                .thenThrow(issuanceHttpFailure(409, "{\"code\":\"KEY_ISSUANCE_EXPIRED\"}"));
+        doThrow(new IllegalStateException("database unavailable")).when(operations).markIssueExpired(anyString());
+        assertThatThrownBy(() -> coordinator.issueOrGetUserKey(1L)).isInstanceOf(IllegalStateException.class);
+        verify(operations, times(1)).beginIssue(anyString(), eq(1L));
+        verify(bank, never()).confirmUserKey(anyString(), anyString());
     }
 }

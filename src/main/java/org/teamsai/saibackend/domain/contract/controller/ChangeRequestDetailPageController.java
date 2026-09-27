@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 
 @Controller
-public class ChangeRequestDetailController {
+public class ChangeRequestDetailPageController {
 
 
     @Hidden
