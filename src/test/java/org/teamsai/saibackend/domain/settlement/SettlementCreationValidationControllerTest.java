@@ -17,7 +17,7 @@ import org.teamsai.saibackend.domain.settlement.controller.*;
 import org.teamsai.saibackend.domain.settlement.repository.*;
 import org.teamsai.saibackend.domain.settlement.service.*;
 import org.teamsai.saibackend.domain.settlement.support.*;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.GlobalExceptionHandler;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
@@ -30,13 +30,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class SettlementCreationValidationControllerTest {
     private MockMvc mvc;
-    private UserRepository userRepository;
+    private UserService userService;
     private SettlementRepository settlementRepository;
     private RecurringSettlementRepository recurringRepository;
 
     @BeforeEach
     void setUp() {
-        userRepository = mock(UserRepository.class);
+        userService = mock(UserService.class);
         settlementRepository = mock(SettlementRepository.class);
         recurringRepository = mock(RecurringSettlementRepository.class);
         SettlementParticipantValidator participants = new SettlementParticipantValidator();
@@ -46,10 +46,10 @@ class SettlementCreationValidationControllerTest {
         SharedSettlementService shared = new SharedSettlementService(accounts,
                 new SettlementValidator(mock(LinkedBankAccountService.class),
                         mock(SettlementParticipantRepository.class), participants),
-                registration, calculator, settlementRepository, userRepository);
+                registration, calculator, settlementRepository, userService);
         RecurringSettlementService recurring = new RecurringSettlementService(recurringRepository,
                 settlementRepository, new RecurringSettlementValidator(participants), calculator,
-                registration, accounts, userRepository);
+                registration, accounts, userService);
         CustomUserDetails principal = mock(CustomUserDetails.class);
         when(principal.getUserId()).thenReturn(1L);
 
@@ -95,7 +95,7 @@ class SettlementCreationValidationControllerTest {
                         .content(request(type, "test", participants)))
                 .andExpect(status().is(code.equals("DUPLICATE_SETTLEMENT_PARTICIPANT") ? 409 : 400))
                 .andExpect(jsonPath("$.code").value(code));
-        verifyNoInteractions(userRepository, settlementRepository, recurringRepository);
+        verifyNoInteractions(userService, settlementRepository, recurringRepository);
     }
 
     @ParameterizedTest
@@ -107,7 +107,7 @@ class SettlementCreationValidationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(type.equals("shared")
                         ? "정산명을 입력해주세요." : "정산명을 입력해 주세요."));
-        verifyNoInteractions(userRepository, settlementRepository, recurringRepository);
+        verifyNoInteractions(userService, settlementRepository, recurringRepository);
     }
 
     private String request(String type, String title, String participants) {
