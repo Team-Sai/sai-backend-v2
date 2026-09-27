@@ -29,6 +29,32 @@ public class SettlementAbandonmentDetectionService {
     private final SettlementAbandonmentNotifier notifier;
 
     public SettlementAbandonmentResult detectAbandoned(LocalDate baseDate) {
+        SettlementAbandonmentResult result = null;
+        RuntimeException detectionFailure = null;
+        try {
+            result = detectAndRecord(baseDate);
+        } catch (RuntimeException e) {
+            detectionFailure = e;
+        }
+
+        // Delivery uses its own transactions and must run even if detection failed.
+        try {
+            deliverPending();
+        } catch (RuntimeException deliveryFailure) {
+            if (detectionFailure == null) {
+                throw deliveryFailure;
+            }
+            if (detectionFailure != deliveryFailure) {
+                detectionFailure.addSuppressed(deliveryFailure);
+            }
+        }
+        if (detectionFailure != null) {
+            throw detectionFailure;
+        }
+        return result;
+    }
+
+    private SettlementAbandonmentResult detectAndRecord(LocalDate baseDate) {
         long totalCount = settlementRepository.countBySettlementStatus(SettlementStatus.IN_PROGRESS);
         log.info("정산 장기방치 감지 배치 시작, 대상 정산 총 {}건, baseDate={}", totalCount, baseDate);
 
@@ -72,8 +98,6 @@ public class SettlementAbandonmentDetectionService {
             }
             pageNumber++;
         }
-
-        deliverPending();
 
         log.info("정산 장기방치 감지 배치 종료, 신규 방치 감지 {}건 (총 {}건 중)", detectedCount, totalCount);
         return new SettlementAbandonmentResult(detectedCount);

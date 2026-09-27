@@ -8,8 +8,6 @@ CREATE TABLE IF NOT EXISTS settlement_abandonment_alert (
     INDEX idx_abandonment_delivery (delivery_status, settlement_id, reference_date)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
--- Existing rows represent previously processed alerts and must not be replayed.
--- New application records explicitly use PENDING and leave notified_at null.
 ALTER TABLE settlement_abandonment_alert
     ADD COLUMN IF NOT EXISTS delivery_status VARCHAR(16) NOT NULL DEFAULT 'SENT',
     ADD COLUMN IF NOT EXISTS message TEXT NULL,

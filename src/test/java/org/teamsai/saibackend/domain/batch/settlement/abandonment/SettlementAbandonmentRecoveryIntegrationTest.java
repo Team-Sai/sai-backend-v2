@@ -3,6 +3,10 @@ package org.teamsai.saibackend.domain.batch.settlement.abandonment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.job.parameters.JobParametersBuilder;
+import org.springframework.batch.core.repository.support.ResourcelessJobRepository;
+import org.springframework.batch.infrastructure.item.ExecutionContext;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementAbandonmentAlertRepository;
+import org.teamsai.saibackend.domain.batch.common.listener.LoggingJobExecutionListener;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.support.OverdueCriteria;
 import org.teamsai.saibackend.domain.settlement.support.SettlementAbandonmentRecorder;
@@ -85,6 +90,31 @@ class SettlementAbandonmentRecoveryIntegrationTest {
         detection.detectAbandoned(REFERENCE_DATE.plusDays(5));
         assertThat(status()).isEqualTo("SENT");
         verify(slack, times(2)).trySend(MESSAGE);
+    }
+
+    @Test
+    void detectionFailureMarksJobFailedButPendingDeliveryCommits() throws Exception {
+        recorder.recordIfAbsent(ID, REFERENCE_DATE, MESSAGE);
+        var failure = new IllegalStateException("new detection failed");
+        when(settlements.countBySettlementStatus(
+                org.teamsai.saibackend.domain.settlement.type.SettlementStatus.IN_PROGRESS))
+                .thenThrow(failure);
+        when(slack.trySend(MESSAGE)).thenReturn(true);
+
+        var repository = new ResourcelessJobRepository();
+        var config = new SettlementAbandonmentJobConfig(repository, transactionManager,
+                mock(LoggingJobExecutionListener.class));
+        var job = config.settlementAbandonmentJob(config.settlementAbandonmentStep(detection));
+        var parameters = new JobParametersBuilder()
+                .addString("baseDate", REFERENCE_DATE.plusDays(4).toString()).toJobParameters();
+        var instance = repository.createJobInstance(job.getName(), parameters);
+        var execution = repository.createJobExecution(instance, parameters, new ExecutionContext());
+        job.execute(execution);
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(execution.getAllFailureExceptions()).contains(failure);
+        assertThat(status()).isEqualTo("SENT");
+        verify(slack).trySend(MESSAGE);
     }
 
     @Test

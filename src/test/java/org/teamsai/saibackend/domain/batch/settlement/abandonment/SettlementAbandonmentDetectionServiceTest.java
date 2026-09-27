@@ -98,6 +98,50 @@ class SettlementAbandonmentDetectionServiceTest {
         verifyNoInteractions(notifier);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"count", "page", "criteria", "record"})
+    void detectionFailureStillDeliversPendingAndPreservesOriginalFailure(String phase) {
+        var failure = new IllegalStateException("detection failed: " + phase);
+        switch (phase) {
+            case "count" -> when(settlements.countBySettlementStatus(SettlementStatus.IN_PROGRESS))
+                    .thenThrow(failure);
+            case "page" -> when(settlements.findBySettlementStatusOrderBySettlementIdAsc(
+                    SettlementStatus.IN_PROGRESS, PageRequest.of(0, 100))).thenThrow(failure);
+            case "criteria" -> {
+                var settlement = candidate(today.minusDays(3));
+                when(criteria.resolveReferenceDate(settlement)).thenThrow(failure);
+            }
+            case "record" -> {
+                candidate(today.minusDays(3));
+                when(recorder.recordIfAbsent(eq(1L), any(), any())).thenThrow(failure);
+            }
+        }
+        when(recorder.pendingAfter(null, null)).thenReturn(List.of(
+                SettlementAbandonmentAlert.pending(9L, today.minusDays(5), "previous alert")));
+
+        assertThatThrownBy(() -> service.detectAbandoned(today)).isSameAs(failure);
+
+        verify(notifier).sendPending(9L, today.minusDays(5));
+    }
+
+    @Test
+    void preservesBothFailuresWhenDetectionAndPendingLookupFail() {
+        var detectionFailure = new IllegalStateException("detection failed");
+        var deliveryFailure = new IllegalStateException("pending lookup failed");
+        when(settlements.countBySettlementStatus(SettlementStatus.IN_PROGRESS)).thenThrow(detectionFailure);
+        when(recorder.pendingAfter(null, null)).thenThrow(deliveryFailure);
+
+        assertThatThrownBy(() -> service.detectAbandoned(today)).isSameAs(detectionFailure);
+        assertThat(detectionFailure.getSuppressed()).containsExactly(deliveryFailure);
+    }
+
+    @Test
+    void pendingLookupFailureIsNotReportedAsSuccessfulDetection() {
+        var failure = new IllegalStateException("pending lookup failed");
+        when(recorder.pendingAfter(null, null)).thenThrow(failure);
+        assertThatThrownBy(() -> service.detectAbandoned(today)).isSameAs(failure);
+    }
+
     @Test
     void failedDeliveryDoesNotBlockLaterPagesOrLoopOnSameRecord() {
         var firstDate = today.minusDays(5);
