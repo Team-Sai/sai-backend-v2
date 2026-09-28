@@ -128,6 +128,7 @@ public class SettlementQueryService {
                 settlement.getSplitType() != null
                         ? settlement.getSplitType().name()
                         : null,
+                settlement.getTotalAmount(),
                 settlement.getDueDate(),
                 recurringSettlement != null
                         ? recurringSettlement.getStartDate()

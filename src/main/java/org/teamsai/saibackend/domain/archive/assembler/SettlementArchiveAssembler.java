@@ -1,11 +1,8 @@
 package org.teamsai.saibackend.domain.archive.assembler;
 
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementArchivePreviewResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementDetailResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 
@@ -23,9 +20,16 @@ public final class SettlementArchiveAssembler {
             List<SettlementPaymentHistoryResponse> paymentHistory,
             SettlementAccountResponse settlementAccount
     ) {
+
+        BigDecimal ownerAmount =
+                detail.totalAmount()
+                        .subtract(paymentStatus.getTotalExpectedAmount());
+
         return SettlementArchivePreviewResponse.builder()
                 .settlementId(detail.settlementId())
-                .settlementDisplayId(SETTLEMENT_DISPLAY_ID_PREFIX + detail.settlementId())
+                .settlementDisplayId(
+                        SETTLEMENT_DISPLAY_ID_PREFIX + detail.settlementId()
+                )
                 .title(detail.title())
                 .ownerName(detail.ownerName())
                 .settlementType(detail.settlementType())
@@ -34,6 +38,7 @@ public final class SettlementArchiveAssembler {
                 .splitType(detail.splitType())
                 .dueDate(detail.dueDate())
                 .createdAt(detail.createdAt())
+                .ownerAmount(ownerAmount)
                 .paymentStatus(paymentStatus)
                 .paymentHistory(paymentHistory)
                 .settlementAccount(settlementAccount)

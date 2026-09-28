@@ -231,6 +231,7 @@ class RecurringSettlementServiceTest {
                         OWNER_ID,
                         FIRST_SETTLEMENT_ID,
                         request.getParticipants(),
+                        request.getSplitType(),
                         perPersonAmount
                 );
 
@@ -260,7 +261,153 @@ class RecurringSettlementServiceTest {
         assertThat(response.getEndDate())
                 .isEqualTo(LocalDate.of(2027, 8, 17));
     }
+    @Test
+    @DisplayName(
+            "CUSTOM 정기정산 생성 시 정기 설정과 최초 회차를 CUSTOM 방식으로 생성한다"
+    )
+    void createCustomRecurringSettlementSuccess() {
 
+        RecurringSettlementCreateRequest request =
+                RecurringSettlementCreateRequest.builder()
+                        .settlementCategory("OTT·구독")
+                        .title("넷플릭스 구독")
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("20000"))
+                        .cycleRule(CycleRule.MONTHLY)
+                        .startDate(LocalDate.of(2026, 9, 1))
+                        .endDate(LocalDate.of(2027, 9, 1))
+                        .linkedAccountId(LINKED_ACCOUNT_ID)
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("30000")
+                                        ),
+                                        participant(
+                                                "SAI_USER_B",
+                                                new BigDecimal("50000")
+                                        )
+                                )
+                        )
+                        .build();
+
+        User owner =
+                User.builder()
+                        .userId(OWNER_ID)
+                        .build();
+
+        given(
+                userService.getUser(OWNER_ID)
+        ).willReturn(owner);
+
+        given(
+                recurringSettlementRepository.save(
+                        any(RecurringSettlement.class)
+                )
+        ).willAnswer(invocation -> {
+
+            RecurringSettlement recurring =
+                    invocation.getArgument(0);
+
+            return RecurringSettlement.builder()
+                    .recurringSettlementId(RECURRING_SETTLEMENT_ID)
+                    .owner(recurring.getOwner())
+                    .settlementCategory(recurring.getSettlementCategory())
+                    .title(recurring.getTitle())
+                    .splitType(recurring.getSplitType())
+                    .totalAmount(recurring.getTotalAmount())
+                    .cycleRule(recurring.getCycleRule())
+                    .startDate(recurring.getStartDate())
+                    .endDate(recurring.getEndDate())
+                    .createdAt(recurring.getCreatedAt())
+                    .build();
+        });
+
+        given(
+                settlementRepository.save(
+                        any(Settlement.class)
+                )
+        ).willAnswer(invocation -> {
+
+            Settlement settlement =
+                    invocation.getArgument(0);
+
+            return Settlement.builder()
+                    .settlementId(FIRST_SETTLEMENT_ID)
+                    .recurringSettlement(
+                            settlement.getRecurringSettlement()
+                    )
+                    .owner(settlement.getOwner())
+                    .settlementType(settlement.getSettlementType())
+                    .settlementStatus(settlement.getSettlementStatus())
+                    .settlementCategory(settlement.getSettlementCategory())
+                    .title(settlement.getTitle())
+                    .splitType(settlement.getSplitType())
+                    .totalAmount(settlement.getTotalAmount())
+                    .cycleDate(settlement.getCycleDate())
+                    .createdAt(settlement.getCreatedAt())
+                    .build();
+        });
+
+        recurringSettlementService.create(
+                OWNER_ID,
+                request
+        );
+
+        ArgumentCaptor<RecurringSettlement> recurringCaptor =
+                ArgumentCaptor.forClass(
+                        RecurringSettlement.class
+                );
+
+        ArgumentCaptor<Settlement> settlementCaptor =
+                ArgumentCaptor.forClass(
+                        Settlement.class
+                );
+
+        then(recurringSettlementRepository)
+                .should()
+                .save(
+                        recurringCaptor.capture()
+                );
+
+        then(settlementRepository)
+                .should()
+                .save(
+                        settlementCaptor.capture()
+                );
+
+        assertThat(
+                recurringCaptor.getValue()
+                        .getSplitType()
+        ).isEqualTo(SplitType.CUSTOM);
+
+        assertThat(
+                settlementCaptor.getValue()
+                        .getSplitType()
+        ).isEqualTo(SplitType.CUSTOM);
+
+        then(settlementAmountCalculator)
+                .shouldHaveNoInteractions();
+
+        then(participantService)
+                .should()
+                .registerParticipants(
+                        OWNER_ID,
+                        FIRST_SETTLEMENT_ID,
+                        request.getParticipants(),
+                        SplitType.CUSTOM,
+                        null
+                );
+
+        then(settlementAccountService)
+                .should()
+                .selectAccount(
+                        OWNER_ID,
+                        FIRST_SETTLEMENT_ID,
+                        LINKED_ACCOUNT_ID
+                );
+    }
     @Test
     @DisplayName("정기정산 설정 저장에 실패하면 최초 회차를 생성하지 않는다")
     void createFailsWhenRecurringSettlementInsertFails() {
@@ -479,6 +626,7 @@ class RecurringSettlementServiceTest {
                         OWNER_ID,
                         FIRST_SETTLEMENT_ID,
                         request.getParticipants(),
+                        request.getSplitType(),
                         expectedAmount
                 );
     }
@@ -577,6 +725,7 @@ class RecurringSettlementServiceTest {
                         OWNER_ID,
                         FIRST_SETTLEMENT_ID,
                         request.getParticipants(),
+                        request.getSplitType(),
                         perPersonAmount
                 );
     }
@@ -585,6 +734,7 @@ class RecurringSettlementServiceTest {
         return RecurringSettlementCreateRequest.builder()
                 .settlementCategory("OTT·구독")
                 .title("넷플릭스 구독")
+                .splitType(SplitType.EQUAL)
                 .totalAmount(new BigDecimal("450000"))
                 .cycleRule(CycleRule.MONTHLY)
                 .startDate(LocalDate.of(2026, 8, 17))
@@ -602,6 +752,17 @@ class RecurringSettlementServiceTest {
     ) {
         return SettlementParticipantCreateRequest.builder()
                 .userToken(userToken)
+                .build();
+    }
+
+    private SettlementParticipantCreateRequest participant(
+            String userToken,
+            BigDecimal amount
+    ) {
+
+        return SettlementParticipantCreateRequest.builder()
+                .userToken(userToken)
+                .amount(amount)
                 .build();
     }
 }

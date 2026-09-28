@@ -14,6 +14,7 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipant
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantRole;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.settlement.type.SplitType;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.service.UserService;
 
@@ -62,7 +63,8 @@ public class SettlementParticipantService {
             Long ownerId,
             Long settlementId,
             List<SettlementParticipantCreateRequest> participants,
-            BigDecimal expectedAmount
+            SplitType splitType,
+            BigDecimal equalAmount
     ) {
         for (SettlementParticipantCreateRequest participantRequest : participants) {
 
@@ -77,7 +79,13 @@ public class SettlementParticipantService {
                             settlementId,
                             participantUser.getUserId()
                     );
+            BigDecimal expectedAmount;
 
+            if(splitType == SplitType.EQUAL){
+                expectedAmount = equalAmount;
+            } else {
+                expectedAmount = participantRequest.getAmount();
+            }
             settlementPaymentService.createObligation(
                     participantId,
                     expectedAmount

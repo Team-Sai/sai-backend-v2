@@ -45,12 +45,14 @@ public class RecurringSettlementService {
         recurringSettlementValidator.validateCreateRequest(request);
 
         User owner = userService.getUser(ownerId);
-
-        BigDecimal perPersonAmount =
-                settlementAmountCalculator.calculateEqualAmount(
-                        request.getTotalAmount(),
-                        request.getParticipants().size()
-                );
+        BigDecimal perPersonAmount = null;
+        if (request.getSplitType() == SplitType.EQUAL){
+           perPersonAmount =
+                    settlementAmountCalculator.calculateEqualAmount(
+                            request.getTotalAmount(),
+                            request.getParticipants().size()
+                    );
+        }
 
         LocalDateTime createdAt = LocalDateTime.now();
 
@@ -59,7 +61,7 @@ public class RecurringSettlementService {
                         .owner(owner)
                         .settlementCategory(request.getSettlementCategory())
                         .title(request.getTitle())
-                        .splitType(SplitType.EQUAL)
+                        .splitType(request.getSplitType())
                         .totalAmount(request.getTotalAmount())
                         .cycleRule(request.getCycleRule())
                         .startDate(request.getStartDate())
@@ -77,7 +79,7 @@ public class RecurringSettlementService {
                         .settlementStatus(SettlementStatus.IN_PROGRESS)
                         .settlementCategory(request.getSettlementCategory())
                         .title(request.getTitle())
-                        .splitType(SplitType.EQUAL)
+                        .splitType(request.getSplitType())
                         .totalAmount(request.getTotalAmount())
                         .dueDate(null)
                         .cycleDate(request.getStartDate())
@@ -88,7 +90,11 @@ public class RecurringSettlementService {
                 settlementRepository.save(firstSettlement);
 
         settlementParticipantService.registerParticipants(
-                ownerId,savedFirstSettlement.getSettlementId(),request.getParticipants(),perPersonAmount
+                ownerId,
+                savedFirstSettlement.getSettlementId(),
+                request.getParticipants(),
+                request.getSplitType(),
+                perPersonAmount
         );
 
         settlementAccountService.selectAccount(

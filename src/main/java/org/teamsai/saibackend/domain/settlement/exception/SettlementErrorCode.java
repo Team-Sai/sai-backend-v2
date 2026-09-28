@@ -86,6 +86,20 @@ public enum SettlementErrorCode implements BaseErrorCode<DomainException> {
             HttpStatus.BAD_REQUEST,
             "정산 참여자 정보가 올바르지 않습니다."
     ),
+    INVALID_OWNER_AMOUNT(
+            HttpStatus.BAD_REQUEST,
+            "생성자 부담 금액을 확인해 주세요."
+    ),
+
+    INVALID_PARTICIPANT_AMOUNT(
+            HttpStatus.BAD_REQUEST,
+            "참여자 부담 금액을 확인해 주세요."
+    ),
+
+    SETTLEMENT_AMOUNT_MISMATCH(
+            HttpStatus.BAD_REQUEST,
+            "생성자와 참여자 부담 금액의 합이 총 정산 금액과 일치하지 않습니다."
+    ),
 
     DUPLICATE_SETTLEMENT_PARTICIPANT(
             HttpStatus.CONFLICT,
