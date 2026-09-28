@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleQueryService;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 
 @Tag(
         name = "차용증 API",

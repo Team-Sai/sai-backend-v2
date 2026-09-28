@@ -16,7 +16,6 @@ import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDate;
 import java.util.Optional;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

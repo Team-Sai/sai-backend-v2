@@ -2,7 +2,6 @@ package org.teamsai.saibackend.domain.notification.type;
 
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 
 public enum ReminderStage {
