@@ -6,7 +6,7 @@ import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountReposit
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
-import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;

@@ -29,7 +29,7 @@ import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerateService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.notification.entity.Notification;
 import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
@@ -98,8 +98,8 @@ class RepaymentDueReminderJobIntegrationTest {
         }
 
         @Bean
-        RepaymentScheduleGenerator repaymentScheduleGenerator() {
-            return org.mockito.Mockito.mock(RepaymentScheduleGenerator.class);
+        RepaymentScheduleGenerateService repaymentScheduleGenerateService() {
+            return org.mockito.Mockito.mock(RepaymentScheduleGenerateService.class);
         }
 
         @Bean

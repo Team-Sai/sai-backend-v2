@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.settlement.support;
+package org.teamsai.saibackend.domain.settlement.type;
 
 public enum CycleGenerationStatus {
     CREATED,

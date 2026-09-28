@@ -1,8 +1,8 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 

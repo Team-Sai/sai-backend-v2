@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.contract;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimator;
+import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimateService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
@@ -10,10 +10,10 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DisplayName("MonthlyPaymentEstimator 단위 테스트")
-class MonthlyPaymentEstimatorTest {
+@DisplayName("MonthlyPaymentEstimateService 단위 테스트")
+class MonthlyPaymentEstimateServiceTest {
 
-    private final MonthlyPaymentEstimator estimator = new MonthlyPaymentEstimator();
+    private final MonthlyPaymentEstimateService estimator = new MonthlyPaymentEstimateService();
 
     private static final BigDecimal PRINCIPAL = BigDecimal.valueOf(100_000_000);
     private static final BigDecimal INTEREST_RATE = BigDecimal.valueOf(4.5);

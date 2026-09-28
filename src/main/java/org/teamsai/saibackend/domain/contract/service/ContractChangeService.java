@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.assembler.ContractChangeAssembler;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractChangeResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;

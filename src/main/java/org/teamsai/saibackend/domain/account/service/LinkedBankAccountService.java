@@ -19,7 +19,7 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.math.BigDecimal;
 
-import static org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus.AVAILABLE;
+import static org.teamsai.saibackend.domain.account.type.ConnectionStatus.AVAILABLE;
 
 @Slf4j
 @Service

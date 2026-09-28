@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRejectRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractChangeResponse;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeService;

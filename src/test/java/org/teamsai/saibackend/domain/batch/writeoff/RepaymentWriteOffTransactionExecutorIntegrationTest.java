@@ -19,7 +19,7 @@ import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerateService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
 import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = {
         RepaymentWriteOffTransactionExecutor.class,
         RepaymentScheduleService.class,
-        RepaymentScheduleGenerator.class,
+        RepaymentScheduleGenerateService.class,
         RepaymentWriteOffTransactionExecutorIntegrationTest.TestSliceConfig.class
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

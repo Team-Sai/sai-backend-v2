@@ -17,7 +17,7 @@ import java.util.Objects;
 public class ChangeRequestDetailQueryService {
 
     private final ContractChangeQueryService contractChangeQueryService;
-    private final MonthlyPaymentEstimator monthlyPaymentEstimator;
+    private final MonthlyPaymentEstimateService monthlyPaymentEstimateService;
 
     public ChangeRequestDetailResponse getDetail(Long contractId, Long changeRequestId, Long userId) {
 
@@ -34,7 +34,7 @@ public class ChangeRequestDetailQueryService {
             throw ChangeRequestDetailErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
         }
 
-        BigDecimal currentMonthlyPayment = monthlyPaymentEstimator.estimate(
+        BigDecimal currentMonthlyPayment = monthlyPaymentEstimateService.estimate(
                 contract.getPrincipalAmount(),
                 contract.getInterestRate(),
                 contract.getRepaymentType().name(),
@@ -42,7 +42,7 @@ public class ChangeRequestDetailQueryService {
                 contract.getMaturityDate()
         );
 
-        BigDecimal newMonthlyPayment = monthlyPaymentEstimator.estimate(
+        BigDecimal newMonthlyPayment = monthlyPaymentEstimateService.estimate(
                 contract.getPrincipalAmount(),
                 ChangeRequestDetailAssembler.effectiveInterestRate(contract, changeRequest),
                 ChangeRequestDetailAssembler.effectiveRepaymentType(contract, changeRequest),

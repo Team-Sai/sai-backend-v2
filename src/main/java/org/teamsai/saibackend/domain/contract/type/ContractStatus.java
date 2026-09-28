@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.contract.dto.request;
+package org.teamsai.saibackend.domain.contract.type;
 
 public enum ContractStatus {
     DRAFT, // 최초 생성 시 기본 상태
