@@ -17,8 +17,9 @@ import org.teamsai.saibackend.global.client.MockBankClient;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.math.BigDecimal;
 
-import static org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus.AVAILABLE;
+import static org.teamsai.saibackend.domain.account.type.ConnectionStatus.AVAILABLE;
 
 @Slf4j
 @Service
@@ -116,6 +117,23 @@ public class LinkedBankAccountService {
                 LinkedBankAccount.class,
                 linkedAccountId
         );
+    }
+
+    public LinkedBankAccount getLinkedAccount(Long linkedAccountId) {
+        return linkedBankAccountRepository.findById(linkedAccountId)
+                .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
+    }
+
+    public Long getLastSyncedTransactionId(Long linkedAccountId) {
+        return linkedBankAccountRepository.findLastSyncedTransactionIdById(linkedAccountId);
+    }
+
+    @Transactional
+    public void advanceTransactionCursor(Long linkedAccountId, Long transactionId, BigDecimal balance) {
+        int updated = linkedBankAccountRepository.advanceCursorAndBalance(linkedAccountId, transactionId, balance);
+        if (updated == 0 && !linkedBankAccountRepository.existsById(linkedAccountId)) {
+            throw AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException();
+        }
     }
 
     public List<Long> getLinkedAccountIds(Long userId) {

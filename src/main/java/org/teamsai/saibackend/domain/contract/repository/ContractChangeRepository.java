@@ -5,17 +5,17 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface ContractChangeRepository
-        extends JpaRepository<LoanContractChangeRequestEntity, Long> {
+        extends JpaRepository<LoanContractChangeRequest, Long> {
 
-    List<LoanContractChangeRequestEntity> findByContractId(Long contractId);
+    List<LoanContractChangeRequest> findByContractId(Long contractId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT c FROM LoanContractChangeRequestEntity c WHERE c.changeRequestId = :changeRequestId")
-    Optional<LoanContractChangeRequestEntity> findByIdForUpdate(@Param("changeRequestId") Long changeRequestId);
+    @Query("SELECT c FROM LoanContractChangeRequest c WHERE c.changeRequestId = :changeRequestId")
+    Optional<LoanContractChangeRequest> findByIdForUpdate(@Param("changeRequestId") Long changeRequestId);
 }

@@ -6,30 +6,30 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-public interface RepaymentScheduleRepository extends JpaRepository<RepaymentScheduleEntity, Long> {
+public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSchedule, Long> {
 
-    List<RepaymentScheduleEntity> findByContractIdOrderBySequenceAsc(Long contractId);
+    List<RepaymentSchedule> findByContractIdOrderBySequenceAsc(Long contractId);
 
-    List<RepaymentScheduleEntity> findByStatusAndDueDateBefore(RepaymentScheduleStatus status, LocalDate date);
+    List<RepaymentSchedule> findByStatusAndDueDateBefore(RepaymentScheduleStatus status, LocalDate date);
 
-    List<RepaymentScheduleEntity> findByDueDateInAndStatus(List<LocalDate> dueDate, RepaymentScheduleStatus status);
+    List<RepaymentSchedule> findByDueDateInAndStatus(List<LocalDate> dueDate, RepaymentScheduleStatus status);
 
-    List<RepaymentScheduleEntity> findByStatusAndDueDateLessThanEqual(RepaymentScheduleStatus status, LocalDate cutoffDate);
+    List<RepaymentSchedule> findByStatusAndDueDateLessThanEqual(RepaymentScheduleStatus status, LocalDate cutoffDate);
 
-    Optional<RepaymentScheduleEntity> findFirstByContractIdAndStatusInOrderBySequenceAsc(
+    Optional<RepaymentSchedule> findFirstByContractIdAndStatusInOrderBySequenceAsc(
             Long contractId, List<RepaymentScheduleStatus> statuses
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT r FROM RepaymentScheduleEntity r WHERE r.scheduleId = :scheduleId")
-    Optional<RepaymentScheduleEntity> findByIdForUpdate(@Param("scheduleId") Long scheduleId);
+    @Query("SELECT r FROM RepaymentSchedule r WHERE r.scheduleId = :scheduleId")
+    Optional<RepaymentSchedule> findByIdForUpdate(@Param("scheduleId") Long scheduleId);
 
     void deleteByContractIdAndStatus(Long contractId, RepaymentScheduleStatus status);
 
@@ -63,11 +63,11 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
     List<RepaymentScheduleWithRemainingProjection> findByContractIds(@Param("contractIds") List<Long> contractIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT r FROM RepaymentScheduleEntity r WHERE r.contractId = :contractId ORDER BY r.sequence Asc")
-    List<RepaymentScheduleEntity> findByContractIdForUpdate(@Param("contractId")Long contractId);
+    @Query("SELECT r FROM RepaymentSchedule r WHERE r.contractId = :contractId ORDER BY r.sequence Asc")
+    List<RepaymentSchedule> findByContractIdForUpdate(@Param("contractId")Long contractId);
 
     @Modifying
-    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :status " +
+    @Query("UPDATE RepaymentSchedule r SET r.status = :status " +
             "WHERE r.scheduleId IN :scheduleIds AND r.status = :expectedStatus")
     int updateStatusBulk(
             @Param("scheduleIds") List<Long> scheduleIds,
@@ -75,14 +75,14 @@ public interface RepaymentScheduleRepository extends JpaRepository<RepaymentSche
             @Param("expectedStatus") RepaymentScheduleStatus expectedStatus);
 
     @Modifying
-    @Query("UPDATE RepaymentScheduleEntity r SET r.status = :newStatus " +
+    @Query("UPDATE RepaymentSchedule r SET r.status = :newStatus " +
             "WHERE r.status = :expectedStatus AND r.dueDate < :baseDate")
     int markOverdueBulk(
             @Param("newStatus") RepaymentScheduleStatus newStatus,
             @Param("expectedStatus") RepaymentScheduleStatus expectedStatus,
             @Param("baseDate") LocalDate baseDate);
 
-    @Query("SELECT r.scheduleId FROM RepaymentScheduleEntity r " +
+    @Query("SELECT r.scheduleId FROM RepaymentSchedule r " +
             "WHERE r.status = :status AND r.dueDate <= :cutoffDate")
     List<Long> findScheduleIdsByStatusAndDueDateLessThanEqual(
             @Param("status") RepaymentScheduleStatus status,

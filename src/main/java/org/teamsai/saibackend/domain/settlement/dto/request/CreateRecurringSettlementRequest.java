@@ -1,6 +1,5 @@
 package org.teamsai.saibackend.domain.settlement.dto.request;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,9 +39,7 @@ public class CreateRecurringSettlementRequest {
 
     @NotNull(message = "정산 수취 계좌를 선택해 주세요.")
     private Long linkedAccountId;
-
-    @Valid
-    @NotEmpty(message = "참여자를 한 명 이상 선택해 주세요.")
+    
     private List<CreateSettlementParticipantRequest> participants;
 
     @AssertTrue(message = "종료일은 시작일보다 빠를 수 없습니다.")

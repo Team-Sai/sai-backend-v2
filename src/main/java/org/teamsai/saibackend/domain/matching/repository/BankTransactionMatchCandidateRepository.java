@@ -6,27 +6,27 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateStatus;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface BankTransactionMatchCandidateRepository
-        extends JpaRepository<BankTransactionMatchCandidateEntity, Long> {
+        extends JpaRepository<BankTransactionMatchCandidate, Long> {
 
-    List<BankTransactionMatchCandidateEntity>
+    List<BankTransactionMatchCandidate>
     findAllByBankTransactionIdOrderByMatchCandidateIdAsc(Long bankTransactionId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT candidate
-            FROM BankTransactionMatchCandidateEntity candidate
+            FROM BankTransactionMatchCandidate candidate
             WHERE candidate.matchCandidateId = :matchCandidateId
               AND candidate.bankTransactionId = :bankTransactionId
               AND candidate.candidateStatus = :candidateStatus
             """)
-    Optional<BankTransactionMatchCandidateEntity> findAvailableForUpdate(
+    Optional<BankTransactionMatchCandidate> findAvailableForUpdate(
             @Param("matchCandidateId") Long matchCandidateId,
             @Param("bankTransactionId") Long bankTransactionId,
             @Param("candidateStatus") MatchingCandidateStatus candidateStatus
@@ -39,7 +39,7 @@ public interface BankTransactionMatchCandidateRepository
 
     @Modifying(flushAutomatically = true)
     @Query("""
-            DELETE FROM BankTransactionMatchCandidateEntity candidate
+            DELETE FROM BankTransactionMatchCandidate candidate
             WHERE candidate.bankTransactionId = :bankTransactionId
             """)
     int deleteAllByBankTransactionId(@Param("bankTransactionId") Long bankTransactionId);

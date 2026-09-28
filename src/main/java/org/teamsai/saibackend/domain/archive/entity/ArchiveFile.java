@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.teamsai.saibackend.domain.archive.type.ArchiveStatus;
 
 import java.time.LocalDateTime;
 

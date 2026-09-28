@@ -3,13 +3,10 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.ReminderStage;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
-import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
@@ -25,10 +22,12 @@ import java.util.stream.Collectors;
 public class SettlementReminderSender {
 
     private final SettlementParticipantRepository participantRepository;
-    private final PaymentObligationRepository paymentObligationRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
     private final NotificationService notificationService;
 
-    public int sendForSettlement(Settlement settlement, ReminderStage stage) {
+    public record DeliveryResult(int processedCount, int failedCount) {}
+
+    public DeliveryResult sendForSettlement(Settlement settlement, ReminderStage stage) {
         List<SettlementParticipant> activeParticipants =
                 participantRepository.findBySettlementIdAndStatus(
                         settlement.getSettlementId(),
@@ -36,7 +35,7 @@ public class SettlementReminderSender {
                 );
 
         if (activeParticipants.isEmpty()) {
-            return 0;
+            return new DeliveryResult(0, 0);
         }
 
         Map<Long, Long> userIdByParticipantId = activeParticipants.stream()
@@ -49,39 +48,37 @@ public class SettlementReminderSender {
                 .map(SettlementParticipant::getParticipantId)
                 .toList();
 
-        List<PaymentObligationEntity> unresolvedObligations =
-                paymentObligationRepository.findLatestByParticipantIds(
-                                participantIds,
-                                ObligationStatus.ACTIVE
-                        ).stream()
-                        .filter(o -> o.getPaymentStatus().isUnresolved())
+        List<PaymentObligationView> unresolvedObligations =
+                paymentObligationQueryService.findLatestActiveByParticipantIds(participantIds).stream()
+                        .filter(o -> o.paymentStatus().isUnresolved())
                         .toList();
 
         int sent = 0;
-        for (PaymentObligationEntity obligation : unresolvedObligations) {
-            Long userId = userIdByParticipantId.get(obligation.getParticipantId());
+        int failed = 0;
+        for (PaymentObligationView obligation : unresolvedObligations) {
+            Long userId = userIdByParticipantId.get(obligation.participantId());
             if (userId == null) {
-                log.warn("참여자-사용자 매핑 실패 participantId={}", obligation.getParticipantId());
+                log.warn("참여자-사용자 매핑 실패 participantId={}", obligation.participantId());
                 continue;
             }
             try {
                 sendOneReminder(userId, obligation, settlement, stage);
                 sent++;
             } catch (Exception e) {
-                log.error("리마인드 발송 실패 paymentObligationId={}", obligation.getPaymentObligationId(), e);
+                failed++;
+                log.error("리마인드 발송 실패 paymentObligationId={}", obligation.paymentObligationId(), e);
             }
         }
-        return sent;
+        return new DeliveryResult(sent, failed);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void sendOneReminder(Long userId, PaymentObligationEntity obligation, Settlement settlement, ReminderStage stage) {
-        notificationService.createIfAbsent(
+    private void sendOneReminder(Long userId, PaymentObligationView obligation, Settlement settlement, ReminderStage stage) {
+        notificationService.createIfAbsentInNewTransaction(
                 userId,
                 stage.type(),
                 stage.title(),
                 stage.contentFor(settlement, obligation),
-                obligation.getPaymentObligationId(),  // referenceId — obligation 단위로 dedup
+                obligation.paymentObligationId(),  // referenceId — obligation 단위로 dedup
                 settlement.getSettlementId()           // secondaryReferenceId — 참고용
         );
     }

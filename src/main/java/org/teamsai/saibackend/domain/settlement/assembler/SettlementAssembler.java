@@ -1,7 +1,7 @@
 package org.teamsai.saibackend.domain.settlement.assembler;
 
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
@@ -11,7 +11,7 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentSt
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,37 +45,37 @@ public final class SettlementAssembler {
     }
 
     public static SettlementPaymentObligationResponse toObligationResponse(
-            PaymentObligationEntity obligation,
+            PaymentObligationView obligation,
             SettlementParticipant participant,
-            List<PaymentRecordEntity> records
+            List<PaymentRecord> records
     ) {
         BigDecimal paidAmount = records.stream()
-                .map(PaymentRecordEntity::getAmount)
+                .map(PaymentRecord::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         LocalDateTime latestPaymentAt = records.stream()
-                .map(PaymentRecordEntity::getRecordedAt)
+                .map(PaymentRecord::getRecordedAt)
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
 
-        BigDecimal remainingAmount = obligation.getExpectedAmount()
+        BigDecimal remainingAmount = obligation.expectedAmount()
                 .subtract(paidAmount)
                 .max(BigDecimal.ZERO);
 
-        PaymentStatus paymentStatus = calculatePaymentStatus(obligation.getExpectedAmount(), paidAmount);
+        PaymentStatus paymentStatus = calculatePaymentStatus(obligation.expectedAmount(), paidAmount);
 
         return SettlementPaymentObligationResponse.builder()
-                .paymentObligationId(obligation.getPaymentObligationId())
-                .participantId(obligation.getParticipantId())
+                .paymentObligationId(obligation.paymentObligationId())
+                .participantId(obligation.participantId())
                 .userId(participant.getUser().getUserId())
                 .participantName(participant.getUser().getName())
-                .expectedAmount(obligation.getExpectedAmount())
+                .expectedAmount(obligation.expectedAmount())
                 .paidAmount(paidAmount)
                 .remainingAmount(remainingAmount)
                 .latestPaymentAt(latestPaymentAt)
                 .paymentStatus(paymentStatus)
-                .obligationStatus(obligation.getObligationStatus())
-                .overdueSince(obligation.getOverdueSince())
+                .obligationStatus(obligation.obligationStatus())
+                .overdueSince(obligation.overdueSince())
                 .build();
     }
 
@@ -133,8 +133,8 @@ public final class SettlementAssembler {
     }
 
     public static SettlementPaymentHistoryResponse toPaymentHistoryResponse(
-            PaymentRecordEntity record,
-            BankTransactionEntity transaction,
+            PaymentRecord record,
+            BankTransaction transaction,
             String payerName
     ) {
         return SettlementPaymentHistoryResponse.builder()

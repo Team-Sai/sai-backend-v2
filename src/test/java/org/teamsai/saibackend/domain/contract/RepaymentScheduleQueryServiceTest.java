@@ -8,7 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
@@ -46,7 +46,7 @@ class RepaymentScheduleQueryServiceTest {
         Long userId = 10L;
         when(loanContractService.findContract(contractId, userId))
                 .thenReturn(LoanContractResponse.builder().contractId(contractId).creditorId(userId).build());
-        List<RepaymentScheduleEntity> schedules = List.of(
+        List<RepaymentSchedule> schedules = List.of(
                 schedule(1, RepaymentScheduleStatus.PAID),
                 schedule(2, RepaymentScheduleStatus.PAID),
                 schedule(3, RepaymentScheduleStatus.PENDING),
@@ -82,8 +82,8 @@ class RepaymentScheduleQueryServiceTest {
         verify(repaymentScheduleRepository, never()).findByContractIdOrderBySequenceAsc(1L);
     }
 
-    private RepaymentScheduleEntity schedule(int sequence, RepaymentScheduleStatus status) {
-        RepaymentScheduleEntity schedule = new RepaymentScheduleEntity(
+    private RepaymentSchedule schedule(int sequence, RepaymentScheduleStatus status) {
+        RepaymentSchedule schedule = new RepaymentSchedule(
                 1L,
                 sequence,
                 LocalDate.of(2026, 1, 1),

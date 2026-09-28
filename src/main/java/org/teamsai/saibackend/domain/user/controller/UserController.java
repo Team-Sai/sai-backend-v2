@@ -15,6 +15,7 @@ import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserTokenLookupResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.service.UserService;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
 
 @Tag(
         name = "회원 정보 API",
@@ -25,6 +26,7 @@ import org.teamsai.saibackend.domain.user.service.UserService;
 public class UserController {
 
     private final UserService userService;
+    private final AccountLinkCoordinator accountLinkCoordinator;
 
     @GetMapping("/mypage")
     public String myPage() {
@@ -81,7 +83,7 @@ public class UserController {
             @AuthenticationPrincipal(expression = "userId")
             Long userId
     ) {
-        userService.withdraw(userId);
+        accountLinkCoordinator.withdrawUser(userId);
     }
     @Operation(
             summary = "토큰 기반 회원 정보 조회",

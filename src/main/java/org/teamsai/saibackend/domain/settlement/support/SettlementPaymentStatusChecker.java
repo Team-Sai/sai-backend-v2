@@ -26,13 +26,13 @@ public class SettlementPaymentStatusChecker {
                 .allMatch(obligation -> {
                     BigDecimal paidAmount =
                             data.paidAmountMap().getOrDefault(
-                                    obligation.getPaymentObligationId(),
+                                    obligation.paymentObligationId(),
                                     BigDecimal.ZERO
                             );
 
-                    return isResolved(obligation.getObligationStatus())
+                    return isResolved(obligation.obligationStatus())
                             || paidAmount.compareTo(
-                            obligation.getExpectedAmount()
+                            obligation.expectedAmount()
                     ) >= 0;
                 });
     }

@@ -8,9 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQueryRepository;
@@ -27,12 +27,12 @@ public class BankTransactionService {
 
     private final BankTransactionRepository bankTransactionRepository;
     private final BankTransactionQueryRepository bankTransactionQueryRepository;
-    private final LinkedBankAccountRepository linkedBankAccountRepository;
+    private final LinkedBankAccountService linkedBankAccountService;
     @PersistenceContext
     private EntityManager entityManager;
 
     @Transactional
-    public Long saveIfNotExists(BankTransactionEntity bankTransaction) {
+    public Long saveIfNotExists(BankTransaction bankTransaction) {
         validateNewBankTransaction(bankTransaction);
 
         bankTransactionRepository.insertIfAbsent(
@@ -55,18 +55,18 @@ public class BankTransactionService {
                 );
     }
 
-    public Optional<BankTransactionEntity> findById(Long bankTransactionId) {
+    public Optional<BankTransaction> findById(Long bankTransactionId) {
         return bankTransactionRepository.findById(bankTransactionId);
     }
 
-    public List<BankTransactionEntity> findPendingDeposits() {
+    public List<BankTransaction> findPendingDeposits() {
         return bankTransactionRepository.findPendingDeposits(
                 BankTransactionProcessingStatus.PENDING,
                 BankTransactionType.DEPOSIT
         );
     }
 
-    public List<BankTransactionEntity> findPendingDepositsByLinkedAccountId(
+    public List<BankTransaction> findPendingDepositsByLinkedAccountId(
             Long linkedAccountId
     ) {
         return bankTransactionRepository.findPendingDepositsByLinkedAccountId(
@@ -77,11 +77,11 @@ public class BankTransactionService {
     }
 
     @Transactional
-    public BankTransactionEntity findByIdAndLinkedAccountIdForUpdate(
+    public BankTransaction findByIdAndLinkedAccountIdForUpdate(
             Long bankTransactionId,
             Long linkedAccountId
     ) {
-        BankTransactionEntity bankTransaction = bankTransactionRepository
+        BankTransaction bankTransaction = bankTransactionRepository
                 .findLockedByBankTransactionIdAndLinkedAccountId(
                         bankTransactionId,
                         linkedAccountId
@@ -102,7 +102,7 @@ public class BankTransactionService {
     ) {
         validateStatusTransition(currentStatus, nextStatus);
 
-        BankTransactionEntity bankTransaction =
+        BankTransaction bankTransaction =
                 bankTransactionRepository.findLockedByBankTransactionId(
                                 bankTransactionId
                         )
@@ -125,7 +125,7 @@ public class BankTransactionService {
         bankTransactionRepository.flush();
     }
 
-    public List<BankTransactionEntity> findRetryCandidates(
+    public List<BankTransaction> findRetryCandidates(
             Long linkedAccountId
     ) {
         return bankTransactionQueryRepository.findRetryCandidates(linkedAccountId);
@@ -136,7 +136,7 @@ public class BankTransactionService {
             Long bankTransactionId,
             BankTransactionProcessingStatus currentStatus
     ) {
-        Optional<BankTransactionEntity> transactionOptional =
+        Optional<BankTransaction> transactionOptional =
                 bankTransactionRepository.findLockedByBankTransactionId(
                         bankTransactionId
                 );
@@ -145,7 +145,7 @@ public class BankTransactionService {
             return 0;
         }
 
-        BankTransactionEntity bankTransaction = transactionOptional.get();
+        BankTransaction bankTransaction = transactionOptional.get();
 
         entityManager.refresh(bankTransaction, LockModeType.PESSIMISTIC_WRITE);
 
@@ -165,20 +165,19 @@ public class BankTransactionService {
             Long linkedAccountId,
             Long bankTransactionId
     ) {
-        LinkedBankAccount account = linkedBankAccountRepository.findById(linkedAccountId)
-                .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
+        LinkedBankAccount account = linkedBankAccountService.getLinkedAccount(linkedAccountId);
 
         if (!account.getUserId().equals(userId)) {
             throw AccountErrorCode.ACCOUNT_ACCESS_DENIED.toException();
         }
 
-        BankTransactionEntity transaction =
+        BankTransaction transaction =
                 findByIdAndLinkedAccountIdForUpdate(bankTransactionId, linkedAccountId);
 
         return BankTransactionDetailResponse.from(transaction);
     }
     private void validateNewBankTransaction(
-            BankTransactionEntity bankTransaction
+            BankTransaction bankTransaction
     ) {
         if (bankTransaction == null
                 || hasInvalidRequiredField(bankTransaction)
@@ -191,7 +190,7 @@ public class BankTransactionService {
     }
 
     private boolean hasInvalidRequiredField(
-            BankTransactionEntity bankTransaction
+            BankTransaction bankTransaction
     ) {
         return bankTransaction.getLinkedAccountId() == null
                 || isBlank(bankTransaction.getExternalTransactionId())
@@ -201,14 +200,14 @@ public class BankTransactionService {
     }
 
     private boolean hasInvalidAmount(
-            BankTransactionEntity bankTransaction
+            BankTransaction bankTransaction
     ) {
         return bankTransaction.getAmount() == null
                 || bankTransaction.getAmount().signum() <= 0;
     }
 
     private boolean hasInvalidInitialStatus(
-            BankTransactionEntity bankTransaction
+            BankTransaction bankTransaction
     ) {
         return bankTransaction.getProcessingStatus() != null
                 && bankTransaction.getProcessingStatus()
