@@ -10,7 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
@@ -64,7 +64,7 @@ class PaymentServiceTest {
                 "남은 금액과 같은 금액을 납부하면 납부기록을 생성하고 완납 상태로 변경한다"
         )
         void applyPaymentFullyPaid() {
-            PaymentObligationEntity obligation = createActiveObligation();
+            PaymentObligation obligation = createActiveObligation();
             LocalDateTime overdueSince = LocalDateTime.of(2026, 1, 1, 0, 0);
             obligation.markOverdue(overdueSince);
 
@@ -120,7 +120,7 @@ class PaymentServiceTest {
                 "남은 금액보다 적은 금액을 납부하면 부분납 상태로 변경한다"
         )
         void applyPaymentPartiallyPaid() {
-            PaymentObligationEntity obligation = createActiveObligation();
+            PaymentObligation obligation = createActiveObligation();
             LocalDateTime overdueSince = LocalDateTime.of(2026, 1, 1, 0, 0);
             obligation.markOverdue(overdueSince);
 
@@ -412,7 +412,7 @@ class PaymentServiceTest {
                 "납부기록 생성에 실패하면 예외가 발생한다"
         )
         void applyPaymentFailsWhenPaymentRecordCreateFails() {
-            PaymentObligationEntity obligation = createActiveObligation();
+            PaymentObligation obligation = createActiveObligation();
 
             given(
                     paymentObligationRepository
@@ -472,7 +472,7 @@ class PaymentServiceTest {
                 "납부기록 서비스의 중복 예외를 전달하고 납부 상태를 변경하지 않는다"
         )
         void applyPaymentFailsWhenDuplicateKeyExceptionOccursOnInsert() {
-            PaymentObligationEntity obligation = createActiveObligation();
+            PaymentObligation obligation = createActiveObligation();
 
             given(
                     paymentObligationRepository
@@ -532,7 +532,7 @@ class PaymentServiceTest {
                 "이미 완납된 납부의무에는 추가 납부를 반영하지 않는다"
         )
         void applyPaymentFailsWhenObligationIsAlreadyPaid() {
-            PaymentObligationEntity obligation = createActiveObligation();
+            PaymentObligation obligation = createActiveObligation();
             obligation.changePaymentStatus(PaymentStatus.PAID);
             given(paymentObligationRepository.findByIdForUpdate(PAYMENT_OBLIGATION_ID))
                     .willReturn(Optional.of(obligation));
@@ -562,11 +562,11 @@ class PaymentServiceTest {
                 given(
                         paymentObligationRepository.saveAndFlush(
                                 any(
-                                        PaymentObligationEntity.class
+                                        PaymentObligation.class
                                 )
                         )
                 ).willAnswer(invocation -> {
-                    PaymentObligationEntity entity = invocation.getArgument(0);
+                    PaymentObligation entity = invocation.getArgument(0);
                     ReflectionTestUtils.setField(entity, "paymentObligationId", PAYMENT_OBLIGATION_ID);
                     return entity;
                 });
@@ -580,9 +580,9 @@ class PaymentServiceTest {
 
                 assertThat(createdId).isEqualTo(PAYMENT_OBLIGATION_ID);
 
-                ArgumentCaptor<PaymentObligationEntity> captor =
+                ArgumentCaptor<PaymentObligation> captor =
                         ArgumentCaptor.forClass(
-                                PaymentObligationEntity.class
+                                PaymentObligation.class
                         );
 
                 verify(paymentObligationRepository)
@@ -591,7 +591,7 @@ class PaymentServiceTest {
                         );
 
 
-                PaymentObligationEntity savedObligation =
+                PaymentObligation savedObligation =
                         captor.getValue();
 
 
@@ -650,7 +650,7 @@ class PaymentServiceTest {
                         never()
                 ).saveAndFlush(
                         any(
-                                PaymentObligationEntity.class
+                                PaymentObligation.class
                         )
                 );
             }
@@ -679,7 +679,7 @@ class PaymentServiceTest {
                         never()
                 ).saveAndFlush(
                         any(
-                                PaymentObligationEntity.class
+                                PaymentObligation.class
                         )
                 );
             }
@@ -708,7 +708,7 @@ class PaymentServiceTest {
                         never()
                 ).saveAndFlush(
                         any(
-                                PaymentObligationEntity.class
+                                PaymentObligation.class
                         )
                 );
             }
@@ -721,7 +721,7 @@ class PaymentServiceTest {
             void createObligationPropagatesSaveFailure() {
                 DataIntegrityViolationException failure =
                         new DataIntegrityViolationException("납부 의무 저장 실패");
-                given(paymentObligationRepository.saveAndFlush(any(PaymentObligationEntity.class)))
+                given(paymentObligationRepository.saveAndFlush(any(PaymentObligation.class)))
                         .willThrow(failure);
 
                 assertThatThrownBy(() -> paymentService.createObligation(PARTICIPANT_ID, EXPECTED_AMOUNT))
@@ -731,19 +731,19 @@ class PaymentServiceTest {
     }
 
 
-    private PaymentObligationEntity createActiveObligation() {
+    private PaymentObligation createActiveObligation() {
         return createObligation(
                 ObligationStatus.ACTIVE
         );
     }
 
 
-    private PaymentObligationEntity createObligation(
+    private PaymentObligation createObligation(
             ObligationStatus obligationStatus
     ) {
 
-        PaymentObligationEntity obligation =
-                new PaymentObligationEntity(1L, new BigDecimal("100000"));
+        PaymentObligation obligation =
+                new PaymentObligation(1L, new BigDecimal("100000"));
         // DB에서 조회된 ID와 상태를 테스트용 Entity에 재현한다.
         ReflectionTestUtils.setField(obligation, "paymentObligationId", PAYMENT_OBLIGATION_ID);
         ReflectionTestUtils.setField(obligation, "obligationStatus", obligationStatus);

@@ -9,9 +9,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
-import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
+import org.teamsai.saibackend.domain.contract.dto.ChangedLoanContractDTO;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
@@ -72,8 +72,8 @@ class LoanChangeServiceTest {
     @DisplayName("변경 계약(v2) Entity 저장")
     class InsertChangedContract {
 
-        private ChangeLoanContractResponse changedContract() {
-            return ChangeLoanContractResponse.builder()
+        private ChangedLoanContractDTO changedContract() {
+            return ChangedLoanContractDTO.builder()
                     .previousContractId(PREVIOUS_CONTRACT_ID)
                     .creditorId(CREDITOR_ID)
                     .debtorId(DEBTOR_ID)
@@ -97,7 +97,7 @@ class LoanChangeServiceTest {
         @Test
         @DisplayName("이전 계약/채권자/채무자 참조를 걸어서 새 계약 Entity를 저장한다")
         void insertChangedContractSuccess() {
-            ChangeLoanContractResponse changedContract = changedContract();
+            ChangedLoanContractDTO changedContract = changedContract();
             given(entityManager.getReference(LoanContract.class, PREVIOUS_CONTRACT_ID))
                     .willReturn(contract(ContractStatus.COMPLETED));
             given(entityManager.getReference(User.class, CREDITOR_ID)).willReturn(userRef(CREDITOR_ID));
@@ -119,7 +119,7 @@ class LoanChangeServiceTest {
         @Test
         @DisplayName("이전 계약/채무자 정보가 없으면 해당 참조 없이 저장한다")
         void insertChangedContractWithoutPreviousContractAndDebtor() {
-            ChangeLoanContractResponse changedContract = ChangeLoanContractResponse.builder()
+            ChangedLoanContractDTO changedContract = ChangedLoanContractDTO.builder()
                     .previousContractId(null)
                     .creditorId(CREDITOR_ID)
                     .debtorId(null)

@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
@@ -142,19 +142,19 @@ class SettlementPaymentReaderTest {
                         1002L
                 );
 
-        PaymentRecordEntity r1 =
+        PaymentRecord r1 =
                 paymentRecord(
                         1001L,
                         "3000"
                 );
 
-        PaymentRecordEntity r2 =
+        PaymentRecord r2 =
                 paymentRecord(
                         1001L,
                         "2000"
                 );
 
-        PaymentRecordEntity r3 =
+        PaymentRecord r3 =
                 paymentRecord(
                         1002L,
                         "7000"
@@ -242,12 +242,12 @@ class SettlementPaymentReaderTest {
                 org.teamsai.saibackend.domain.payment.type.ObligationStatus.ACTIVE, null);
     }
 
-    private PaymentRecordEntity paymentRecord(
+    private PaymentRecord paymentRecord(
             Long obligationId,
             String amount
     ) {
-        PaymentRecordEntity paymentRecord =
-                mock(PaymentRecordEntity.class);
+        PaymentRecord paymentRecord =
+                mock(PaymentRecord.class);
 
         when(
                 paymentRecord.getTargetId()

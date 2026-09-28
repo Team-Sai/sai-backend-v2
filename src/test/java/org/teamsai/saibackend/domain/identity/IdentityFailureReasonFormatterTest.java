@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.identity;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.support.IdentityFailureReasonFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,12 +16,12 @@ class IdentityFailureReasonFormatterTest {
     @Test
     @DisplayName("실패 사유와 PG 코드, PG 메시지를 구분자로 연결한다")
     void createFailureReasonCombinesFailureValues() {
-        PortOneIdentityResponse response =
-                new PortOneIdentityResponse(
+        PortOneIdentityDTO response =
+                new PortOneIdentityDTO(
                         "identity-verification-test",
                         "FAILED",
                         null,
-                        new PortOneIdentityResponse.Failure(
+                        new PortOneIdentityDTO.Failure(
                                 "인증 실패",
                                 "PG-001",
                                 "사용자 인증 실패"
@@ -40,12 +40,12 @@ class IdentityFailureReasonFormatterTest {
     @Test
     @DisplayName("비어 있는 실패 정보는 제외하고 조합한다")
     void createFailureReasonIgnoresBlankValues() {
-        PortOneIdentityResponse response =
-                new PortOneIdentityResponse(
+        PortOneIdentityDTO response =
+                new PortOneIdentityDTO(
                         "identity-verification-test",
                         "FAILED",
                         null,
-                        new PortOneIdentityResponse.Failure(
+                        new PortOneIdentityDTO.Failure(
                                 "인증 실패",
                                 null,
                                 " "
@@ -62,8 +62,8 @@ class IdentityFailureReasonFormatterTest {
     @Test
     @DisplayName("실패 정보가 없으면 FAILED를 반환한다")
     void createFailureReasonReturnsDefaultWhenFailureIsNull() {
-        PortOneIdentityResponse response =
-                new PortOneIdentityResponse(
+        PortOneIdentityDTO response =
+                new PortOneIdentityDTO(
                         "identity-verification-test",
                         "FAILED",
                         null,
@@ -80,12 +80,12 @@ class IdentityFailureReasonFormatterTest {
     @Test
     @DisplayName("실패 정보가 모두 비어 있으면 FAILED를 반환한다")
     void createFailureReasonReturnsDefaultWhenFailureValuesAreEmpty() {
-        PortOneIdentityResponse response =
-                new PortOneIdentityResponse(
+        PortOneIdentityDTO response =
+                new PortOneIdentityDTO(
                         "identity-verification-test",
                         "FAILED",
                         null,
-                        new PortOneIdentityResponse.Failure(
+                        new PortOneIdentityDTO.Failure(
                                 null,
                                 "",
                                 " "
@@ -102,12 +102,12 @@ class IdentityFailureReasonFormatterTest {
     @Test
     @DisplayName("실패 정보의 앞뒤 공백을 제거하고 조합한다")
     void createFailureReasonTrimsValues() {
-        PortOneIdentityResponse response =
-                new PortOneIdentityResponse(
+        PortOneIdentityDTO response =
+                new PortOneIdentityDTO(
                         "identity-verification-test",
                         "FAILED",
                         null,
-                        new PortOneIdentityResponse.Failure(
+                        new PortOneIdentityDTO.Failure(
                                 " 인증 실패 ",
                                 " PG-001 ",
                                 " 사용자 인증 실패 "

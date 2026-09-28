@@ -31,7 +31,7 @@ public class AccountLinkFlowService {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final LinkedBankAccountService linkedBankAccountService;
-    private final AccountLinkCoordinator accountLinkCoordinator;
+    private final AccountLinkCoordinateService accountLinkCoordinator;
     private final UserService userService;
     private final IdentityValidator identityValidator;
 

@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.settlement.support;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 
 import java.util.HashSet;
@@ -13,7 +13,7 @@ import java.util.Set;
 public class SettlementParticipantValidator {
 
     public void validateParticipants(
-            List<CreateSettlementParticipantRequest> participants
+            List<SettlementParticipantCreateRequest> participants
     ) {
         if (participants == null || participants.isEmpty()) {
             throw SettlementErrorCode.SETTLEMENT_PARTICIPANT_REQUIRED
@@ -22,7 +22,7 @@ public class SettlementParticipantValidator {
 
         Set<String> userTokens = new HashSet<>();
 
-        for (CreateSettlementParticipantRequest participant : participants) {
+        for (SettlementParticipantCreateRequest participant : participants) {
             if (participant == null
                     || !StringUtils.hasText(participant.getUserToken())) {
                 throw SettlementErrorCode.INVALID_SETTLEMENT_PARTICIPANT

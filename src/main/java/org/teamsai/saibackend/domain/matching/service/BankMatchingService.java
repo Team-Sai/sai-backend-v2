@@ -6,7 +6,7 @@ import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
 import java.util.List;
@@ -36,7 +36,7 @@ public class BankMatchingService {
         validateLinkedAccountId(linkedAccountId);
         validateMatchingScope(targetType, aggregateId);
 
-        List<BankTransactionEntity> bankTransactions =
+        List<BankTransaction> bankTransactions =
                 bankTransactionService.findPendingDepositsByLinkedAccountId(
                         linkedAccountId
                 );
@@ -88,7 +88,7 @@ public class BankMatchingService {
     private List<AutoMatchingTransactionResult> processTransactions(
             Long userId,
             Long linkedAccountId,
-            List<BankTransactionEntity> bankTransactions,
+            List<BankTransaction> bankTransactions,
             MatchingTargetType targetType,
             Long aggregateId,
             boolean isBatch

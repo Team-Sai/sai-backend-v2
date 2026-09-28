@@ -11,7 +11,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.dto.response.LinkableAccountResponse;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 
 import java.util.List;
 
@@ -126,15 +126,15 @@ public class MockBankClient {
         );
     }
 
-    public List<BankTransactionResponse> getTransactions(Long accountId, String userKey, Long afterTransactionId) {
-        List<BankTransactionResponse> response = restClient.get()
+    public List<BankTransactionDTO> getTransactions(Long accountId, String userKey, Long afterTransactionId) {
+        List<BankTransactionDTO> response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/mock-bank/accounts/{accountId}/transactions")
                         .queryParam("afterTransactionId", afterTransactionId)
                         .build(accountId))
                 .header(USER_KEY_HEADER, userKey)
                 .retrieve()
-                .body(new ParameterizedTypeReference<List<BankTransactionResponse>>() {});
+                .body(new ParameterizedTypeReference<List<BankTransactionDTO>>() {});
 
         return requireBody(response);
     }

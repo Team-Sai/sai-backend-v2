@@ -3,8 +3,8 @@ package org.teamsai.saibackend.domain.settlement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateSharedSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.SharedSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
@@ -29,9 +29,9 @@ public class SharedSettlementService {
     private final SettlementRepository settlementRepository;
     private final UserService userService;
     @Transactional
-    public CreateSharedSettlementResponse create(
+    public SharedSettlementCreateResponse create(
             Long ownerId,
-            CreateSharedSettlementRequest request
+            SharedSettlementCreateRequest request
     ) {
        settlementValidator.validateCreateRequest(request);
 
@@ -78,6 +78,6 @@ public class SharedSettlementService {
                 request.getLinkedAccountId()
         );
 
-        return CreateSharedSettlementResponse.from(savedSettlement);
+        return SharedSettlementCreateResponse.from(savedSettlement);
     }
 }

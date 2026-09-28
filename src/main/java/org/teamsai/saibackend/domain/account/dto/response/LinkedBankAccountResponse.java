@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.account.dto.response;
 
 import lombok.Builder;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
-import org.teamsai.saibackend.domain.account.util.BankCodeResolver;
+import org.teamsai.saibackend.domain.account.service.BankCodeResolveService;
 
 import java.math.BigDecimal;
 
@@ -25,7 +25,7 @@ public record LinkedBankAccountResponse(
         return LinkedBankAccountResponse.builder()
                 .linkedAccountId(entity.getLinkedAccountId())
                 .bankCode(entity.getBankCode())
-                .bankName(BankCodeResolver.resolveBankName(entity.getBankCode()))
+                .bankName(BankCodeResolveService.resolveBankName(entity.getBankCode()))
                 .maskedAccountNumber(maskAccountNumber(entity.getAccountNumber()))
                 .accountAlias(entity.getAccountAlias())
                 .accountHolderName(entity.getAccountHolderName())

@@ -13,7 +13,7 @@ import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResul
 import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingTransactionService;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -70,9 +70,9 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("각 거래를 조회 순서대로 처리하고 결과를 집계한다")
     void processesTransactionsInOrderAndAggregatesResults() {
-        BankTransactionEntity first = bankTransaction(101L);
-        BankTransactionEntity second = bankTransaction(102L);
-        BankTransactionEntity third = bankTransaction(103L);
+        BankTransaction first = bankTransaction(101L);
+        BankTransaction second = bankTransaction(102L);
+        BankTransaction third = bankTransaction(103L);
 
         given(bankTransactionService
                 .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
@@ -106,7 +106,7 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("배치 실행 여부를 거래 처리 단계까지 그대로 전달한다")
     void passesBatchFlagDownToTransactionProcessing() {
-        BankTransactionEntity transaction = bankTransaction(101L);
+        BankTransaction transaction = bankTransaction(101L);
 
         given(bankTransactionService
                 .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
@@ -122,7 +122,7 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("단건 처리 실패를 그대로 전파한다")
     void propagatesTransactionProcessingFailure() {
-        BankTransactionEntity transaction = bankTransaction(101L);
+        BankTransaction transaction = bankTransaction(101L);
         DomainException exception = MatchingErrorCode
                 .INVALID_MATCHING_REQUEST
                 .toException();
@@ -152,8 +152,8 @@ class BankMatchingServiceTest {
                 );
     }
 
-    private BankTransactionEntity bankTransaction(Long bankTransactionId) {
-        BankTransactionEntity transaction = new BankTransactionEntity(
+    private BankTransaction bankTransaction(Long bankTransactionId) {
+        BankTransaction transaction = new BankTransaction(
                 LINKED_ACCOUNT_ID,
                 "external-" + bankTransactionId,
                 new BigDecimal("10000.00"),

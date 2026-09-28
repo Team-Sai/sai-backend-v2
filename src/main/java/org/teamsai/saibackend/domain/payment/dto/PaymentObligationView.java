@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.payment.dto;
 
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 
@@ -15,7 +15,7 @@ public record PaymentObligationView(
         ObligationStatus obligationStatus,
         LocalDateTime overdueSince
 ) {
-    public static PaymentObligationView from(PaymentObligationEntity entity) {
+    public static PaymentObligationView from(PaymentObligation entity) {
         return new PaymentObligationView(
                 entity.getPaymentObligationId(),
                 entity.getParticipantId(),

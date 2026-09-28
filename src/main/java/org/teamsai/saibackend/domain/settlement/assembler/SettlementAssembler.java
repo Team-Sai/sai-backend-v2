@@ -1,17 +1,17 @@
 package org.teamsai.saibackend.domain.settlement.assembler;
 
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,11 +28,11 @@ public final class SettlementAssembler {
     private SettlementAssembler() {
     }
 
-    public static CreateRecurringSettlementResponse toCreateRecurringSettlementResponse(
+    public static RecurringSettlementCreateResponse toCreateRecurringSettlementResponse(
             RecurringSettlement recurringSettlement,
             Settlement firstSettlement
     ) {
-        return CreateRecurringSettlementResponse.builder()
+        return RecurringSettlementCreateResponse.builder()
                 .recurringSettlementId(recurringSettlement.getRecurringSettlementId())
                 .firstSettlementId(firstSettlement.getSettlementId())
                 .settlementType(firstSettlement.getSettlementType())
@@ -47,14 +47,14 @@ public final class SettlementAssembler {
     public static SettlementPaymentObligationResponse toObligationResponse(
             PaymentObligationView obligation,
             SettlementParticipant participant,
-            List<PaymentRecordEntity> records
+            List<PaymentRecord> records
     ) {
         BigDecimal paidAmount = records.stream()
-                .map(PaymentRecordEntity::getAmount)
+                .map(PaymentRecord::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         LocalDateTime latestPaymentAt = records.stream()
-                .map(PaymentRecordEntity::getRecordedAt)
+                .map(PaymentRecord::getRecordedAt)
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
 
@@ -133,8 +133,8 @@ public final class SettlementAssembler {
     }
 
     public static SettlementPaymentHistoryResponse toPaymentHistoryResponse(
-            PaymentRecordEntity record,
-            BankTransactionEntity transaction,
+            PaymentRecord record,
+            BankTransaction transaction,
             String payerName
     ) {
         return SettlementPaymentHistoryResponse.builder()

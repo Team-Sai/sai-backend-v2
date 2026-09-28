@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
@@ -24,7 +24,7 @@ import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentData;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentReader;
 import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -105,13 +105,13 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentRecordEntity r1 =
+        PaymentRecord r1 =
                 paymentRecord(
                         1001L,
                         5000
                 );
 
-        PaymentRecordEntity r2 =
+        PaymentRecord r2 =
                 paymentRecord(
                         1002L,
                         20000
@@ -213,19 +213,19 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentRecordEntity r1 =
+        PaymentRecord r1 =
                 paymentRecord(
                         1001L,
                         10000
                 );
 
-        PaymentRecordEntity r2 =
+        PaymentRecord r2 =
                 paymentRecord(
                         1002L,
                         4000
                 );
 
-        PaymentRecordEntity r3 =
+        PaymentRecord r3 =
                 paymentRecord(
                         1003L,
                         4000
@@ -291,7 +291,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentRecordEntity record =
+        PaymentRecord record =
                 paymentRecord(
                         1001L,
                         10000
@@ -354,7 +354,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentRecordEntity record =
+        PaymentRecord record =
                 paymentRecord(
                         1001L,
                         11000
@@ -460,7 +460,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentRecordEntity record =
+        PaymentRecord record =
                 paymentRecord(
                         1001L,
                         5000
@@ -572,7 +572,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentRecordEntity record =
+        PaymentRecord record =
                 historyPaymentRecord(
                         100L,
                         200L,
@@ -647,7 +647,7 @@ class SettlementQueryServicePaymentTest {
                         ObligationStatus.ACTIVE
                 );
 
-        PaymentRecordEntity record =
+        PaymentRecord record =
                 historyPaymentRecord(
                         100L,
                         999L,
@@ -726,7 +726,7 @@ class SettlementQueryServicePaymentTest {
     private void preparePaymentHistoryStatus(
             List<SettlementParticipant> participants,
             List<PaymentObligationView> obligations,
-            List<PaymentRecordEntity> paymentRecords
+            List<PaymentRecord> paymentRecords
     ) {
         Settlement settlement =
                 paymentSettlement();
@@ -758,14 +758,14 @@ class SettlementQueryServicePaymentTest {
     private SettlementPaymentData paymentData(
             List<SettlementParticipant> participants,
             List<PaymentObligationView> obligations,
-            List<PaymentRecordEntity> paymentRecords
+            List<PaymentRecord> paymentRecords
     ) {
         Map<Long, BigDecimal> paidAmountMap =
                 paymentRecords.stream()
                         .collect(Collectors.groupingBy(
-                                PaymentRecordEntity::getTargetId,
+                                PaymentRecord::getTargetId,
                                 Collectors.mapping(
-                                        PaymentRecordEntity::getAmount,
+                                        PaymentRecord::getAmount,
                                         Collectors.reducing(
                                                 BigDecimal.ZERO,
                                                 BigDecimal::add
@@ -856,13 +856,13 @@ class SettlementQueryServicePaymentTest {
                 org.teamsai.saibackend.domain.payment.type.PaymentStatus.UNPAID, obligationStatus, null);
     }
 
-    private PaymentRecordEntity paymentRecord(
+    private PaymentRecord paymentRecord(
             Long obligationId,
             long amount
     ) {
-        PaymentRecordEntity paymentRecord =
+        PaymentRecord paymentRecord =
                 mock(
-                        PaymentRecordEntity.class
+                        PaymentRecord.class
                 );
 
         lenient()
@@ -900,12 +900,12 @@ class SettlementQueryServicePaymentTest {
         return paymentRecord;
     }
 
-    private PaymentRecordEntity historyPaymentRecord(
+    private PaymentRecord historyPaymentRecord(
             Long targetId,
             Long bankTransactionId,
             String amount
     ) {
-        return new PaymentRecordEntity(
+        return new PaymentRecord(
                 bankTransactionId,
                 PaymentTargetType.SETTLEMENT,
                 targetId,
@@ -924,13 +924,13 @@ class SettlementQueryServicePaymentTest {
         );
     }
 
-    private BankTransactionEntity bankTransaction(
+    private BankTransaction bankTransaction(
             Long bankTransactionId,
             String counterpartyName,
             String externalTransactionId
     ) {
-        BankTransactionEntity transaction =
-                new BankTransactionEntity(
+        BankTransaction transaction =
+                new BankTransaction(
                         1L,
                         externalTransactionId,
                         BigDecimal.ONE,

@@ -1,8 +1,8 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
-import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 
 import java.math.BigDecimal;
@@ -16,9 +16,9 @@ public final class ChangeRequestDetailAssembler {
     private ChangeRequestDetailAssembler() {
     }
 
-    public static ChangeRequestDetailResponse toDetail(
+    public static ContractChangeRequestDetailResponse toDetail(
             LoanContractResponse contract,
-            LoanContractChangeRequestEntity changeRequest,
+            LoanContractChangeRequest changeRequest,
             Long newContractId,
             BigDecimal currentMonthlyPayment,
             BigDecimal newMonthlyPayment
@@ -26,7 +26,7 @@ public final class ChangeRequestDetailAssembler {
         LocalDate effectiveMaturityDate = effectiveMaturityDate(contract, changeRequest);
         boolean requestedByCreditor = Objects.equals(changeRequest.getUserId(), contract.getCreditorId());
 
-        return ChangeRequestDetailResponse.builder()
+        return ContractChangeRequestDetailResponse.builder()
                 .changeRequestId(changeRequest.getChangeRequestId())
                 .newContractId(newContractId)
                 .requesterName(requestedByCreditor ? contract.getCreditorName() : contract.getDebtorName())
@@ -50,25 +50,25 @@ public final class ChangeRequestDetailAssembler {
     }
 
     public static BigDecimal effectiveInterestRate(
-            LoanContractResponse contract, LoanContractChangeRequestEntity changeRequest) {
+            LoanContractResponse contract, LoanContractChangeRequest changeRequest) {
         return changeRequest.getNewInterestRate() != null
                 ? changeRequest.getNewInterestRate() : contract.getInterestRate();
     }
 
     public static String effectiveRepaymentType(
-            LoanContractResponse contract, LoanContractChangeRequestEntity changeRequest) {
+            LoanContractResponse contract, LoanContractChangeRequest changeRequest) {
         return changeRequest.getNewRepaymentType() != null
                 ? changeRequest.getNewRepaymentType() : contract.getRepaymentType().name();
     }
 
     public static LocalDate effectiveMaturityDate(
-            LoanContractResponse contract, LoanContractChangeRequestEntity changeRequest) {
+            LoanContractResponse contract, LoanContractChangeRequest changeRequest) {
         return changeRequest.getNewMaturityDate() != null
                 ? changeRequest.getNewMaturityDate() : contract.getMaturityDate();
     }
 
     private static String effectiveTerms(
-            LoanContractResponse contract, LoanContractChangeRequestEntity changeRequest) {
+            LoanContractResponse contract, LoanContractChangeRequest changeRequest) {
         return changeRequest.getNewTerms() != null
                 ? changeRequest.getNewTerms() : contract.getTerms();
     }

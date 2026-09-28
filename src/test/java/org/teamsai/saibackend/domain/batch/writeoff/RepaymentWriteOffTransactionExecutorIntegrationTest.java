@@ -15,13 +15,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.contract.entity.LoanContract;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.LoanContractRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
-import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerator;
+import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerateService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.user.entity.User;
 
@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = {
         RepaymentWriteOffTransactionExecutor.class,
         RepaymentScheduleService.class,
-        RepaymentScheduleGenerator.class,
+        RepaymentScheduleGenerateService.class,
         RepaymentWriteOffTransactionExecutorIntegrationTest.TestSliceConfig.class
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -55,8 +55,8 @@ class RepaymentWriteOffTransactionExecutorIntegrationTest {
     )
     @EntityScan(
             basePackageClasses = {
-                    RepaymentScheduleEntity.class,
-                    PaymentObligationEntity.class,
+                    RepaymentSchedule.class,
+                    PaymentObligation.class,
                     LoanContract.class,
                     LinkedBankAccount.class,
                     User.class

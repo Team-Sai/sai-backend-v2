@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.dto.response.MatchingReviewProcessResponse;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
@@ -384,11 +384,11 @@ class BankTransactionMatchingReviewServiceTest {
         );
     }
 
-    private BankTransactionMatchCandidateEntity candidate(
+    private BankTransactionMatchCandidate candidate(
             MatchingTargetType targetType,
             Long targetId
     ) {
-        return BankTransactionMatchCandidateEntity.builder()
+        return BankTransactionMatchCandidate.builder()
                 .matchCandidateId(MATCH_CANDIDATE_ID)
                 .bankTransactionId(BANK_TRANSACTION_ID)
                 .targetType(targetType)

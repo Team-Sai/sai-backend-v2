@@ -1,8 +1,8 @@
 package org.teamsai.saibackend.domain.settlement;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.RecurringSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.support.RecurringSettlementValidator;
 import org.teamsai.saibackend.domain.settlement.support.SettlementParticipantValidator;
@@ -23,8 +23,8 @@ class RecurringSettlementValidatorTest {
     @Test
     @DisplayName("동일한 참여자를 중복 선택하면 예외가 발생한다")
     void rejectsDuplicateParticipants() {
-        CreateRecurringSettlementRequest request =
-                CreateRecurringSettlementRequest.builder()
+        RecurringSettlementCreateRequest request =
+                RecurringSettlementCreateRequest.builder()
                         .participants(List.of(
                                 participant("SAI_USER_A"),
                                 participant("SAI_USER_A")
@@ -37,8 +37,8 @@ class RecurringSettlementValidatorTest {
                 .isEqualTo(SettlementErrorCode.DUPLICATE_SETTLEMENT_PARTICIPANT);
     }
 
-    private CreateSettlementParticipantRequest participant(String userToken) {
-        return CreateSettlementParticipantRequest.builder()
+    private SettlementParticipantCreateRequest participant(String userToken) {
+        return SettlementParticipantCreateRequest.builder()
                 .userToken(userToken)
                 .build();
     }
