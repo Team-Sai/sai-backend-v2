@@ -20,6 +20,7 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.service.SettlementParticipantService;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantRole;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.settlement.type.SplitType;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
 import org.teamsai.saibackend.domain.user.service.UserService;
@@ -414,6 +415,7 @@ class SettlementParticipantServiceTest {
                 OWNER_ID,
                 SETTLEMENT_ID,
                 participants,
+                SplitType.EQUAL,
                 EXPECTED_AMOUNT
         );
 
@@ -554,6 +556,7 @@ class SettlementParticipantServiceTest {
                 OWNER_ID,
                 SETTLEMENT_ID,
                 participants,
+                SplitType.EQUAL,
                 EXPECTED_AMOUNT
         );
 
@@ -596,6 +599,141 @@ class SettlementParticipantServiceTest {
                 );
     }
 
+    @Test
+    @DisplayName(
+            "CUSTOM 정산은 참여자별 입력 금액으로 납부 의무를 생성한다"
+    )
+    void registerParticipantsUsesCustomAmounts() {
+
+        BigDecimal firstAmount = new BigDecimal("30000");
+        BigDecimal secondAmount = new BigDecimal("50000");
+
+        List<SettlementParticipantCreateRequest> participants =
+                List.of(
+                        participantRequest(FIRST_USER_TOKEN, firstAmount),
+                        participantRequest(SECOND_USER_TOKEN, secondAmount)
+                );
+
+        Settlement settlement =
+                Settlement.builder()
+                        .settlementId(SETTLEMENT_ID)
+                        .build();
+
+        User firstUser =
+                User.builder()
+                        .userId(FIRST_USER_ID)
+                        .userToken(FIRST_USER_TOKEN)
+                        .build();
+
+        User secondUser =
+                User.builder()
+                        .userId(SECOND_USER_ID)
+                        .userToken(SECOND_USER_TOKEN)
+                        .build();
+
+        given(
+                userService.findRequestTarget(
+                        OWNER_ID,
+                        FIRST_USER_TOKEN
+                )
+        ).willReturn(firstUser);
+
+        given(
+                userService.findRequestTarget(
+                        OWNER_ID,
+                        SECOND_USER_TOKEN
+                )
+        ).willReturn(secondUser);
+
+        given(
+                settlementRepository.findById(
+                        SETTLEMENT_ID
+                )
+        ).willReturn(
+                Optional.of(settlement)
+        );
+
+        given(
+                userService.getUser(
+                        FIRST_USER_ID
+                )
+        ).willReturn(firstUser);
+
+        given(
+                userService.getUser(
+                        SECOND_USER_ID
+                )
+        ).willReturn(secondUser);
+
+        given(
+                participantRepository.save(
+                        any(SettlementParticipant.class)
+                )
+        ).willAnswer(invocation -> {
+
+            SettlementParticipant participant =
+                    invocation.getArgument(0);
+
+            Long savedParticipantId =
+                    participant.getUser()
+                            .getUserId()
+                            .equals(FIRST_USER_ID)
+                            ? FIRST_PARTICIPANT_ID
+                            : SECOND_PARTICIPANT_ID;
+
+            return SettlementParticipant.builder()
+                    .participantId(savedParticipantId)
+                    .settlement(participant.getSettlement())
+                    .user(participant.getUser())
+                    .participantRole(participant.getParticipantRole())
+                    .participantStatus(participant.getParticipantStatus())
+                    .joinedAt(participant.getJoinedAt())
+                    .build();
+        });
+
+        participantService.registerParticipants(
+                OWNER_ID,
+                SETTLEMENT_ID,
+                participants,
+                SplitType.CUSTOM,
+                null
+        );
+
+        verify(settlementPaymentService)
+                .createObligation(
+                        FIRST_PARTICIPANT_ID,
+                        firstAmount
+                );
+
+        verify(settlementPaymentService)
+                .createObligation(
+                        SECOND_PARTICIPANT_ID,
+                        secondAmount
+                );
+
+        verify(notificationService)
+                .create(
+                        FIRST_USER_ID,
+                        NotificationType.SETTLEMENT_PARTICIPANT_ADDED,
+                        "새로운 정산에 참여자로 등록되었습니다.",
+                        "정산 금액 "
+                                + firstAmount.toPlainString()
+                                + "원이 등록되었습니다.",
+                        SETTLEMENT_ID
+                );
+
+        verify(notificationService)
+                .create(
+                        SECOND_USER_ID,
+                        NotificationType.SETTLEMENT_PARTICIPANT_ADDED,
+                        "새로운 정산에 참여자로 등록되었습니다.",
+                        "정산 금액 "
+                                + secondAmount.toPlainString()
+                                + "원이 등록되었습니다.",
+                        SETTLEMENT_ID
+                );
+    }
+
 
     private SettlementParticipantCreateRequest participantRequest(
             String userToken
@@ -606,6 +744,24 @@ class SettlementParticipantServiceTest {
         given(
                 request.getUserToken()
         ).willReturn(userToken);
+
+        return request;
+    }
+
+    private SettlementParticipantCreateRequest participantRequest(
+            String userToken,
+            BigDecimal amount
+    ) {
+        SettlementParticipantCreateRequest request =
+                mock(SettlementParticipantCreateRequest.class);
+
+        given(
+                request.getUserToken()
+        ).willReturn(userToken);
+
+        given(
+                request.getAmount()
+        ).willReturn(amount);
 
         return request;
     }
