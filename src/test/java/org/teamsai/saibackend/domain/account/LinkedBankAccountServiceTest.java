@@ -22,6 +22,18 @@ class LinkedBankAccountServiceTest {
  final LinkedAccountWriter writer=mock(LinkedAccountWriter.class);
  final LinkedBankAccountService service=new LinkedBankAccountService(repository,users,bank,mock(EntityManager.class),writer);
  AccountDetailResponse detail(Long id){return new AccountDetailResponse(id,"088","masked","name","holder",BigDecimal.TEN,"ACTIVE",null,null);}
+ @Test void unchangedCursorIsAcceptedWhenAccountExists(){
+  when(repository.advanceCursorAndBalance(1L, 11L, BigDecimal.TEN)).thenReturn(0);
+  when(repository.existsById(1L)).thenReturn(true);
+  service.advanceTransactionCursor(1L, 11L, BigDecimal.TEN);
+  verify(repository).existsById(1L);
+ }
+ @Test void unchangedCursorIsRejectedWhenAccountWasDeleted(){
+  when(repository.advanceCursorAndBalance(1L, 11L, BigDecimal.TEN)).thenReturn(0);
+  when(repository.existsById(1L)).thenReturn(false);
+  assertThatThrownBy(() -> service.advanceTransactionCursor(1L, 11L, BigDecimal.TEN))
+   .extracting("errorCode").isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND);
+ }
  LinkAccountRequest request(Long... ids){return new LinkAccountRequest(java.util.Arrays.stream(ids).map(id->new LinkAccountRequest.SelectedAccount(id,"alias")).toList());}
  @Test void deduplicatesSelectionAndExcludesExistingBeforeBankCalls(){
   when(users.getUserKeyByUserId(1L)).thenReturn("key");

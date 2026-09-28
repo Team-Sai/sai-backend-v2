@@ -3,12 +3,12 @@ package org.teamsai.saibackend.domain.matching.repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 
 import java.util.Optional;
 
 public interface BankTransactionMatchCandidateValidationQueryRepository
-        extends Repository<BankTransactionMatchCandidateEntity, Long> {
+        extends Repository<BankTransactionMatchCandidate, Long> {
 
     @Query(value = """
             SELECT
@@ -69,7 +69,7 @@ public interface BankTransactionMatchCandidateValidationQueryRepository
                 )
             )
             """, nativeQuery = true)
-    Optional<BankTransactionMatchCandidateEntity> findByIdAndBankTransactionId(
+    Optional<BankTransactionMatchCandidate> findByIdAndBankTransactionId(
             @Param("matchCandidateId") Long matchCandidateId,
             @Param("bankTransactionId") Long bankTransactionId
     );

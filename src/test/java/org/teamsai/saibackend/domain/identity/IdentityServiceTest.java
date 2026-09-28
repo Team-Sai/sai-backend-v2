@@ -26,7 +26,7 @@ import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDate;
@@ -63,7 +63,7 @@ class IdentityServiceTest {
     private IdentityRepository identityRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private UserService userService;
 
     @Mock
     private PortOneIdentityService portOneIdentityService;
@@ -83,7 +83,7 @@ class IdentityServiceTest {
     void setUp() {
         identityService = new IdentityService(
                 identityRepository,
-                userRepository,
+                userService,
                 portOneIdentityService,
                 identityValidator,
                 identityStatusService,
@@ -102,7 +102,7 @@ class IdentityServiceTest {
         @DisplayName("REQUESTED 상태의 인증 요청을 저장하고 SDK 정보를 반환한다")
         void prepareSuccess() {
             User user = createUser();
-            given(userRepository.getReferenceById(USER_ID)).willReturn(user);
+            given(userService.getUserReference(USER_ID)).willReturn(user);
 
             IdentityPrepareRequest request =
                     new IdentityPrepareRequest(
@@ -135,7 +135,7 @@ class IdentityServiceTest {
             Identity savedIdentity =
                     captor.getValue();
 
-            verify(userRepository).getReferenceById(USER_ID);
+            verify(userService).getUserReference(USER_ID);
             assertThat(savedIdentity.getUser()).isSameAs(user);
 
             assertThat(savedIdentity.getUser().getUserId())
@@ -265,9 +265,9 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    userRepository.findById(USER_ID)
+                    userService.getUser(USER_ID)
             ).willReturn(
-                    Optional.of(user)
+                    user
             );
 
             given(
@@ -415,7 +415,7 @@ class IdentityServiceTest {
             );
 
             verifyNoInteractions(
-                    userRepository
+                    userService
             );
         }
 
@@ -447,9 +447,9 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    userRepository.findById(USER_ID)
+                    userService.getUser(USER_ID)
             ).willReturn(
-                    Optional.of(user)
+                    user
             );
 
             given(
@@ -581,7 +581,7 @@ class IdentityServiceTest {
             );
 
             verifyNoInteractions(
-                    userRepository
+                    userService
             );
         }
 
@@ -613,9 +613,9 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    userRepository.findById(USER_ID)
+                    userService.getUser(USER_ID)
             ).willReturn(
-                    Optional.of(user)
+                    user
             );
 
             given(
@@ -724,7 +724,7 @@ class IdentityServiceTest {
 
             verifyNoInteractions(
                     portOneIdentityService,
-                    userRepository
+                    userService
             );
         }
 
@@ -790,7 +790,7 @@ class IdentityServiceTest {
 
             verifyNoInteractions(
                     portOneIdentityService,
-                    userRepository
+                    userService
             );
         }
 
@@ -875,7 +875,7 @@ class IdentityServiceTest {
             );
 
             verifyNoInteractions(
-                    userRepository
+                    userService
             );
         }
 
@@ -936,7 +936,7 @@ class IdentityServiceTest {
             );
 
             verifyNoInteractions(
-                    userRepository
+                    userService
             );
         }
 
@@ -973,9 +973,9 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    userRepository.findById(USER_ID)
+                    userService.getUser(USER_ID)
             ).willReturn(
-                    Optional.of(user)
+                    user
             );
 
             doThrow(mismatchException)
@@ -1049,9 +1049,9 @@ class IdentityServiceTest {
             ).willReturn(response);
 
             given(
-                    userRepository.findById(USER_ID)
-            ).willReturn(
-                    Optional.empty()
+                    userService.getUser(USER_ID)
+            ).willThrow(
+                    UserErrorCode.USER_NOT_FOUND.toException()
             );
 
             assertThatThrownBy(

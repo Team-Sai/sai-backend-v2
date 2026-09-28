@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
@@ -81,7 +81,7 @@ class PaymentRecordServiceTest {
         List<Long> targetIds =
                 List.of(1L, 2L);
 
-        List<PaymentRecordEntity> records =
+        List<PaymentRecord> records =
                 List.of(
                         createRecord(1L, 1L, "10000"),
                         createRecord(2L, 2L, "20000")
@@ -96,7 +96,7 @@ class PaymentRecordServiceTest {
         ).willReturn(records);
 
         // when
-        List<PaymentRecordEntity> result =
+        List<PaymentRecord> result =
                 paymentRecordService.findConfirmedRecordsByTargetIds(
                         targetType,
                         targetIds
@@ -119,7 +119,7 @@ class PaymentRecordServiceTest {
     @DisplayName("targetIds가 비어 있으면 Repository를 호출하지 않고 빈 목록을 반환한다")
     void findConfirmedRecordsReturnsEmptyListWhenTargetIdsIsEmpty() {
         // when
-        List<PaymentRecordEntity> result =
+        List<PaymentRecord> result =
                 paymentRecordService.findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
                         List.of()
@@ -141,7 +141,7 @@ class PaymentRecordServiceTest {
     @DisplayName("targetIds가 null이면 Repository를 호출하지 않고 빈 목록을 반환한다")
     void findConfirmedRecordsReturnsEmptyListWhenTargetIdsIsNull() {
         // when
-        List<PaymentRecordEntity> result =
+        List<PaymentRecord> result =
                 paymentRecordService.findConfirmedRecordsByTargetIds(
                         PaymentTargetType.SETTLEMENT,
                         null
@@ -206,9 +206,9 @@ class PaymentRecordServiceTest {
                 )
         ).willReturn(false);
 
-        PaymentRecordEntity savedRecord =
+        PaymentRecord savedRecord =
                 org.mockito.Mockito.mock(
-                        PaymentRecordEntity.class
+                        PaymentRecord.class
                 );
 
         given(
@@ -217,7 +217,7 @@ class PaymentRecordServiceTest {
 
         given(
                 paymentRecordRepository.saveAndFlush(
-                        any(PaymentRecordEntity.class)
+                        any(PaymentRecord.class)
                 )
         ).willReturn(savedRecord);
 
@@ -242,16 +242,16 @@ class PaymentRecordServiceTest {
 
         verify(paymentRecordRepository)
                 .saveAndFlush(
-                        any(PaymentRecordEntity.class)
+                        any(PaymentRecord.class)
                 );
     }
 
-    private PaymentRecordEntity createRecord(
+    private PaymentRecord createRecord(
             Long bankTransactionId,
             Long targetId,
             String amount
     ) {
-        return new PaymentRecordEntity(
+        return new PaymentRecord(
                 bankTransactionId,
                 PaymentTargetType.SETTLEMENT,
                 targetId,

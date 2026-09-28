@@ -6,7 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.assembler.RepaymentScheduleAssembler;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
-import org.teamsai.saibackend.domain.contract.entity.RepaymentScheduleEntity;
+import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
@@ -23,14 +23,14 @@ public class RepaymentScheduleQueryService {
 
     public RepaymentScheduleSummaryResponse getScheduleSummary(Long contractId, Long userId) {
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
-        List<RepaymentScheduleEntity> schedules =
+        List<RepaymentSchedule> schedules =
                 repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId);
 
         LocalDate nextDueDate = repaymentScheduleRepository.findFirstByContractIdAndStatusInOrderBySequenceAsc(
                         contractId,
                         List.of(RepaymentScheduleStatus.PENDING, RepaymentScheduleStatus.OVERDUE)
                 )
-                .map(RepaymentScheduleEntity::getDueDate)
+                .map(RepaymentSchedule::getDueDate)
                 .orElse(null);
 
         return RepaymentScheduleAssembler.toSummary(contract, schedules, nextDueDate);

@@ -20,6 +20,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.teamsai.saibackend.domain.link.service.UserLinkLock;
+import org.teamsai.saibackend.domain.link.service.LinkOperationStore;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -90,7 +93,7 @@ class IdentityTransactionIntegrationTest {
             IdentityRepository.class, UserRepository.class, LoanContractRepository.class
     })
     @Import({IdentityService.class, IdentityStatusService.class, IdentityValidator.class,
-            IdentityFailureReasonFormatter.class, LoanContractService.class})
+            IdentityFailureReasonFormatter.class, LoanContractService.class, UserService.class})
     static class Config {}
 
     @Autowired IdentityService service;
@@ -105,7 +108,9 @@ class IdentityTransactionIntegrationTest {
     @MockitoBean PortOneIdentityService portOne;
     @MockitoBean LoanContractFileService files;
     @MockitoBean ContractAccountService accounts;
-    @MockitoBean UserService userService;
+    @MockitoSpyBean UserService userService;
+    @MockitoBean UserLinkLock userLinkLock;
+    @MockitoBean LinkOperationStore linkOperationStore;
     @MockitoBean NotificationService notifications;
 
     private final List<Long> userIds = new ArrayList<>();
@@ -268,7 +273,7 @@ class IdentityTransactionIntegrationTest {
         String id = verified();
         Long contractId = pendingContract();
         when(files.saveSignatureFile(eq(contractId), any())).thenReturn("test/signature.png");
-        when(userService.getMyInfo(anyLong())).thenReturn(UserResponse.builder().name(NAME).birthDate(BIRTH).build());
+        doReturn(UserResponse.builder().name(NAME).birthDate(BIRTH).build()).when(userService).getMyInfo(anyLong());
         assertThat(sign(contractId, id)).isEqualTo(ContractStatus.COMPLETED);
         assertThat(state(id)).isEqualTo("USED");
         LoanContract contract = contracts.findById(contractId).orElseThrow();
@@ -282,7 +287,7 @@ class IdentityTransactionIntegrationTest {
         String id = verified();
         Long contractId = pendingContract();
         when(files.saveSignatureFile(eq(contractId), any())).thenReturn("test/signature.png");
-        when(userService.getMyInfo(anyLong())).thenThrow(new IllegalStateException("after signature mutation"));
+        doThrow(new IllegalStateException("after signature mutation")).when(userService).getMyInfo(anyLong());
         assertThatThrownBy(() -> sign(contractId, id)).isInstanceOf(IllegalStateException.class);
         assertThat(state(id)).isEqualTo("VERIFIED");
         assertThat(readIdentity(id).getUsedAt()).isNull();

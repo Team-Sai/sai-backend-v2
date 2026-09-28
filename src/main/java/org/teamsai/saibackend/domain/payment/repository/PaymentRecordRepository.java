@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.payment.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 
@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface PaymentRecordRepository
-        extends JpaRepository<PaymentRecordEntity, Long> {
+        extends JpaRepository<PaymentRecord, Long> {
 
     boolean existsByBankTransactionId(
             Long bankTransactionId
@@ -19,7 +19,7 @@ public interface PaymentRecordRepository
 
     @Query("""
             SELECT COALESCE(SUM(paymentRecord.amount), 0)
-            FROM PaymentRecordEntity paymentRecord
+            FROM PaymentRecord paymentRecord
             WHERE paymentRecord.paymentTargetType = :paymentTargetType
               AND paymentRecord.targetId = :targetId
               AND paymentRecord.recordStatus = :recordStatus
@@ -37,13 +37,13 @@ public interface PaymentRecordRepository
 
     @Query("""
             SELECT paymentRecord
-            FROM PaymentRecordEntity paymentRecord
+            FROM PaymentRecord paymentRecord
             WHERE paymentRecord.paymentTargetType = :paymentTargetType
               AND paymentRecord.targetId IN :targetIds
               AND paymentRecord.recordStatus = :recordStatus
             ORDER BY paymentRecord.recordedAt DESC
             """)
-    List<PaymentRecordEntity> findConfirmedByTargetIds(
+    List<PaymentRecord> findConfirmedByTargetIds(
             @Param("paymentTargetType")
             PaymentTargetType paymentTargetType,
 

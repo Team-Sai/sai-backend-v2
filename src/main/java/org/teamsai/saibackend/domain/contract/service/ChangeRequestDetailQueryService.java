@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.contract.assembler.ChangeRequestDetailAssembler;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 
@@ -22,7 +22,7 @@ public class ChangeRequestDetailQueryService {
     public ChangeRequestDetailResponse getDetail(Long contractId, Long changeRequestId, Long userId) {
 
         LoanContractResponse contract = contractChangeQueryService.getContract(contractId, userId);
-        LoanContractChangeRequestEntity changeRequest = contractChangeQueryService.getChangeRequest(changeRequestId);
+        LoanContractChangeRequest changeRequest = contractChangeQueryService.getChangeRequest(changeRequestId);
 
         if (!changeRequest.getContractId().equals(contractId)) {
             throw ChangeRequestDetailErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();

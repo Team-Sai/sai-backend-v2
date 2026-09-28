@@ -8,9 +8,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
@@ -32,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,7 +49,7 @@ class RecurringSettlementCycleServiceTest {
     private SettlementParticipantRepository participantRepository;
 
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
+    private PaymentObligationQueryService paymentObligationQueryService;
 
     @Mock
     private SettlementPaymentService settlementPaymentService;
@@ -127,16 +127,6 @@ class RecurringSettlementCycleServiceTest {
         return User.builder()
                 .userId(userId)
                 .build();
-    }
-
-    private PaymentObligationEntity obligation(
-            Long participantId,
-            BigDecimal expectedAmount
-    ) {
-        return new PaymentObligationEntity(
-                participantId,
-                expectedAmount
-        );
     }
 
     private List<ObligationStatus> allObligationStatuses() {
@@ -453,9 +443,9 @@ class RecurringSettlementCycleServiceTest {
                     );
 
             verify(
-                    paymentObligationRepository,
+                    paymentObligationQueryService,
                     never()
-            ).findLatestByParticipantIdsAndObligationStatuses(any(), any());
+            ).findLatestExpectedAmountsByParticipantIdsAndStatuses(any(), any());
         }
 
 
@@ -576,19 +566,12 @@ class RecurringSettlementCycleServiceTest {
             );
 
             when(
-                    paymentObligationRepository
-                            .findLatestByParticipantIdsAndObligationStatuses(
+                    paymentObligationQueryService
+                            .findLatestExpectedAmountsByParticipantIdsAndStatuses(
                                     List.of(1L),
                                     allObligationStatuses()
                             )
-            ).thenReturn(
-                    List.of(
-                            obligation(
-                                    1L,
-                                    BigDecimal.valueOf(150000)
-                            )
-                    )
-            );
+            ).thenReturn(Map.of(1L, BigDecimal.valueOf(150000)));
 
             CycleGenerationResult outcome =
                     sut.generateOneCycle(
@@ -615,9 +598,9 @@ class RecurringSettlementCycleServiceTest {
             );
 
             verify(
-                    paymentObligationRepository,
+                    paymentObligationQueryService,
                     times(1)
-            ).findLatestByParticipantIdsAndObligationStatuses(any(), any());
+            ).findLatestExpectedAmountsByParticipantIdsAndStatuses(any(), any());
         }
 
 
@@ -659,14 +642,12 @@ class RecurringSettlementCycleServiceTest {
             );
 
             when(
-                    paymentObligationRepository
-                            .findLatestByParticipantIdsAndObligationStatuses(
+                    paymentObligationQueryService
+                            .findLatestExpectedAmountsByParticipantIdsAndStatuses(
                                     List.of(1L),
                                     allObligationStatuses()
                             )
-            ).thenReturn(
-                    List.of()
-            );
+            ).thenReturn(Map.of());
 
             assertThatThrownBy(
                     () -> sut.generateOneCycle(
@@ -810,27 +791,16 @@ class RecurringSettlementCycleServiceTest {
             );
 
             when(
-                    paymentObligationRepository
-                            .findLatestByParticipantIdsAndObligationStatuses(
+                    paymentObligationQueryService
+                            .findLatestExpectedAmountsByParticipantIdsAndStatuses(
                                     List.of(1L, 2L, 3L),
                                     allObligationStatuses()
                             )
-            ).thenReturn(
-                    List.of(
-                            obligation(
-                                    1L,
-                                    BigDecimal.valueOf(100000)
-                            ),
-                            obligation(
-                                    2L,
-                                    BigDecimal.valueOf(120000)
-                            ),
-                            obligation(
-                                    3L,
-                                    BigDecimal.valueOf(80000)
-                            )
-                    )
-            );
+            ).thenReturn(Map.of(
+                    1L, BigDecimal.valueOf(100000),
+                    2L, BigDecimal.valueOf(120000),
+                    3L, BigDecimal.valueOf(80000)
+            ));
 
             CycleGenerationResult outcome =
                     sut.generateOneCycle(
@@ -848,9 +818,9 @@ class RecurringSettlementCycleServiceTest {
             ).save(any(SettlementParticipant.class));
 
             verify(
-                    paymentObligationRepository,
+                    paymentObligationQueryService,
                     times(1)
-            ).findLatestByParticipantIdsAndObligationStatuses(any(), any());
+            ).findLatestExpectedAmountsByParticipantIdsAndStatuses(any(), any());
 
             verify(settlementPaymentService)
                     .createObligation(

@@ -16,7 +16,7 @@ import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.ContractChangeRepository;
 import org.teamsai.saibackend.domain.contract.service.*;
@@ -78,14 +78,14 @@ class ContractChangeServiceTest {
     @InjectMocks
     private ContractChangeService contractChangeService;
 
-    private LoanContractChangeRequestEntity entity(
+    private LoanContractChangeRequest entity(
             Long changeRequestId,
             Long contractId,
             Long userId,
             ChangeRequestStatus status,
             String requesterSignature
     ) {
-        LoanContractChangeRequestEntity entity = new LoanContractChangeRequestEntity(
+        LoanContractChangeRequest entity = new LoanContractChangeRequest(
                 contractId,
                 userId,
                 "이자율 조정 요청",
@@ -141,12 +141,12 @@ class ContractChangeServiceTest {
                     .willReturn(createContract(ContractStatus.COMPLETED));
             given(contractChangeRepository.findByContractId(CONTRACT_ID))
                     .willReturn(List.of());
-            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequestEntity.class)))
+            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequest.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
 
             contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID);
 
-            verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequestEntity.class));
+            verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequest.class));
 
             ArgumentCaptor<ChangeLoanContractResponse> captor =
                     ArgumentCaptor.forClass(ChangeLoanContractResponse.class);
@@ -174,7 +174,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("이미 PENDING 요청이 있으면 예외가 발생한다")
         void requestChangeFailsWhenDuplicatePending() {
-            LoanContractChangeRequestEntity pendingRequest =
+            LoanContractChangeRequest pendingRequest =
                     entity(1L, CONTRACT_ID, USER_ID, ChangeRequestStatus.PENDING, null);
 
             given(loanContractService.findContract(CONTRACT_ID, USER_ID))
@@ -225,12 +225,12 @@ class ContractChangeServiceTest {
                     .willReturn(contract);
             given(contractChangeRepository.findByContractId(CONTRACT_ID))
                     .willReturn(List.of());
-            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequestEntity.class)))
+            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequest.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
 
             contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID);
 
-            verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequestEntity.class));
+            verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequest.class));
             verify(loanChangeService).insertChangedContract(any());
         }
     }
@@ -255,7 +255,7 @@ class ContractChangeServiceTest {
                     .build();
         }
 
-        private LoanContractChangeRequestEntity pendingChangeRequest() {
+        private LoanContractChangeRequest pendingChangeRequest() {
             // 요청자 = 채권자(USER_ID)
             return entity(CHANGE_REQUEST_ID, V1_CONTRACT_ID, USER_ID, ChangeRequestStatus.PENDING, null);
         }
@@ -264,7 +264,7 @@ class ContractChangeServiceTest {
         @DisplayName("승인 처리 시 변경 요청을 APPROVED로 바꾸고 v1 계약을 SUPERSEDED로 전환한다")
         void approveChangeSupersedesV1Contract() {
             MultipartFile signature = mock(MultipartFile.class);
-            LoanContractChangeRequestEntity changeRequest = pendingChangeRequest();
+            LoanContractChangeRequest changeRequest = pendingChangeRequest();
 
             given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
                     .willReturn(pendingV2Contract());
@@ -296,10 +296,10 @@ class ContractChangeServiceTest {
             MultipartFile signature = mock(MultipartFile.class);
 
             // 1단계(후보 찾기) 시점에는 아직 PENDING으로 보였음
-            LoanContractChangeRequestEntity snapshotWhenFound = pendingChangeRequest();
+            LoanContractChangeRequest snapshotWhenFound = pendingChangeRequest();
 
             // 2단계(잠금 걸고 재조회) 시점에는, 그 사이 다른 요청이 먼저 승인 처리를 끝내버린 상태
-            LoanContractChangeRequestEntity latestState =
+            LoanContractChangeRequest latestState =
                     entity(CHANGE_REQUEST_ID, V1_CONTRACT_ID, USER_ID, ChangeRequestStatus.APPROVED, null);
 
             given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
@@ -326,7 +326,7 @@ class ContractChangeServiceTest {
         @DisplayName("요청자 본인이 자기 요청을 승인하려 하면 예외가 발생한다")
         void approveChangeFailsWhenRequesterApprovesOwnRequest() {
             MultipartFile signature = mock(MultipartFile.class);
-            LoanContractChangeRequestEntity changeRequest = pendingChangeRequest(); // 요청자 = USER_ID(채권자)
+            LoanContractChangeRequest changeRequest = pendingChangeRequest(); // 요청자 = USER_ID(채권자)
 
             given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
                     .willReturn(pendingV2Contract());
@@ -357,7 +357,7 @@ class ContractChangeServiceTest {
         private static final Long V2_CONTRACT_ID = 2L;
         private static final String RETURN_REASON = "이율이 너무 높습니다";
 
-        private LoanContractChangeRequestEntity pendingChangeRequest(Long requesterId) {
+        private LoanContractChangeRequest pendingChangeRequest(Long requesterId) {
             return entity(CHANGE_REQUEST_ID, CONTRACT_ID, requesterId, ChangeRequestStatus.PENDING, null);
         }
 
@@ -383,13 +383,13 @@ class ContractChangeServiceTest {
 
             contractChangeService.rejectChange(CONTRACT_ID, CHANGE_REQUEST_ID, RETURN_REASON, USER_ID);
 
-            verify(contractChangeRepository).save(any(LoanContractChangeRequestEntity.class));
+            verify(contractChangeRepository).save(any(LoanContractChangeRequest.class));
         }
 
         @Test
         @DisplayName("채권자가 요청한 건을 채무자가 반려하면 사유를 저장하고 v2를 REJECTED로 바꾼다")
         void rejectChangeSuccess() {
-            LoanContractChangeRequestEntity changeRequest = pendingChangeRequest(USER_ID);
+            LoanContractChangeRequest changeRequest = pendingChangeRequest(USER_ID);
 
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
                     .willReturn(createContract(ContractStatus.COMPLETED));
@@ -431,7 +431,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("changeRequestId가 다른 계약 소속이면 예외가 발생한다")
         void rejectChangeFailsWhenContractMismatch() {
-            LoanContractChangeRequestEntity otherContractRequest =
+            LoanContractChangeRequest otherContractRequest =
                     entity(CHANGE_REQUEST_ID, 999L, USER_ID, ChangeRequestStatus.PENDING, null);
 
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
@@ -451,7 +451,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("이미 처리된(APPROVED) 요청을 반려하려 하면 예외가 발생한다")
         void rejectChangeFailsWhenAlreadyProcessed() {
-            LoanContractChangeRequestEntity approvedRequest =
+            LoanContractChangeRequest approvedRequest =
                     entity(CHANGE_REQUEST_ID, CONTRACT_ID, USER_ID, ChangeRequestStatus.APPROVED, null);
 
             given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
@@ -496,11 +496,11 @@ class ContractChangeServiceTest {
         private static final String SAVED_PATH = "uploads/signatures/change_200_signature.png";
         private static final String IDENTITY_VERIFICATION_ID = "identity-verification-id";
 
-        private LoanContractChangeRequestEntity pendingChangeRequest(Long ownerUserId, Long contractId) {
+        private LoanContractChangeRequest pendingChangeRequest(Long ownerUserId, Long contractId) {
             return entity(CHANGE_REQUEST_ID, contractId, ownerUserId, ChangeRequestStatus.PENDING, null);
         }
 
-        private LoanContractChangeRequestEntity changeRequestWithStatus(ChangeRequestStatus status, Long ownerUserId, Long contractId) {
+        private LoanContractChangeRequest changeRequestWithStatus(ChangeRequestStatus status, Long ownerUserId, Long contractId) {
             return entity(CHANGE_REQUEST_ID, contractId, ownerUserId, status, null);
         }
 
@@ -508,7 +508,7 @@ class ContractChangeServiceTest {
         @DisplayName("채무자가 요청자면 서명 후 채권자에게 알림이 간다")
         void submitRequesterSignatureSuccessWhenRequesterIsDebtor() {
             MultipartFile signature = mock(MultipartFile.class);
-            LoanContractChangeRequestEntity changeRequest = pendingChangeRequest(DEBTOR_ID, CONTRACT_ID);
+            LoanContractChangeRequest changeRequest = pendingChangeRequest(DEBTOR_ID, CONTRACT_ID);
 
             given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
@@ -534,7 +534,7 @@ class ContractChangeServiceTest {
         @DisplayName("채권자가 요청자면 서명 후 채무자에게 알림이 간다")
         void submitRequesterSignatureSuccessWhenRequesterIsCreditor() {
             MultipartFile signature = mock(MultipartFile.class);
-            LoanContractChangeRequestEntity changeRequest = pendingChangeRequest(USER_ID, CONTRACT_ID);
+            LoanContractChangeRequest changeRequest = pendingChangeRequest(USER_ID, CONTRACT_ID);
 
             given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
                     .willReturn(Optional.of(changeRequest));
@@ -642,7 +642,7 @@ class ContractChangeServiceTest {
         private static final Long CHANGE_REQUEST_ID = 300L;
         private static final Long V2_CONTRACT_ID = 301L;
 
-        private LoanContractChangeRequestEntity changeRequestEntity(
+        private LoanContractChangeRequest changeRequestEntity(
                 ChangeRequestStatus status, Long ownerUserId, Long contractId, String requesterSignature
         ) {
             return entity(CHANGE_REQUEST_ID, contractId, ownerUserId, status, requesterSignature);
@@ -659,7 +659,7 @@ class ContractChangeServiceTest {
         @Test
         @DisplayName("서명 전 요청은 요청자 본인이 취소할 수 있고, 임시 계약도 함께 무효화한다")
         void cancelChangeRequestSuccess() {
-            LoanContractChangeRequestEntity changeRequest =
+            LoanContractChangeRequest changeRequest =
                     changeRequestEntity(ChangeRequestStatus.PENDING, USER_ID, CONTRACT_ID, null);
 
             given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))

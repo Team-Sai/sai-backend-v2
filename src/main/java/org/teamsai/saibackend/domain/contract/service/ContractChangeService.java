@@ -13,7 +13,7 @@ import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractChangeResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.event.ContractCompletedEvent;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
@@ -46,7 +46,7 @@ public class ContractChangeService {
     private final ApplicationEventPublisher eventPublisher;
     private final ContractChangeRepository contractChangeRepository;
 
-    private LoanContractChangeRequestEntity getChangeRequestForUpdate(Long changeRequestId) {
+    private LoanContractChangeRequest getChangeRequestForUpdate(Long changeRequestId) {
         return contractChangeRepository.findByIdForUpdate(changeRequestId)
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
     }
@@ -56,7 +56,7 @@ public class ContractChangeService {
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
     }
 
-    private Long resolveApproverId(LoanContractResponse contract, LoanContractChangeRequestEntity changeRequest) {
+    private Long resolveApproverId(LoanContractResponse contract, LoanContractChangeRequest changeRequest) {
         boolean requesterIsCreditor = Objects.equals(contract.getCreditorId(), changeRequest.getUserId());
         return requesterIsCreditor ? contract.getDebtorId() : contract.getCreditorId();
     }
@@ -108,7 +108,7 @@ public class ContractChangeService {
             throw ContractChangeErrorCode.INVALID_MATURITY_DATE.toException();
         }
 
-        List<LoanContractChangeRequestEntity> existingRequests = contractChangeRepository.findByContractId(contractId);
+        List<LoanContractChangeRequest> existingRequests = contractChangeRepository.findByContractId(contractId);
 
         boolean hasPendingRequest = existingRequests.stream()
                 .anyMatch(changeRequest -> ChangeRequestStatus.PENDING.equals(changeRequest.getStatus()));
@@ -126,7 +126,7 @@ public class ContractChangeService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        LoanContractChangeRequestEntity changeEntity = new LoanContractChangeRequestEntity(
+        LoanContractChangeRequest changeEntity = new LoanContractChangeRequest(
                 contractId,
                 userId,
                 request.getChangeReason(),
@@ -140,7 +140,7 @@ public class ContractChangeService {
                 now
         );
 
-        LoanContractChangeRequestEntity savedEntity;
+        LoanContractChangeRequest savedEntity;
         try {
             savedEntity = contractChangeRepository.saveAndFlush(changeEntity);
         } catch (DataIntegrityViolationException e) {
@@ -161,7 +161,7 @@ public class ContractChangeService {
     public LoanContractChangeResponse rejectChange(Long contractId, Long changeRequestId, String returnReason, Long userId) {
 
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
-        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
+        LoanContractChangeRequest changeRequest = getChangeRequestForUpdate(changeRequestId);
 
         if (!Objects.equals(resolveApproverId(contract, changeRequest), userId)) {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
@@ -208,7 +208,7 @@ public class ContractChangeService {
 
         Long v1ContractId = contract.getPreviousContractId();
 
-        LoanContractChangeRequestEntity changeRequest = contractChangeRepository.findByContractId(v1ContractId).stream()
+        LoanContractChangeRequest changeRequest = contractChangeRepository.findByContractId(v1ContractId).stream()
                 .filter(r -> r.getStatus() == ChangeRequestStatus.PENDING)
                 .findFirst()
                 .orElseThrow(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND::toException);
@@ -252,7 +252,7 @@ public class ContractChangeService {
 
     @Transactional
     public void cancelChangeRequest(Long contractId, Long changeRequestId, Long userId) {
-        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
+        LoanContractChangeRequest changeRequest = getChangeRequestForUpdate(changeRequestId);
 
         changeRequest.validateBelongsTo(contractId);
         changeRequest.validateRequestedBy(userId);
@@ -282,7 +282,7 @@ public class ContractChangeService {
 
         identityService.consume(userId, identityVerificationId, IdentityPurpose.LOAN_CONTRACT);
 
-        LoanContractChangeRequestEntity changeRequest = getChangeRequestForUpdate(changeRequestId);
+        LoanContractChangeRequest changeRequest = getChangeRequestForUpdate(changeRequestId);
 
         changeRequest.validateBelongsTo(contractId);
         changeRequest.validateRequestedBy(userId);
