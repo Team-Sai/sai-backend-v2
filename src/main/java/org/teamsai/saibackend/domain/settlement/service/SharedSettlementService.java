@@ -36,11 +36,14 @@ public class SharedSettlementService {
        settlementValidator.validateCreateRequest(request);
 
        User owner = userService.getUser(ownerId);
-        BigDecimal perPersonAmount =
-                settlementAmountCalculator.calculateEqualAmount(
-                        request.getTotalAmount(),
-                        request.getParticipants().size()
-                );
+       BigDecimal perPersonAmount = null;
+       if(request.getSplitType() == SplitType.EQUAL){
+           perPersonAmount =
+                   settlementAmountCalculator.calculateEqualAmount(
+                           request.getTotalAmount(),
+                           request.getParticipants().size()
+                   );
+       }
 
         LocalDateTime createdAt = LocalDateTime.now();
 
@@ -55,7 +58,7 @@ public class SharedSettlementService {
                                 request.getSettlementCategory()
                         )
                         .title(request.getTitle())
-                        .splitType(SplitType.EQUAL)
+                        .splitType(request.getSplitType())
 
                         .totalAmount(request.getTotalAmount())
                         .dueDate(request.getDueDate())
@@ -69,6 +72,7 @@ public class SharedSettlementService {
                 ownerId,
                 savedSettlement.getSettlementId(),
                 request.getParticipants(),
+                request.getSplitType(),
                 perPersonAmount
         );
 

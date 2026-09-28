@@ -31,8 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SharedSettlementService 단위 테스트")
@@ -206,6 +205,7 @@ class SharedSettlementServiceTest {
                         OWNER_ID,
                         SETTLEMENT_ID,
                         request.getParticipants(),
+                        SplitType.EQUAL,
                         expectedAmount
                 );
 
@@ -236,7 +236,111 @@ class SharedSettlementServiceTest {
                         "제주도 여행비 정산"
                 );
     }
+    @Test
+    @DisplayName(
+            "CUSTOM 공동정산 생성 시 균등 금액을 계산하지 않고 CUSTOM 방식으로 참여자를 등록한다"
+    )
+    void createCustomSharedSettlementSuccess() {
 
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .settlementCategory("여행")
+                        .title("제주도 여행비 정산")
+                        .dueDate(LocalDate.now().plusDays(7))
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("20000"))
+                        .linkedAccountId(LINKED_ACCOUNT_ID)
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("30000")
+                                        ),
+                                        participant(
+                                                "SAI_USER_B",
+                                                new BigDecimal("50000")
+                                        )
+                                )
+                        )
+                        .build();
+
+        User owner =
+                User.builder()
+                        .userId(OWNER_ID)
+                        .build();
+
+        given(
+                userService.getUser(OWNER_ID)
+        ).willReturn(owner);
+
+        given(
+                settlementRepository.save(
+                        any(Settlement.class)
+                )
+        ).willAnswer(invocation -> {
+
+            Settlement settlement =
+                    invocation.getArgument(0);
+
+            return Settlement.builder()
+                    .settlementId(SETTLEMENT_ID)
+                    .owner(settlement.getOwner())
+                    .settlementType(settlement.getSettlementType())
+                    .settlementStatus(settlement.getSettlementStatus())
+                    .settlementCategory(settlement.getSettlementCategory())
+                    .title(settlement.getTitle())
+                    .splitType(settlement.getSplitType())
+                    .totalAmount(settlement.getTotalAmount())
+                    .dueDate(settlement.getDueDate())
+                    .createdAt(settlement.getCreatedAt())
+                    .build();
+        });
+
+        sharedSettlementService.create(
+                OWNER_ID,
+                request
+        );
+
+        ArgumentCaptor<Settlement> settlementCaptor =
+                ArgumentCaptor.forClass(
+                        Settlement.class
+                );
+
+        verify(settlementRepository)
+                .save(
+                        settlementCaptor.capture()
+                );
+
+        assertThat(
+                settlementCaptor.getValue()
+                        .getSplitType()
+        ).isEqualTo(SplitType.CUSTOM);
+
+        verify(
+                settlementAmountCalculator,
+                never()
+        ).calculateEqualAmount(
+                any(),
+                any(Integer.class)
+        );
+
+        verify(participantService)
+                .registerParticipants(
+                        OWNER_ID,
+                        SETTLEMENT_ID,
+                        request.getParticipants(),
+                        SplitType.CUSTOM,
+                        null
+                );
+
+        verify(settlementAccountService)
+                .selectAccount(
+                        OWNER_ID,
+                        SETTLEMENT_ID,
+                        LINKED_ACCOUNT_ID
+                );
+    }
 
     @Test
     @DisplayName(
@@ -408,6 +512,7 @@ class SharedSettlementServiceTest {
                         OWNER_ID,
                         SETTLEMENT_ID,
                         request.getParticipants(),
+                        SplitType.EQUAL,
                         expectedAmount
                 );
 
@@ -428,25 +533,13 @@ class SharedSettlementServiceTest {
 
         return SharedSettlementCreateRequest
                 .builder()
-                .settlementCategory(
-                        "여행"
-                )
-                .title(
-                        "제주도 여행비 정산"
-                )
-                .dueDate(
-                        LocalDate.now()
-                                .plusDays(7)
-                )
-                .totalAmount(
-                        totalAmount
-                )
-                .linkedAccountId(
-                        LINKED_ACCOUNT_ID
-                )
-                .participants(
-                        participants
-                )
+                .settlementCategory("여행")
+                .title("제주도 여행비 정산")
+                .dueDate(LocalDate.now().plusDays(7))
+                .splitType(SplitType.EQUAL)
+                .totalAmount(totalAmount)
+                .linkedAccountId(LINKED_ACCOUNT_ID)
+                .participants(participants)
                 .build();
     }
 
@@ -460,6 +553,17 @@ class SharedSettlementServiceTest {
                 .userToken(
                         userToken
                 )
+                .build();
+    }
+
+    private SettlementParticipantCreateRequest participant(
+            String userToken,
+            BigDecimal amount
+    ) {
+
+        return SettlementParticipantCreateRequest.builder()
+                .userToken(userToken)
+                .amount(amount)
                 .build();
     }
 }

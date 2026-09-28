@@ -8,11 +8,13 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeQueryService;
+import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.MonthlyPaymentEstimateService;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractChangeRequestDetailResponse;
@@ -40,6 +42,9 @@ class ChangeRequestDetailQueryServiceTest {
 
     @Mock
     private ContractChangeQueryService contractChangeQueryService;
+
+    @Mock
+    private LoanContractService loanContractService;
 
     @Spy
     private MonthlyPaymentEstimateService monthlyPaymentEstimateService = new MonthlyPaymentEstimateService();
@@ -105,7 +110,7 @@ class ChangeRequestDetailQueryServiceTest {
     @Test
     @DisplayName("계약서와 변경요청을 조합해 상세 정보(월 상환액 포함)를 반환한다")
     void getDetailSuccess() {
-        given(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID))
+        given(loanContractService.findContract(CONTRACT_ID, USER_ID))
                 .willReturn(createContract());
         given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID))
                 .willReturn(createChangeRequest());
@@ -153,7 +158,7 @@ class ChangeRequestDetailQueryServiceTest {
                 "자금 사정으로 인한 연장 요청", null, LocalDateTime.now()
         );
 
-        given(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).willReturn(contract);
+        given(loanContractService.findContract(CONTRACT_ID, USER_ID)).willReturn(contract);
         given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeRequest);
 
         ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
@@ -164,7 +169,7 @@ class ChangeRequestDetailQueryServiceTest {
     @Test
     @DisplayName("계약 당사자가 아니면 예외가 발생한다")
     void getDetailFailsWhenNotContractParty() {
-        given(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID))
+        given(loanContractService.findContract(CONTRACT_ID, USER_ID))
                 .willThrow(LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException());
 
         assertThatThrownBy(() -> changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID))
@@ -181,7 +186,7 @@ class ChangeRequestDetailQueryServiceTest {
                 null, null, null, null, null, null, LocalDateTime.now()
         );
 
-        when(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
+        when(loanContractService.findContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
         when(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
         ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
@@ -198,12 +203,33 @@ class ChangeRequestDetailQueryServiceTest {
                 null, null, null, null, null, "이율이 너무 높습니다", LocalDateTime.now()
         );
 
-        when(contractChangeQueryService.getContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
+        when(loanContractService.findContract(CONTRACT_ID, USER_ID)).thenReturn(contract);
         when(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).thenReturn(changeRequest);
 
         ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getReturnReason()).isEqualTo("이율이 너무 높습니다");
+    }
+
+
+    @Test
+    @DisplayName("변경이 승인되어 대체(SUPERSEDED)된 계약의 처리된 요청도 상세 조회할 수 있다")
+    void getDetail_succeedsWhenContractIsSuperseded() {
+        LoanContractResponse contract = createContract();
+        ReflectionTestUtils.setField(contract, "status", ContractStatus.SUPERSEDED);
+
+        LoanContractChangeRequest changeRequest = buildChangeRequest(
+                CHANGE_REQUEST_ID, CONTRACT_ID, USER_ID, ChangeRequestStatus.APPROVED,
+                LocalDate.of(2026, 12, 31), null, null, null,
+                "자금 사정으로 인한 연장 요청", null, LocalDateTime.now()
+        );
+
+        given(loanContractService.findContract(CONTRACT_ID, USER_ID)).willReturn(contract);
+        given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeRequest);
+
+        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+
+        assertThat(result.getStatus()).isEqualTo("승인됨");
     }
 
 }

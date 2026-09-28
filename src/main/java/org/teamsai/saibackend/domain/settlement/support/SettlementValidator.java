@@ -3,11 +3,15 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
 import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.settlement.type.SplitType;
+
+import java.math.BigDecimal;
 
 @Component
 @RequiredArgsConstructor
@@ -36,6 +40,10 @@ public class SettlementValidator {
         }
 
         participantValidator.validateParticipants(request.getParticipants());
+
+        if (request.getSplitType() == SplitType.CUSTOM){
+            validateCustomAmounts(request);
+        }
     }
 
     public void validateAccessibleUser(
@@ -57,6 +65,28 @@ public class SettlementValidator {
             throw SettlementErrorCode
                     .SETTLEMENT_ACCESS_DENIED
                     .toException();
+        }
+    }
+
+    private void validateCustomAmounts(SharedSettlementCreateRequest request){
+        BigDecimal ownerAmount = request.getOwnerAmount();
+
+        if (ownerAmount == null || ownerAmount.compareTo(BigDecimal.ZERO) < 0){
+            throw SettlementErrorCode.INVALID_OWNER_AMOUNT.toException();
+        }
+
+        BigDecimal total = ownerAmount;
+        for (SettlementParticipantCreateRequest participant : request.getParticipants()){
+            BigDecimal amount = participant.getAmount();
+
+            if(amount == null || amount.compareTo(BigDecimal.ZERO) <= 0){
+                throw SettlementErrorCode.INVALID_PARTICIPANT_AMOUNT.toException();
+            }
+
+            total = total.add(amount);
+        }
+        if (total.compareTo(request.getTotalAmount())!=0){
+            throw SettlementErrorCode.SETTLEMENT_AMOUNT_MISMATCH.toException();
         }
     }
 }
