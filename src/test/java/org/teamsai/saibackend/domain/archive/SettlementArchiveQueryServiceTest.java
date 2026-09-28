@@ -172,6 +172,7 @@ class SettlementArchiveQueryServiceTest {
             assertThat(preview.settlementStatus()).isEqualTo("CLOSED");
             assertThat(preview.splitType()).isEqualTo("EQUAL");
             assertThat(preview.settlementDisplayId()).isEqualTo("ST-1");
+            assertThat(preview.ownerAmount()).isEqualByComparingTo(new BigDecimal("90000"));
             assertThat(preview.paymentStatus().getObligations()).hasSize(1);
             assertThat(preview.paymentStatus().getObligations().get(0).getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
             assertThat(preview.paymentHistory()).hasSize(1);

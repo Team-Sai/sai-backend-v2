@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.settlement.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -38,8 +39,12 @@ public class SharedSettlementCreateRequest {
 
     @NotNull(message = "정산 분배 방식을 선택해 주세요.")
     private SplitType splitType;
-
+    @Digits(
+            integer = 13,
+            fraction = 0,
+            message = "생성자 부담 금액은 원 단위로 입력해 주세요."
+    )
     private BigDecimal ownerAmount;
-
+    @Valid
     private List<SettlementParticipantCreateRequest> participants;
 }
