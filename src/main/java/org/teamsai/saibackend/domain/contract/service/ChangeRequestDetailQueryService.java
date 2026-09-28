@@ -17,11 +17,12 @@ import java.util.Objects;
 public class ChangeRequestDetailQueryService {
 
     private final ContractChangeQueryService contractChangeQueryService;
+    private final LoanContractService loanContractService;
     private final MonthlyPaymentEstimator monthlyPaymentEstimator;
 
     public ChangeRequestDetailResponse getDetail(Long contractId, Long changeRequestId, Long userId) {
 
-        LoanContractResponse contract = contractChangeQueryService.getContract(contractId, userId);
+        LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         LoanContractChangeRequestEntity changeRequest = contractChangeQueryService.getChangeRequest(changeRequestId);
 
         if (!changeRequest.getContractId().equals(contractId)) {
