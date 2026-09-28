@@ -13,6 +13,15 @@ import java.text.Normalizer;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * 본인인증 서비스의 입력 및 업무 규칙을 검증한다.
+ *
+ * 요청값과 외부 응답의 null은 각 검증 메서드에서 도메인 예외로 처리한다.
+ * DB 조회 대상의 존재 여부는 서비스에서 확인한다.
+ * 소유권 검증에는 조회가 완료된 Identity와 검증된 사용자 ID를 전달한다.
+ *
+ * 저장, 상태 변경, 외부 API 호출은 수행하지 않는다.
+ */
 @Component
 public class IdentityValidator {
 
@@ -33,16 +42,8 @@ public class IdentityValidator {
         }
     }
 
-    public void validatePrepareRequest(
-            IdentityPrepareRequest request
-    ) {
-        if (request == null
-                || request.purpose() == null) {
-
-            throw IdentityErrorCode
-                    .INVALID_IDENTITY_PURPOSE
-                    .toException();
-        }
+    public void validatePrepareRequest(IdentityPrepareRequest request) {
+        validatePurpose(request == null ? null : request.purpose());
     }
 
     public void validateIdentityVerificationId(
@@ -57,6 +58,12 @@ public class IdentityValidator {
         }
     }
 
+    /**
+     * 전제조건:
+     * - identity는 서비스에서 조회에 성공한 엔티티다.
+     * - identity의 소유자와 소유자 ID는 존재한다.
+     * - userId는 validateUserId()를 통과한 값이다.
+     */
     public void validateOwner(
             Identity identity,
             Long userId
@@ -161,13 +168,9 @@ public class IdentityValidator {
         );
     }
 
-    public void validatePurpose(
-            IdentityPurpose purpose
-    ) {
+    public void validatePurpose(IdentityPurpose purpose) {
         if (purpose == null) {
-            throw IdentityErrorCode
-                    .INVALID_IDENTITY_PURPOSE
-                    .toException();
+            throw IdentityErrorCode.INVALID_IDENTITY_PURPOSE.toException();
         }
     }
 }

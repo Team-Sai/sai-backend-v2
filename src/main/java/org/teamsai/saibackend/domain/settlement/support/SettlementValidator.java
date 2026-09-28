@@ -3,16 +3,11 @@ package org.teamsai.saibackend.domain.settlement.support;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
 import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
 import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
-
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -20,6 +15,7 @@ public class SettlementValidator {
 
     private final LinkedBankAccountService linkedBankAccountService;
     private final SettlementParticipantRepository settlementParticipantRepository;
+    private final SettlementParticipantValidator participantValidator;
 
     public void validateOwner(Settlement settlement, Long userId){
         if(!settlement.getOwner().getUserId().equals(userId)){
@@ -36,43 +32,10 @@ public class SettlementValidator {
 
     public void validateCreateRequest(SharedSettlementCreateRequest request) {
         if (request == null) {
-            throw SettlementErrorCode
-                    .INVALID_SETTLEMENT_REQUEST
-                    .toException();
+            throw SettlementErrorCode.INVALID_SETTLEMENT_REQUEST.toException();
         }
 
-        List<SettlementParticipantCreateRequest> participants =
-                request.getParticipants();
-
-        if (participants == null || participants.isEmpty()) {
-            throw SettlementErrorCode
-                    .SETTLEMENT_PARTICIPANT_REQUIRED
-                    .toException();
-        }
-
-        validateDuplicateParticipants(participants);
-    }
-
-    private void validateDuplicateParticipants(List<SettlementParticipantCreateRequest> participants) {
-        Set<String> userTokens = new HashSet<>();
-
-        for (SettlementParticipantCreateRequest participant
-                : participants) {
-
-            if (participant == null
-                    || participant.getUserToken() == null
-                    || participant.getUserToken().isBlank()) {
-                throw SettlementErrorCode
-                        .INVALID_SETTLEMENT_PARTICIPANT
-                        .toException();
-            }
-
-            if (!userTokens.add(participant.getUserToken())) {
-                throw SettlementErrorCode
-                        .DUPLICATE_SETTLEMENT_PARTICIPANT
-                        .toException();
-            }
-        }
+        participantValidator.validateParticipants(request.getParticipants());
     }
 
     public void validateAccessibleUser(

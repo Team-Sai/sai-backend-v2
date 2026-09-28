@@ -5,17 +5,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
+import org.teamsai.saibackend.domain.payment.entity.PaymentObligation;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
 import org.teamsai.saibackend.domain.payment.type.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SettlementPaymentService {
+
+    private static final int WRITE_OFF_CHUNK_SIZE = 500;
 
     private final PaymentObligationRepository paymentObligationRepository;
     private final PaymentRecordService paymentRecordService;
@@ -61,7 +65,7 @@ public class SettlementPaymentService {
         validateBankTransactionId(bankTransactionId);
         validateNotDuplicatePaymentRecord(bankTransactionId);
 
-        PaymentObligationEntity obligation =
+        PaymentObligation obligation =
                 paymentObligationRepository.findByIdForUpdate(paymentObligationId)
                         .orElseThrow(PaymentErrorCode.PAYMENT_OBLIGATION_NOT_FOUND::toException);
 
@@ -109,13 +113,13 @@ public class SettlementPaymentService {
     public Long createObligation(Long participantId, BigDecimal expectedAmount){
         validateObligationCreation(participantId,expectedAmount);
 
-        PaymentObligationEntity paymentObligation =
-               new PaymentObligationEntity(
+        PaymentObligation paymentObligation =
+               new PaymentObligation(
                        participantId,
                        expectedAmount
                );
 
-        PaymentObligationEntity savedPaymentObligation =
+        PaymentObligation savedPaymentObligation =
                 paymentObligationRepository.saveAndFlush(
                         paymentObligation
                 );
@@ -123,7 +127,38 @@ public class SettlementPaymentService {
         return savedPaymentObligation.getPaymentObligationId();
     }
 
-    private void validateActiveObligation(PaymentObligationEntity obligation) {
+    @Transactional
+    public int markOverdueByParticipantIds(List<Long> participantIds, LocalDateTime overdueSince) {
+        if (participantIds == null || participantIds.isEmpty()) {
+            return 0;
+        }
+
+        var obligations = paymentObligationRepository.findUnpaidByParticipantIds(
+                participantIds,
+                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID),
+                ObligationStatus.ACTIVE
+        );
+        obligations.forEach(obligation -> obligation.markOverdue(overdueSince));
+        return obligations.size();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int writeOffOneBatch(List<Long> obligationIds) {
+        int total = 0;
+        for (int i = 0; i < obligationIds.size(); i += WRITE_OFF_CHUNK_SIZE) {
+            List<Long> chunk = obligationIds.subList(i, Math.min(i + WRITE_OFF_CHUNK_SIZE, obligationIds.size()));
+            List<PaymentObligation> obligations = paymentObligationRepository.findWriteOffTargetsForUpdate(
+                    chunk,
+                    ObligationStatus.ACTIVE,
+                    List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)
+            );
+            obligations.forEach(PaymentObligation::writeOff);
+            total += obligations.size();
+        }
+        return total;
+    }
+
+    private void validateActiveObligation(PaymentObligation obligation) {
         if (obligation.getObligationStatus() != ObligationStatus.ACTIVE
                 || obligation.getPaymentStatus() == PaymentStatus.PAID) {
             throw PaymentErrorCode.PAYMENT_OBLIGATION_NOT_ACTIVE.toException();

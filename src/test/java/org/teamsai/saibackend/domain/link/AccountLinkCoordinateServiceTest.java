@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.link.service.*;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 import org.teamsai.saibackend.global.client.BankKeyRecoveryException;
 
@@ -30,9 +30,9 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.teamsai.saibackend.domain.link.service.LinkOperationStoreService.Status.*;
 
-class AccountLinkCoordinateServiceTest {
+class AccountLinkCoordinatorTest {
     private final UserLinkLockService lock = mock(UserLinkLockService.class);
-    private final UserRepository users = mock(UserRepository.class);
+    private final UserService users = mock(UserService.class);
     private final LinkedBankAccountService accounts = mock(LinkedBankAccountService.class);
     private final AccountLinkService persistence = mock(AccountLinkService.class);
     private final MockBankClient bank = mock(MockBankClient.class);
@@ -44,7 +44,7 @@ class AccountLinkCoordinateServiceTest {
     @BeforeEach
     void setUp() {
         when(lock.execute(anyLong(), any())).thenAnswer(i -> ((Supplier<?>) i.getArgument(1)).get());
-        when(users.findById(1L)).thenReturn(Optional.of(User.builder().name("name").userToken("token").build()));
+        when(users.getUser(1L)).thenReturn(User.builder().name("name").userToken("token").build());
         when(operations.find(anyString())).thenAnswer(i -> Optional.ofNullable(receipt));
         doAnswer(i -> { receipt = i.getArgument(0); return null; }).when(operations).begin(any());
         doAnswer(i -> {
@@ -64,6 +64,35 @@ class AccountLinkCoordinateServiceTest {
     }
 
     @Test
+    void withdrawalDeletesUserUnderLinkLockWhenNoOperationIsUnresolved() {
+        coordinator.withdrawUser(1L);
+
+        verify(lock).execute(eq(1L), any());
+        verify(operations).hasUnresolved(1L);
+        verify(users).deleteUser(1L);
+    }
+
+    @Test
+    void unresolvedOperationPreventsWithdrawal() {
+        when(operations.hasUnresolved(1L)).thenReturn(true);
+
+        assertError(() -> coordinator.withdrawUser(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
+
+        verify(users, never()).deleteUser(anyLong());
+    }
+
+    @Test
+    void lockFailurePreventsWithdrawal() {
+        doThrow(AccountErrorCode.LINK_IN_PROGRESS.toException())
+                .when(lock).execute(eq(1L), any());
+
+        assertError(() -> coordinator.withdrawUser(1L), AccountErrorCode.LINK_IN_PROGRESS);
+
+        verifyNoInteractions(operations);
+        verify(users, never()).deleteUser(anyLong());
+    }
+
+    @Test
     void keyRequestNetworkFailureIsTranslatedBeforeConfirm() {
         when(bank.requestUserKey(eq("name"), eq("token"), anyString())).thenThrow(new RestClientException("offline"));
         assertError(() -> coordinator.issueOrGetUserKey(1L), AccountErrorCode.BANK_SERVER_UNAVAILABLE);
@@ -77,7 +106,7 @@ class AccountLinkCoordinateServiceTest {
 
     @Test
     void existingKeyIsReadFreshWithoutCallingBank() {
-        when(users.findUserKeyByUserId(1L)).thenReturn("current");
+        when(users.getUserKeyByUserId(1L)).thenReturn("current");
         assertThat(coordinator.issueOrGetUserKey(1L).userKey()).isEqualTo("current");
         verifyNoInteractions(bank);
     }
@@ -105,7 +134,7 @@ class AccountLinkCoordinateServiceTest {
 
     @Test
     void failedRecoveryRemainsPendingInsteadOfBeingReportedAsCompensated() {
-        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(users.getUserKeyByUserId(1L)).thenReturn("old");
         when(accounts.prepareAccountsByIds(1L,"new",List.of(1L))).thenThrow(new IllegalStateException("failed"));
         doThrow(new RestClientException("offline")).when(bank).recoverUserKey(eq("token"), eq("new"), eq("old"), anyString());
         assertError(() -> coordinator.completeCallback(1L,"state","new",List.of(1L)), AccountErrorCode.BANK_SERVER_UNAVAILABLE);
@@ -164,7 +193,7 @@ class AccountLinkCoordinateServiceTest {
             names = {"CONFIRM_UNKNOWN", "COMPENSATION_PENDING"})
     void recoveryDoesNotNeedOriginalStateAndRestoresPreviousKey(LinkOperationStoreService.Status status) {
         receipt = new LinkOperationStoreService.Operation("old-state", 1L, "hash", "old", "new", status);
-        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(users.getUserKeyByUserId(1L)).thenReturn("old");
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
 
         coordinator.recoverUnresolved(1L);
@@ -181,7 +210,7 @@ class AccountLinkCoordinateServiceTest {
                 "id", 1L, "hash", "old", "new", PROCESSING
         );
 
-        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(users.getUserKeyByUserId(1L)).thenReturn("old");
         when(operations.findUnresolved(1L))
                 .thenReturn(List.of(receipt));
         when(operations.hasUnresolved(1L))
@@ -236,7 +265,7 @@ class AccountLinkCoordinateServiceTest {
                 "id", 1L, "hash", "old", "new", PROCESSING
         );
 
-        when(users.findUserKeyByUserId(1L)).thenReturn("old");
+        when(users.getUserKeyByUserId(1L)).thenReturn("old");
         when(operations.findUnresolved(1L))
                 .thenReturn(List.of(receipt));
         when(operations.hasUnresolved(1L))
@@ -314,7 +343,7 @@ class AccountLinkCoordinateServiceTest {
     void recoveryNeverOverwritesAnUnexpectedLocalKey() {
         receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", "old", "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
-        when(users.findUserKeyByUserId(1L)).thenReturn("different");
+        when(users.getUserKeyByUserId(1L)).thenReturn("different");
         assertError(() -> coordinator.recoverUnresolved(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
         verifyNoInteractions(bank);
         verify(operations, never()).mark(anyString(), any());
@@ -406,7 +435,7 @@ class AccountLinkCoordinateServiceTest {
         assertThat(receipt.newKey()).isNull();
         when(operations.findUnresolved(1L)).thenAnswer(i -> List.of(receipt));
         doAnswer(i -> {
-            when(users.findUserKeyByUserId(1L)).thenReturn("new");
+            when(users.getUserKeyByUserId(1L)).thenReturn("new");
             receipt = new LinkOperationStoreService.Operation(receipt.id(), 1L, receipt.requestHash(), null, "new", COMPLETED);
             return null;
         }).when(persistence).completeLink(eq(1L), eq("new"), isNull(), anyList(), eq(originalId));
@@ -511,7 +540,7 @@ class AccountLinkCoordinateServiceTest {
     }
 
     private void assertIssuanceStopsRetrying(RestClientResponseException failure,
-                                           LinkOperationStoreService.Status expectedStatus, AccountErrorCode expectedCode) {
+                                             LinkOperationStoreService.Status expectedStatus, AccountErrorCode expectedCode) {
         when(operations.findUnresolved(1L)).thenAnswer(i -> receipt == null ? List.of() : List.of(receipt));
         when(bank.requestUserKey(eq("name"), eq("token"), anyString())).thenThrow(failure);
 

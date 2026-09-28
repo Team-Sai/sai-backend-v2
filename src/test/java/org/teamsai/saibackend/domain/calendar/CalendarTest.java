@@ -2,19 +2,20 @@ package org.teamsai.saibackend.domain.calendar;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.BeforeEach;
+import org.teamsai.saibackend.domain.integration.reader.IntegrationDashboardDataReader;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
-import org.teamsai.saibackend.domain.contract.dto.request.ContractStatus;
-import org.teamsai.saibackend.domain.contract.dto.request.RepaymentMethod;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
 import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
-import org.teamsai.saibackend.domain.integration.service.IntegrationDashboardQueryService;
+import org.teamsai.saibackend.domain.integration.service.IntegrationCalendarQueryService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
@@ -40,8 +41,14 @@ public class CalendarTest {
     @Mock
     private SettlementQueryService settlementQueryService;
 
-    @InjectMocks
-    private IntegrationDashboardQueryService integrationDashboardQueryService;
+    private IntegrationCalendarQueryService integrationCalendarQueryService;
+
+    @BeforeEach
+    void setUp() {
+        integrationCalendarQueryService = new IntegrationCalendarQueryService(
+                new IntegrationDashboardDataReader(contractDashboardQueryService, settlementQueryService)
+        );
+    }
 
     private static final Long USER_ID = 1L;
     private static final LocalDate TARGET_DATE = LocalDate.of(2026, 8, 14);
@@ -56,7 +63,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -77,7 +84,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSubLabel()).isEqualTo("납부예정");
@@ -95,7 +102,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
@@ -110,7 +117,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
@@ -133,7 +140,7 @@ public class CalendarTest {
                 ));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -156,7 +163,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(101L, BigDecimal.ZERO, BigDecimal.ZERO));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
@@ -180,7 +187,7 @@ public class CalendarTest {
                 ));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting(DashboardCalendarItemResponse::getType)
@@ -206,7 +213,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(103L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).extracting(DashboardCalendarItemResponse::getTitle)
                 .containsExactly("가나다 정산", "차용증 대출");
@@ -222,7 +229,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).isEmpty();
     }
@@ -350,7 +357,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -370,7 +377,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getCounterpartyName()).isEqualTo("김채권");
@@ -388,7 +395,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getInstallmentInfo()).isEqualTo("2/3회차");
@@ -405,7 +412,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, pastDate);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, pastDate);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).isOverdue()).isTrue();
@@ -422,7 +429,7 @@ public class CalendarTest {
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, futureDate);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, futureDate);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).isOverdue()).isFalse();
@@ -441,7 +448,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(105L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -466,7 +473,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(106L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);
@@ -489,7 +496,7 @@ public class CalendarTest {
                 .thenReturn(paymentStatus(107L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
-                integrationDashboardQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
+                integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
 
         assertThat(result).hasSize(1);
         DashboardCalendarItemResponse item = result.get(0);

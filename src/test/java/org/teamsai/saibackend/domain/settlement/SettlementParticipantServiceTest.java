@@ -22,7 +22,6 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantRole;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
@@ -64,8 +63,6 @@ class SettlementParticipantServiceTest {
     @Mock
     private SettlementRepository settlementRepository;
 
-    @Mock
-    private UserRepository userRepository;
 
     @Mock
     private UserService userService;
@@ -105,12 +102,10 @@ class SettlementParticipantServiceTest {
         );
 
         given(
-                userRepository.findById(
+                userService.getUser(
                         USER_ID
                 )
-        ).willReturn(
-                Optional.of(user)
-        );
+        ).willReturn(user);
 
         given(
                 participantRepository.save(
@@ -204,12 +199,10 @@ class SettlementParticipantServiceTest {
         );
 
         given(
-                userRepository.findById(
+                userService.getUser(
                         USER_ID
                 )
-        ).willReturn(
-                Optional.of(user)
-        );
+        ).willReturn(user);
 
         given(
                 participantRepository.save(
@@ -270,8 +263,8 @@ class SettlementParticipantServiceTest {
         );
 
 
-        verify(userRepository, never())
-                .findById(any());
+        verify(userService, never())
+                .getUser(any());
 
         verify(participantRepository, never())
                 .save(any());
@@ -298,12 +291,10 @@ class SettlementParticipantServiceTest {
         );
 
         given(
-                userRepository.findById(
+                userService.getUser(
                         USER_ID
                 )
-        ).willReturn(
-                Optional.empty()
-        );
+        ).willThrow(org.teamsai.saibackend.domain.user.exception.UserErrorCode.USER_NOT_FOUND.toException());
 
 
         assertThatThrownBy(
@@ -381,20 +372,16 @@ class SettlementParticipantServiceTest {
         );
 
         given(
-                userRepository.findById(
+                userService.getUser(
                         FIRST_USER_ID
                 )
-        ).willReturn(
-                Optional.of(firstUser)
-        );
+        ).willReturn(firstUser);
 
         given(
-                userRepository.findById(
+                userService.getUser(
                         SECOND_USER_ID
                 )
-        ).willReturn(
-                Optional.of(secondUser)
-        );
+        ).willReturn(secondUser);
 
         given(
                 participantRepository.save(
@@ -448,13 +435,13 @@ class SettlementParticipantServiceTest {
                         SETTLEMENT_ID
                 );
 
-        verify(userRepository)
-                .findById(
+        verify(userService)
+                .getUser(
                         FIRST_USER_ID
                 );
 
-        verify(userRepository)
-                .findById(
+        verify(userService)
+                .getUser(
                         SECOND_USER_ID
                 );
 
@@ -538,12 +525,10 @@ class SettlementParticipantServiceTest {
         );
 
         given(
-                userRepository.findById(
+                userService.getUser(
                         FIRST_USER_ID
                 )
-        ).willReturn(
-                Optional.of(participantUser)
-        );
+        ).willReturn(participantUser);
 
         given(
                 participantRepository.save(

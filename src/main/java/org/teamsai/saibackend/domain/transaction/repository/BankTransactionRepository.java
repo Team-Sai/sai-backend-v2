@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BankTransactionRepository
-        extends JpaRepository<BankTransactionEntity, Long> {
+        extends JpaRepository<BankTransaction, Long> {
 
     @Modifying(flushAutomatically = true)
     @Query(value = """
@@ -62,19 +62,19 @@ public interface BankTransactionRepository
             @Param("externalTransactionId") String externalTransactionId
     );
 
-    Optional<BankTransactionEntity>
+    Optional<BankTransaction>
     findByBankTransactionIdAndLinkedAccountId(
             Long bankTransactionId,
             Long linkedAccountId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<BankTransactionEntity> findLockedByBankTransactionId(
+    Optional<BankTransaction> findLockedByBankTransactionId(
             Long bankTransactionId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<BankTransactionEntity>
+    Optional<BankTransaction>
     findLockedByBankTransactionIdAndLinkedAccountId(
             Long bankTransactionId,
             Long linkedAccountId
@@ -82,13 +82,13 @@ public interface BankTransactionRepository
 
     @Query("""
             SELECT bt
-            FROM BankTransactionEntity bt
+            FROM BankTransaction bt
             WHERE bt.processingStatus = :processingStatus
               AND bt.transactionType = :transactionType
             ORDER BY bt.transactionAt ASC,
                      bt.bankTransactionId ASC
             """)
-    List<BankTransactionEntity> findPendingDeposits(
+    List<BankTransaction> findPendingDeposits(
             @Param("processingStatus")
             BankTransactionProcessingStatus processingStatus,
 
@@ -98,14 +98,14 @@ public interface BankTransactionRepository
 
     @Query("""
             SELECT bt
-            FROM BankTransactionEntity bt
+            FROM BankTransaction bt
             WHERE bt.linkedAccountId = :linkedAccountId
               AND bt.processingStatus = :processingStatus
               AND bt.transactionType = :transactionType
             ORDER BY bt.transactionAt ASC,
                      bt.bankTransactionId ASC
             """)
-    List<BankTransactionEntity> findPendingDepositsByLinkedAccountId(
+    List<BankTransaction> findPendingDepositsByLinkedAccountId(
             @Param("linkedAccountId")
             Long linkedAccountId,
 

@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequestEntity;
+import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 
 import java.math.BigDecimal;
@@ -32,7 +32,7 @@ public class ContractChangeRequestResponse {
     private String returnReason;
     private String requesterSignature;
 
-    public static ContractChangeRequestResponse from(LoanContractChangeRequestEntity entity) {
+    public static ContractChangeRequestResponse from(LoanContractChangeRequest entity) {
         return ContractChangeRequestResponse.builder()
                 .changeRequestId(entity.getChangeRequestId())
                 .contractId(entity.getContractId())

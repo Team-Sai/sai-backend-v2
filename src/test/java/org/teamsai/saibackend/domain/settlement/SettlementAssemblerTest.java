@@ -3,8 +3,8 @@ package org.teamsai.saibackend.domain.settlement;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.payment.entity.PaymentObligationEntity;
-import org.teamsai.saibackend.domain.payment.entity.PaymentRecordEntity;
+import org.teamsai.saibackend.domain.payment.dto.PaymentObligationView;
+import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
@@ -17,7 +17,7 @@ import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.math.BigDecimal;
@@ -45,19 +45,15 @@ class SettlementAssemblerTest {
         return participant;
     }
 
-    private PaymentObligationEntity obligation(
+    private PaymentObligationView obligation(
             Long obligationId, Long participantId, long expectedAmount, ObligationStatus status
     ) {
-        PaymentObligationEntity obligation = mock(PaymentObligationEntity.class);
-        lenient().when(obligation.getPaymentObligationId()).thenReturn(obligationId);
-        lenient().when(obligation.getParticipantId()).thenReturn(participantId);
-        lenient().when(obligation.getExpectedAmount()).thenReturn(BigDecimal.valueOf(expectedAmount));
-        lenient().when(obligation.getObligationStatus()).thenReturn(status);
-        return obligation;
+        return new PaymentObligationView(obligationId, participantId, BigDecimal.valueOf(expectedAmount),
+                PaymentStatus.UNPAID, status, null);
     }
 
-    private PaymentRecordEntity paymentRecord(long amount, LocalDateTime recordedAt) {
-        PaymentRecordEntity record = mock(PaymentRecordEntity.class);
+    private PaymentRecord paymentRecord(long amount, LocalDateTime recordedAt) {
+        PaymentRecord record = mock(PaymentRecord.class);
         lenient().when(record.getAmount()).thenReturn(BigDecimal.valueOf(amount));
         lenient().when(record.getRecordedAt()).thenReturn(recordedAt);
         return record;
@@ -102,7 +98,7 @@ class SettlementAssemblerTest {
         @DisplayName("결제 기록이 없으면 UNPAID, 전액 남은 금액으로 계산한다")
         void unpaidWhenNoRecords() {
             SettlementParticipant participant = participant(1L, OWNER_ID, "채빈");
-            PaymentObligationEntity obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
+            PaymentObligationView obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
 
             SettlementPaymentObligationResponse result =
                     SettlementAssembler.toObligationResponse(obligation, participant, List.of());
@@ -118,10 +114,10 @@ class SettlementAssemblerTest {
         @DisplayName("일부만 결제되면 PARTIALLY_PAID, 가장 최근 결제일을 사용한다")
         void partiallyPaidUsesLatestPaymentDate() {
             SettlementParticipant participant = participant(1L, OWNER_ID, "채빈");
-            PaymentObligationEntity obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
+            PaymentObligationView obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
             LocalDateTime earlier = LocalDateTime.of(2026, 8, 1, 0, 0);
             LocalDateTime later = LocalDateTime.of(2026, 8, 10, 0, 0);
-            List<PaymentRecordEntity> records = List.of(
+            List<PaymentRecord> records = List.of(
                     paymentRecord(3_000, earlier),
                     paymentRecord(2_000, later)
             );
@@ -139,8 +135,8 @@ class SettlementAssemblerTest {
         @DisplayName("전액 결제되면 PAID, 남은 금액은 0이다")
         void fullyPaid() {
             SettlementParticipant participant = participant(1L, OWNER_ID, "채빈");
-            PaymentObligationEntity obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
-            List<PaymentRecordEntity> records = List.of(paymentRecord(10_000, LocalDateTime.now()));
+            PaymentObligationView obligation = obligation(11L, 1L, 10_000, ObligationStatus.ACTIVE);
+            List<PaymentRecord> records = List.of(paymentRecord(10_000, LocalDateTime.now()));
 
             SettlementPaymentObligationResponse result =
                     SettlementAssembler.toObligationResponse(obligation, participant, records);
@@ -276,14 +272,14 @@ class SettlementAssemblerTest {
         @Test
         @DisplayName("은행 거래가 있으면 거래처명/외부거래ID를 채운다")
         void includesTransactionDetailsWhenPresent() {
-            PaymentRecordEntity record = mock(PaymentRecordEntity.class);
+            PaymentRecord record = mock(PaymentRecord.class);
             lenient().when(record.getPaymentRecordId()).thenReturn(1L);
             lenient().when(record.getRecordedAt()).thenReturn(LocalDateTime.of(2026, 8, 1, 0, 0));
             lenient().when(record.getAmount()).thenReturn(BigDecimal.valueOf(5_000));
             lenient().when(record.getSourceType()).thenReturn(SourceType.AUTO_MATCH);
             lenient().when(record.getBankTransactionId()).thenReturn(99L);
 
-            BankTransactionEntity transaction = mock(BankTransactionEntity.class);
+            BankTransaction transaction = mock(BankTransaction.class);
             lenient().when(transaction.getCounterpartyName()).thenReturn("홍길동");
             lenient().when(transaction.getExternalTransactionId()).thenReturn("EXT-123");
 
@@ -298,7 +294,7 @@ class SettlementAssemblerTest {
         @Test
         @DisplayName("은행 거래가 없으면 거래처명/외부거래ID는 null이다")
         void handlesMissingTransaction() {
-            PaymentRecordEntity record = mock(PaymentRecordEntity.class);
+            PaymentRecord record = mock(PaymentRecord.class);
             lenient().when(record.getPaymentRecordId()).thenReturn(1L);
             lenient().when(record.getAmount()).thenReturn(BigDecimal.valueOf(5_000));
 

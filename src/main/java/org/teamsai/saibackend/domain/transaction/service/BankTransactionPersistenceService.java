@@ -5,9 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
@@ -21,7 +21,7 @@ import java.util.List;
 public class BankTransactionPersistenceService {
 
     private final BankTransactionRepository bankTransactionRepository;
-    private final LinkedBankAccountRepository linkedBankAccountRepository;
+    private final LinkedBankAccountService linkedBankAccountService;
 
     @Transactional
     public int saveAndAdvanceCursor(
@@ -34,7 +34,7 @@ public class BankTransactionPersistenceService {
         LocalDateTime now = LocalDateTime.now();
 
         for (BankTransactionDTO tx : transactions) {
-            BankTransactionEntity transaction = toEntity(linkedAccountId, tx, now);
+            BankTransaction transaction = toEntity(linkedAccountId, tx, now);
 
             // 동기화에서는 저장 ID가 필요 없으므로 중복을 허용하는 저장만 실행한다.
             bankTransactionRepository.insertIfAbsent(
@@ -54,24 +54,19 @@ public class BankTransactionPersistenceService {
                 .max(Comparator.comparing(
                         BankTransactionDTO::transactionId))
                 .orElseThrow();
-        int updated = linkedBankAccountRepository.advanceCursorAndBalance(
+        linkedBankAccountService.advanceTransactionCursor(
                 linkedAccountId,
                 latestTransaction.transactionId(),
                 latestTransaction.balanceAfter()
         );
-
-        if (updated == 0
-                && !linkedBankAccountRepository.existsById(linkedAccountId)) {
-            throw AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException();
-        }
         
         // 신규 INSERT 수가 아니라 중복 거래를 포함한 이번 요청의 처리 대상 수다.
         return transactions.size();
     }
 
-    private BankTransactionEntity toEntity(Long linkedAccountId, BankTransactionDTO tx, LocalDateTime syncedAt) {
+    private BankTransaction toEntity(Long linkedAccountId, BankTransactionDTO tx, LocalDateTime syncedAt) {
         // Entity 생성자가 초기 상태 PENDING과 재시도 횟수 0을 설정한다.
-        return new BankTransactionEntity(
+        return new BankTransaction(
                 linkedAccountId,
                 tx.transactionKey(),
                 tx.amount(),

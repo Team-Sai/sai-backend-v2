@@ -8,7 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidateEntity;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
@@ -24,9 +24,9 @@ import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.payment.repository.PaymentObligationRepository;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
@@ -53,7 +53,7 @@ class BankMatchingTransactionServiceTest {
     @Mock
     private MatchingCandidateRepository matchingCandidateRepository;
     @Mock
-    private PaymentObligationRepository paymentObligationRepository;
+    private PaymentObligationQueryService paymentObligationQueryService;
     @Mock
     private AutoMatchingService autoMatchingService;
     @Mock
@@ -70,7 +70,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("상대방명이 없으면 후보를 조회하지 않고 미매칭으로 변경한다")
     void classifiesBlankCounterpartyNameAsUnmatched() {
-        BankTransactionEntity transaction = bankTransaction(101L, " ");
+        BankTransaction transaction = bankTransaction(101L, " ");
         givenLockedTransaction(transaction);
         AutoMatchingTransactionResult result =
                 transactionService.process(
@@ -93,7 +93,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("특정 대상 동기화 범위 밖 거래는 PENDING으로 유지한다")
     void keepsOutOfScopeTransactionPending() {
-        BankTransactionEntity transaction = bankTransaction(101L, "Hong Gil Dong");
+        BankTransaction transaction = bankTransaction(101L, "Hong Gil Dong");
         givenLockedTransaction(transaction);
         given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountIdAndTarget(
                 LINKED_ACCOUNT_ID,
@@ -116,11 +116,11 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("후보를 조회해 자동매칭하고 은행 거래 상태를 변경한다")
     void executesAutoMatchingAndUpdatesStatus() {
-        BankTransactionEntity staleTransaction = bankTransaction(
+        BankTransaction staleTransaction = bankTransaction(
                 101L,
                 "Old Name"
         );
-        BankTransactionEntity lockedTransaction = bankTransaction(
+        BankTransaction lockedTransaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -168,7 +168,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("중복 납부 결과는 이미 반영된 거래로 저장한다")
     void updatesDuplicatedResultAsApplied() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -192,7 +192,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("자동매칭 결과가 거래 한 건이 아니면 예외가 발생한다")
     void throwsExceptionWhenMatchingResultCountIsInvalid() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -224,7 +224,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("상태 변경 실패를 그대로 전파한다")
     void propagatesStatusUpdateFailure() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -259,7 +259,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("수동 동기화(isBatch=false)는 정산+차용증 후보가 모두 있어도 매칭 검토 알림을 생성하지 않는다 (동기화 결과 화면에서 바로 선택 가능하므로)")
     void doesNotCreateNotificationForCrossDomainCandidatesWhenNotBatch() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -287,7 +287,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("수동 동기화(isBatch=false)는 한 도메인의 후보만 있어도 매칭 검토 알림을 생성하지 않는다")
     void doesNotCreateNotificationForSingleDomainCandidatesWhenNotBatch() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -320,7 +320,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("배치로 실행되고 정산 후보가 완납되지 않았으면 매칭 검토 알림을 생성한다")
     void createsNotificationForUnresolvedSettlementWhenTriggeredByBatch() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -340,7 +340,7 @@ class BankMatchingTransactionServiceTest {
                         MatchingTargetType.SETTLEMENT
                 )));
         // candidateDto(1L, SETTLEMENT)의 targetId는 10L(obligationId) → settlementId 20L로 변환된다고 가정
-        given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
+        given(paymentObligationQueryService.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
         given(settlementPaymentStatusChecker.areAllObligationsResolved(20L))
                 .willReturn(false);
@@ -362,7 +362,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("배치로 실행되어도 정산이 이미 완납이면 알림을 생성하지 않는다")
     void doesNotCreateNotificationWhenSettlementAlreadyResolvedEvenIfBatch() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -381,7 +381,7 @@ class BankMatchingTransactionServiceTest {
                         1L,
                         MatchingTargetType.SETTLEMENT
                 )));
-        given(paymentObligationRepository.findSettlementIdsByObligationIds(List.of(10L)))
+        given(paymentObligationQueryService.findSettlementIdsByObligationIds(List.of(10L)))
                 .willReturn(List.of(20L));
         given(settlementPaymentStatusChecker.areAllObligationsResolved(20L))
                 .willReturn(true);
@@ -398,7 +398,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("배치이고 정산이 미완납이어도 차용증 후보가 함께 있으면 동시 후보 알림이 우선한다")
     void crossDomainNotificationTakesPriorityOverBatchUnresolvedSettlement() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
         );
@@ -437,7 +437,7 @@ class BankMatchingTransactionServiceTest {
     @Test
     @DisplayName("잠금 조회한 거래가 이미 처리됐으면 자동매칭을 다시 실행하지 않는다")
     void skipsTransactionAlreadyProcessedByConcurrentRequest() {
-        BankTransactionEntity transaction = bankTransaction(
+        BankTransaction transaction = bankTransaction(
                 101L,
                 "Hong Gil Dong",
                 BankTransactionProcessingStatus.APPLIED
@@ -463,7 +463,7 @@ class BankMatchingTransactionServiceTest {
                 any(), any(), any()
         );
     }
-    private BankTransactionEntity bankTransaction(
+    private BankTransaction bankTransaction(
             Long bankTransactionId,
             String counterpartyName
     ) {
@@ -473,12 +473,12 @@ class BankMatchingTransactionServiceTest {
                 BankTransactionProcessingStatus.PENDING
         );
     }
-    private BankTransactionEntity bankTransaction(
+    private BankTransaction bankTransaction(
             Long bankTransactionId,
             String counterpartyName,
             BankTransactionProcessingStatus processingStatus
     ) {
-        BankTransactionEntity transaction = new BankTransactionEntity(
+        BankTransaction transaction = new BankTransaction(
                 LINKED_ACCOUNT_ID,
                 "external-" + bankTransactionId,
                 new BigDecimal("10000.00"),
@@ -492,7 +492,7 @@ class BankMatchingTransactionServiceTest {
         transaction.changeProcessingStatus(processingStatus);
         return transaction;
     }
-    private void givenLockedTransaction(BankTransactionEntity transaction) {
+    private void givenLockedTransaction(BankTransaction transaction) {
         given(bankTransactionService.findByIdAndLinkedAccountIdForUpdate(
                 transaction.getBankTransactionId(),
                 LINKED_ACCOUNT_ID
@@ -507,11 +507,11 @@ class BankMatchingTransactionServiceTest {
                 new BigDecimal("10000.00")
         );
     }
-    private BankTransactionMatchCandidateEntity candidateDto(
+    private BankTransactionMatchCandidate candidateDto(
             Long matchCandidateId,
             MatchingTargetType targetType
     ) {
-        return BankTransactionMatchCandidateEntity.builder()
+        return BankTransactionMatchCandidate.builder()
                 .matchCandidateId(matchCandidateId)
                 .bankTransactionId(101L)
                 .targetType(targetType)

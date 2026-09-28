@@ -15,8 +15,6 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantRole;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.repository.UserRepository;
 import org.teamsai.saibackend.domain.user.service.UserService;
 
 import java.math.BigDecimal;
@@ -29,7 +27,6 @@ public class SettlementParticipantService {
 
     private final SettlementParticipantRepository settlementParticipantRepository;
     private final SettlementRepository settlementRepository;
-    private final UserRepository userRepository;
     private final UserService userService;
     private final SettlementPaymentService settlementPaymentService;
     private final NotificationService notificationService;
@@ -44,10 +41,7 @@ public class SettlementParticipantService {
                         SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException
                 );
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(
-                        UserErrorCode.USER_NOT_FOUND::toException
-                );
+        User user = userService.getUser(userId);
 
         SettlementParticipant participant =
                 SettlementParticipant.builder()

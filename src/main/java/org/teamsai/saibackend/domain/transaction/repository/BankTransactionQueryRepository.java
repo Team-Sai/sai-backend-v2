@@ -1,13 +1,13 @@
 package org.teamsai.saibackend.domain.transaction.repository;
 
-import org.teamsai.saibackend.domain.account.dto.type.ConnectionStatus;
+import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
@@ -15,13 +15,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface BankTransactionQueryRepository
-        extends Repository<BankTransactionEntity, Long> {
+        extends Repository<BankTransaction, Long> {
 
     @Query(value = """
             SELECT new org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse(
                 bt, account.bankCode, account.accountNumber)
 
-            FROM BankTransactionEntity bt
+            FROM BankTransaction bt
             JOIN LinkedBankAccount account ON account.linkedAccountId = bt.linkedAccountId
             WHERE account.userId = :userId AND account.connectionStatus = :connectionStatus
               AND (:linkedAccountId IS NULL OR bt.linkedAccountId = :linkedAccountId)
@@ -35,7 +35,7 @@ public interface BankTransactionQueryRepository
             """, countQuery = """
             SELECT COUNT(bt)
 
-            FROM BankTransactionEntity bt
+            FROM BankTransaction bt
             JOIN LinkedBankAccount account ON account.linkedAccountId = bt.linkedAccountId
             WHERE account.userId = :userId AND account.connectionStatus = :connectionStatus
               AND (:linkedAccountId IS NULL OR bt.linkedAccountId = :linkedAccountId)
@@ -91,14 +91,14 @@ public interface BankTransactionQueryRepository
                     """,
             nativeQuery = true
     )
-    List<BankTransactionEntity> findRetryCandidates(
+    List<BankTransaction> findRetryCandidates(
             @Param("linkedAccountId") Long linkedAccountId
     );
 
     @Query(
             value = """
                 SELECT bt
-                FROM BankTransactionEntity bt
+                FROM BankTransaction bt
                 WHERE bt.linkedAccountId = :linkedAccountId
                   AND (
                       :processingStatus IS NULL
@@ -126,7 +126,7 @@ public interface BankTransactionQueryRepository
                 """,
             countQuery = """
                 SELECT COUNT(bt)
-                FROM BankTransactionEntity bt
+                FROM BankTransaction bt
                 WHERE bt.linkedAccountId = :linkedAccountId
                   AND (
                       :processingStatus IS NULL
@@ -151,7 +151,7 @@ public interface BankTransactionQueryRepository
                   )
                 """
     )
-    Page<BankTransactionEntity> search(
+    Page<BankTransaction> search(
             @Param("linkedAccountId")
             Long linkedAccountId,
 

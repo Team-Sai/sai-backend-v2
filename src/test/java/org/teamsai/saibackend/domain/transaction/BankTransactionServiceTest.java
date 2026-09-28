@@ -12,8 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransactionEntity;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
@@ -38,7 +38,7 @@ class BankTransactionServiceTest {
     private BankTransactionRepository bankTransactionRepository;
 
     @Mock
-    private LinkedBankAccountRepository linkedBankAccountRepository;
+    private LinkedBankAccountService linkedBankAccountService;
 
     @Mock
     private EntityManager entityManager;
@@ -55,8 +55,8 @@ class BankTransactionServiceTest {
     @DisplayName("본인 계좌의 거래를 잠금 조회해 상세 응답을 반환한다")
     void getsOwnedTransactionDetailForUpdate() {
         LinkedBankAccount account = LinkedBankAccount.builder().userId(7L).build();
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
-        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.of(account));
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
+        given(linkedBankAccountService.getLinkedAccount(1L)).willReturn(account);
         given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(101L, 1L))
                 .willReturn(Optional.of(transaction));
 
@@ -72,7 +72,7 @@ class BankTransactionServiceTest {
     @DisplayName("타인 계좌의 거래는 잠금 조회하지 않는다")
     void rejectsOtherUsersTransactionForUpdate() {
         LinkedBankAccount account = LinkedBankAccount.builder().userId(8L).build();
-        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.of(account));
+        given(linkedBankAccountService.getLinkedAccount(1L)).willReturn(account);
 
         assertThatThrownBy(() -> bankTransactionService.getOwnedTransactionDetailForUpdate(7L, 1L, 101L))
                 .isInstanceOfSatisfying(DomainException.class,
@@ -84,7 +84,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("연결 계좌가 없으면 거래를 조회하지 않는다")
     void rejectsMissingAccountForUpdate() {
-        given(linkedBankAccountRepository.findById(1L)).willReturn(Optional.empty());
+        given(linkedBankAccountService.getLinkedAccount(1L)).willThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND.toException());
 
         assertThatThrownBy(() -> bankTransactionService.getOwnedTransactionDetailForUpdate(7L, 1L, 101L))
                 .isInstanceOfSatisfying(DomainException.class,
@@ -96,13 +96,13 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("연결계좌와 거래 ID로 은행 거래를 잠금 조회한다")
     void findsTransactionByIdAndLinkedAccountIdForUpdate() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.PENDING);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.PENDING);
         given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(
                 101L,
                 1L
         )).willReturn(Optional.of(transaction));
 
-        BankTransactionEntity result = bankTransactionService
+        BankTransaction result = bankTransactionService
                 .findByIdAndLinkedAccountIdForUpdate(101L, 1L);
 
         assertThat(result).isSameAs(transaction);
@@ -131,7 +131,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("확인 필요 거래를 반영 완료 상태로 변경할 수 있다")
     void updatesNeedsCheckTransactionToApplied() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
         given(bankTransactionRepository.findLockedByBankTransactionId(1L))
                 .willReturn(Optional.of(transaction));
 
@@ -148,7 +148,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("확인 필요 거래를 미매칭 상태로 변경할 수 있다")
     void updatesNeedsCheckTransactionToUnmatched() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.NEEDS_CHECK);
         given(bankTransactionRepository.findLockedByBankTransactionId(1L))
                 .willReturn(Optional.of(transaction));
 
@@ -164,7 +164,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("현재 상태가 달라진 거래는 덮어쓰지 않는다")
     void rejectsStatusUpdateWhenCurrentStatusDoesNotMatch() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.APPLIED);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.APPLIED);
         given(bankTransactionRepository.findLockedByBankTransactionId(1L))
                 .willReturn(Optional.of(transaction));
 
@@ -184,7 +184,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("매칭용 잠금 조회는 DB에서 갱신한 최신 상태를 반환한다")
     void refreshesTransactionBeforeMatching() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.PENDING);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.PENDING);
         given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(101L, 1L))
                 .willReturn(Optional.of(transaction));
         doAnswer(invocation -> {
@@ -192,7 +192,7 @@ class BankTransactionServiceTest {
             return null;
         }).when(entityManager).refresh(transaction, LockModeType.PESSIMISTIC_WRITE);
 
-        BankTransactionEntity result =
+        BankTransaction result =
                 bankTransactionService.findByIdAndLinkedAccountIdForUpdate(101L, 1L);
 
         assertThat(result.getProcessingStatus()).isEqualTo(BankTransactionProcessingStatus.APPLIED);
@@ -201,7 +201,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("상태 변경 전에 최신 상태를 읽어 이미 처리된 거래의 변경을 거부한다")
     void checksRefreshedStatusBeforeUpdating() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.PENDING);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.PENDING);
         given(bankTransactionRepository.findLockedByBankTransactionId(1L))
                 .willReturn(Optional.of(transaction));
         doAnswer(invocation -> {
@@ -223,7 +223,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("재시도 전에 최신 상태를 읽어 이미 처리된 거래의 초기화를 건너뛴다")
     void skipsRetryWhenRefreshedStatusDoesNotMatch() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.UNMATCHED);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.UNMATCHED);
         given(bankTransactionRepository.findLockedByBankTransactionId(1L))
                 .willReturn(Optional.of(transaction));
         doAnswer(invocation -> {
@@ -244,7 +244,7 @@ class BankTransactionServiceTest {
     @Test
     @DisplayName("재시도 횟수도 최신 값에서 증가시킨다")
     void incrementsRefreshedRetryCount() {
-        BankTransactionEntity transaction = transaction(BankTransactionProcessingStatus.UNMATCHED);
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.UNMATCHED);
         given(bankTransactionRepository.findLockedByBankTransactionId(1L))
                 .willReturn(Optional.of(transaction));
         doAnswer(invocation -> {
@@ -262,8 +262,8 @@ class BankTransactionServiceTest {
         verify(bankTransactionRepository).flush();
     }
 
-    private BankTransactionEntity transaction(BankTransactionProcessingStatus status) {
-        BankTransactionEntity transaction = new BankTransactionEntity(
+    private BankTransaction transaction(BankTransactionProcessingStatus status) {
+        BankTransaction transaction = new BankTransaction(
                 1L, "TX-TEST", java.math.BigDecimal.ONE,
                 org.teamsai.saibackend.domain.transaction.type.BankTransactionType.DEPOSIT,
                 java.time.LocalDateTime.of(2026, 8, 5, 10, 0),
