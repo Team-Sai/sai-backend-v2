@@ -104,7 +104,7 @@ class RecurringSettlementValidatorTest {
                 .isInstanceOf(DomainException.class)
                 .extracting("errorCode")
                 .isEqualTo(
-                        SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT
+                        SettlementErrorCode.SETTLEMENT_AMOUNT_MISMATCH
                 );
     }
     private SettlementParticipantCreateRequest participant(

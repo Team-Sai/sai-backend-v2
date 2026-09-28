@@ -31,7 +31,7 @@ public class RecurringSettlementValidator {
         BigDecimal ownerAmount = request.getOwnerAmount();
 
         if (ownerAmount == null || ownerAmount.compareTo(BigDecimal.ZERO) < 0){
-            throw SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT.toException();
+            throw SettlementErrorCode.INVALID_OWNER_AMOUNT.toException();
         }
 
         BigDecimal total = ownerAmount;
@@ -40,14 +40,14 @@ public class RecurringSettlementValidator {
             BigDecimal amount = participant.getAmount();
 
             if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0){
-                throw SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT.toException();
+                throw SettlementErrorCode.INVALID_PARTICIPANT_AMOUNT.toException();
             }
 
             total = total.add(amount);
         }
 
         if (total.compareTo(request.getTotalAmount()) != 0){
-            throw SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT.toException();
+            throw SettlementErrorCode.SETTLEMENT_AMOUNT_MISMATCH.toException();
         }
     }
 }

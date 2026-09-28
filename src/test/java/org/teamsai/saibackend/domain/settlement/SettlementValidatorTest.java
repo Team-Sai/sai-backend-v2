@@ -293,7 +293,7 @@ class SettlementValidatorTest {
                         settlementValidator.validateCreateRequest(
                                 request
                         ),
-                SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT
+                SettlementErrorCode.SETTLEMENT_AMOUNT_MISMATCH
         );
     }
     @Test
@@ -320,7 +320,32 @@ class SettlementValidatorTest {
                         settlementValidator.validateCreateRequest(
                                 request
                         ),
-                SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT
+                SettlementErrorCode.INVALID_PARTICIPANT_AMOUNT
+        );
+    }
+
+    @Test
+    @DisplayName("CUSTOM 정산 생성자 금액이 음수이면 검증에 실패한다")
+    void validateCustomCreateRequestFailsWhenOwnerAmountIsNegative() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("-1"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("100001")
+                                        )
+                                )
+                        )
+                        .build();
+
+        assertSettlementExceptionThrownBy(
+                () -> settlementValidator.validateCreateRequest(request),
+                SettlementErrorCode.INVALID_OWNER_AMOUNT
         );
     }
 
