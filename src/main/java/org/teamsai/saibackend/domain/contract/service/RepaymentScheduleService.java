@@ -4,13 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.event.ContractCreatedEvent;
+import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
-import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
 import java.math.BigDecimal;
@@ -96,9 +96,9 @@ public class RepaymentScheduleService {
         repaymentScheduleRepository.saveAll(newSchedules);
     }
 
-    public RepaymentScheduleResponse getScheduleByScheduleId(Long scheduleId) {
+    public RepaymentScheduleDTO getScheduleByScheduleId(Long scheduleId) {
         return repaymentScheduleRepository.findById(scheduleId)
-                .map(RepaymentScheduleResponse::from)
+                .map(RepaymentScheduleDTO::from)
                 .orElseThrow(() -> RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND.toException());
     }
 
