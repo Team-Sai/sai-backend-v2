@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.account.service.*;
 import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
-import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
+import org.teamsai.saibackend.domain.account.dto.request.AccountLinkRequest;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
@@ -19,7 +19,7 @@ class LinkedBankAccountServiceTest {
  final LinkedBankAccountRepository repository=mock(LinkedBankAccountRepository.class);
  final UserService users=mock(UserService.class);
  final MockBankClient bank=mock(MockBankClient.class);
- final LinkedAccountWriter writer=mock(LinkedAccountWriter.class);
+ final LinkedAccountWriteService writer=mock(LinkedAccountWriteService.class);
  final LinkedBankAccountService service=new LinkedBankAccountService(repository,users,bank,mock(EntityManager.class),writer);
  AccountDetailResponse detail(Long id){return new AccountDetailResponse(id,"088","masked","name","holder",BigDecimal.TEN,"ACTIVE",null,null);}
  @Test void unchangedCursorIsAcceptedWhenAccountExists(){
@@ -34,7 +34,7 @@ class LinkedBankAccountServiceTest {
   assertThatThrownBy(() -> service.advanceTransactionCursor(1L, 11L, BigDecimal.TEN))
    .extracting("errorCode").isEqualTo(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND);
  }
- LinkAccountRequest request(Long... ids){return new LinkAccountRequest(java.util.Arrays.stream(ids).map(id->new LinkAccountRequest.SelectedAccount(id,"alias")).toList());}
+ AccountLinkRequest request(Long... ids){return new AccountLinkRequest(java.util.Arrays.stream(ids).map(id->new AccountLinkRequest.SelectedAccount(id,"alias")).toList());}
  @Test void deduplicatesSelectionAndExcludesExistingBeforeBankCalls(){
   when(users.getUserKeyByUserId(1L)).thenReturn("key");
   when(repository.findAllByUserId(1L)).thenReturn(List.of(LinkedBankAccount.builder().accountId(2L).build()));

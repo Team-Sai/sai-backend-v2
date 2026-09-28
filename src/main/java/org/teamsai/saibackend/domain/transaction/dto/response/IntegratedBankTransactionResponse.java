@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.transaction.dto.response;
 
-import org.teamsai.saibackend.domain.account.util.BankCodeResolver;
+import org.teamsai.saibackend.domain.account.service.BankCodeResolveService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 import org.teamsai.saibackend.global.util.MaskingUtil;
@@ -18,6 +18,6 @@ public record IntegratedBankTransactionResponse(
         this(transaction.getBankTransactionId(), transaction.getLinkedAccountId(), transaction.getAmount(),
                 transaction.getTransactionType(), transaction.getProcessingStatus(), transaction.getTransactionAt(),
                 transaction.getCounterpartyName(), transaction.getMemo(),
-                BankCodeResolver.resolveBankName(bankCode), MaskingUtil.maskAccountNumber(accountNumber));
+                BankCodeResolveService.resolveBankName(bankCode), MaskingUtil.maskAccountNumber(accountNumber));
     }
 }

@@ -11,11 +11,11 @@ import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 
 @Component
-public class UserLinkLock {
+public class UserLinkLockService {
     private final DataSource dataSource;
     private final Semaphore slots;
 
-    public UserLinkLock(
+    public UserLinkLockService(
             DataSource dataSource,
             @Value("${spring.datasource.hikari.maximum-pool-size:10}")
             int poolSize,

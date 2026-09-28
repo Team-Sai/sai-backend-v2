@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.identity.support;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
@@ -80,7 +80,7 @@ public class IdentityValidator {
 
     public void validatePortOneResponse(
             String expectedIdentityVerificationId,
-            PortOneIdentityResponse response
+            PortOneIdentityDTO response
     ) {
         if (response == null
                 || !StringUtils.hasText(response.id())
@@ -109,7 +109,7 @@ public class IdentityValidator {
 
     public void validateSameUser(
             User user,
-            PortOneIdentityResponse.VerifiedCustomer verifiedCustomer
+            PortOneIdentityDTO.VerifiedCustomer verifiedCustomer
     ) {
         validateUserInformation(user);
         validateVerifiedCustomer(verifiedCustomer);
@@ -147,7 +147,7 @@ public class IdentityValidator {
     }
 
     private void validateVerifiedCustomer(
-            PortOneIdentityResponse.VerifiedCustomer verifiedCustomer
+            PortOneIdentityDTO.VerifiedCustomer verifiedCustomer
     ) {
         if (verifiedCustomer == null
                 || !StringUtils.hasText(verifiedCustomer.name())

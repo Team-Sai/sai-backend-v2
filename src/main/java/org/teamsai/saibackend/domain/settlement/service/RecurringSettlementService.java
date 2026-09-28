@@ -4,8 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.request.RecurringSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.repository.RecurringSettlementRepository;
@@ -39,8 +39,8 @@ public class RecurringSettlementService {
     private final UserService userService;
 
     @Transactional
-    public CreateRecurringSettlementResponse create(
-            Long ownerId, CreateRecurringSettlementRequest request
+    public RecurringSettlementCreateResponse create(
+            Long ownerId, RecurringSettlementCreateRequest request
     ){
         recurringSettlementValidator.validateCreateRequest(request);
 

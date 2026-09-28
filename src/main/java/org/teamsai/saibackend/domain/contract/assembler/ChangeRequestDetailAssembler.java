@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
-import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
@@ -16,7 +16,7 @@ public final class ChangeRequestDetailAssembler {
     private ChangeRequestDetailAssembler() {
     }
 
-    public static ChangeRequestDetailResponse toDetail(
+    public static ContractChangeRequestDetailResponse toDetail(
             LoanContractResponse contract,
             LoanContractChangeRequest changeRequest,
             Long newContractId,
@@ -26,7 +26,7 @@ public final class ChangeRequestDetailAssembler {
         LocalDate effectiveMaturityDate = effectiveMaturityDate(contract, changeRequest);
         boolean requestedByCreditor = Objects.equals(changeRequest.getUserId(), contract.getCreditorId());
 
-        return ChangeRequestDetailResponse.builder()
+        return ContractChangeRequestDetailResponse.builder()
                 .changeRequestId(changeRequest.getChangeRequestId())
                 .newContractId(newContractId)
                 .requesterName(requestedByCreditor ? contract.getCreditorName() : contract.getDebtorName())

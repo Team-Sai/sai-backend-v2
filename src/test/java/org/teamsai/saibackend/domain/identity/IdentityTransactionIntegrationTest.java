@@ -21,8 +21,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.teamsai.saibackend.domain.link.service.UserLinkLock;
-import org.teamsai.saibackend.domain.link.service.LinkOperationStore;
+import org.teamsai.saibackend.domain.link.service.UserLinkLockService;
+import org.teamsai.saibackend.domain.link.service.LinkOperationStoreService;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -35,7 +35,7 @@ import org.teamsai.saibackend.domain.contract.service.ContractAccountService;
 import org.teamsai.saibackend.domain.contract.service.LoanContractFileService;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
@@ -109,8 +109,8 @@ class IdentityTransactionIntegrationTest {
     @MockitoBean LoanContractFileService files;
     @MockitoBean ContractAccountService accounts;
     @MockitoSpyBean UserService userService;
-    @MockitoBean UserLinkLock userLinkLock;
-    @MockitoBean LinkOperationStore linkOperationStore;
+    @MockitoBean UserLinkLockService userLinkLock;
+    @MockitoBean LinkOperationStoreService linkOperationStore;
     @MockitoBean NotificationService notifications;
 
     private final List<Long> userIds = new ArrayList<>();
@@ -175,8 +175,8 @@ class IdentityTransactionIntegrationTest {
     @Test
     void failedResultCommitsBeforeDomainExceptionAndTruncatesReason() {
         String id = prepare();
-        when(portOne.getIdentityVerification(id)).thenReturn(new PortOneIdentityResponse(id, "FAILED", null,
-                new PortOneIdentityResponse.Failure("x".repeat(300), null, null)));
+        when(portOne.getIdentityVerification(id)).thenReturn(new PortOneIdentityDTO(id, "FAILED", null,
+                new PortOneIdentityDTO.Failure("x".repeat(300), null, null)));
         assertError(() -> service.complete(ownerId, id), IdentityErrorCode.PORTONE_VERIFICATION_NOT_VERIFIED);
         assertThat(state(id)).isEqualTo("FAILED");
         assertThat(readIdentity(id).getFailureReason()).hasSize(255);
@@ -186,8 +186,8 @@ class IdentityTransactionIntegrationTest {
     @Test
     void mismatchCommitsFailureBeforeRethrowing() {
         String id = prepare();
-        when(portOne.getIdentityVerification(id)).thenReturn(new PortOneIdentityResponse(id, "VERIFIED",
-                new PortOneIdentityResponse.VerifiedCustomer("Different", BIRTH, "test-ci"), null));
+        when(portOne.getIdentityVerification(id)).thenReturn(new PortOneIdentityDTO(id, "VERIFIED",
+                new PortOneIdentityDTO.VerifiedCustomer("Different", BIRTH, "test-ci"), null));
         assertError(() -> service.complete(ownerId, id), IdentityErrorCode.IDENTITY_INFORMATION_MISMATCH);
         assertThat(state(id)).isEqualTo("FAILED");
         assertThat(readIdentity(id).getFailureReason()).isEqualTo("IDENTITY_INFORMATION_MISMATCH");
@@ -203,7 +203,7 @@ class IdentityTransactionIntegrationTest {
             when(portOne.getIdentityVerification(id)).thenThrow(error.toException());
         } else {
             String status = scenario.equals("READY") ? "READY" : scenario.equals("UNKNOWN") ? "UNKNOWN" : "VERIFIED";
-            when(portOne.getIdentityVerification(id)).thenReturn(new PortOneIdentityResponse(
+            when(portOne.getIdentityVerification(id)).thenReturn(new PortOneIdentityDTO(
                     scenario.equals("WRONG_ID") ? "another-id" : id, status, null, null));
             if (scenario.equals("READY")) error = IdentityErrorCode.IDENTITY_VERIFICATION_NOT_COMPLETED;
         }
@@ -360,7 +360,7 @@ class IdentityTransactionIntegrationTest {
         String id = prepare();
         when(portOne.getIdentityVerification(id)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-            return new PortOneIdentityResponse(id, "FAILED", null, null);
+            return new PortOneIdentityDTO(id, "FAILED", null, null);
         });
         assertError(() -> tx.executeWithoutResult(s -> service.complete(ownerId, id)),
                 IdentityErrorCode.PORTONE_VERIFICATION_NOT_VERIFIED);
@@ -431,9 +431,9 @@ class IdentityTransactionIntegrationTest {
         return id;
     }
 
-    private PortOneIdentityResponse verifiedResponse(String id) {
-        return new PortOneIdentityResponse(id, "VERIFIED",
-                new PortOneIdentityResponse.VerifiedCustomer(NAME, BIRTH, "test-ci"), null);
+    private PortOneIdentityDTO verifiedResponse(String id) {
+        return new PortOneIdentityDTO(id, "VERIFIED",
+                new PortOneIdentityDTO.VerifiedCustomer(NAME, BIRTH, "test-ci"), null);
     }
 
     private String state(String id) {

@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateSettlementParticipantRequest {
+public class SettlementParticipantCreateRequest {
     private String userToken;
 }

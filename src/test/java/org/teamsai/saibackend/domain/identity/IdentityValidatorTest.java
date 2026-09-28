@@ -4,7 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
@@ -34,8 +34,8 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("요청 ID와 상태가 정상적이면 검증을 통과한다")
         void validResponse() {
-            PortOneIdentityResponse response =
-                    new PortOneIdentityResponse(
+            PortOneIdentityDTO response =
+                    new PortOneIdentityDTO(
                             VERIFICATION_ID,
                             "VERIFIED",
                             null,
@@ -68,8 +68,8 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("포트원 응답의 인증 ID가 다르면 예외가 발생한다")
         void differentVerificationId() {
-            PortOneIdentityResponse response =
-                    new PortOneIdentityResponse(
+            PortOneIdentityDTO response =
+                    new PortOneIdentityDTO(
                             "different-id",
                             "VERIFIED",
                             null,
@@ -90,8 +90,8 @@ class IdentityValidatorTest {
         @Test
         @DisplayName("알 수 없는 상태값이면 예외가 발생한다")
         void unknownStatus() {
-            PortOneIdentityResponse response =
-                    new PortOneIdentityResponse(
+            PortOneIdentityDTO response =
+                    new PortOneIdentityDTO(
                             VERIFICATION_ID,
                             "UNKNOWN",
                             null,
@@ -122,7 +122,7 @@ class IdentityValidatorTest {
                     BIRTH_DATE
             );
 
-            PortOneIdentityResponse.VerifiedCustomer customer =
+            PortOneIdentityDTO.VerifiedCustomer customer =
                     createCustomer(
                             "김사이",
                             BIRTH_DATE
@@ -145,7 +145,7 @@ class IdentityValidatorTest {
                     BIRTH_DATE
             );
 
-            PortOneIdentityResponse.VerifiedCustomer customer =
+            PortOneIdentityDTO.VerifiedCustomer customer =
                     createCustomer(
                             "박사이",
                             BIRTH_DATE
@@ -170,7 +170,7 @@ class IdentityValidatorTest {
                     BIRTH_DATE
             );
 
-            PortOneIdentityResponse.VerifiedCustomer customer =
+            PortOneIdentityDTO.VerifiedCustomer customer =
                     createCustomer(
                             "김사이",
                             LocalDate.of(
@@ -199,7 +199,7 @@ class IdentityValidatorTest {
                     BIRTH_DATE
             );
 
-            PortOneIdentityResponse.VerifiedCustomer customer =
+            PortOneIdentityDTO.VerifiedCustomer customer =
                     createCustomer(
                             "김사이",
                             BIRTH_DATE
@@ -251,12 +251,12 @@ class IdentityValidatorTest {
                 .build();
     }
 
-    private PortOneIdentityResponse.VerifiedCustomer
+    private PortOneIdentityDTO.VerifiedCustomer
     createCustomer(
             String name,
             LocalDate birthDate
     ) {
-        return new PortOneIdentityResponse.VerifiedCustomer(
+        return new PortOneIdentityDTO.VerifiedCustomer(
                 name,
                 birthDate,
                 "ci-test"

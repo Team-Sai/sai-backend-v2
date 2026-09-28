@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
-import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
+import org.teamsai.saibackend.domain.account.dto.request.AccountLinkRequest;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
@@ -26,19 +26,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-import static org.teamsai.saibackend.domain.link.service.LinkOperationStore.Status.*;
+import static org.teamsai.saibackend.domain.link.service.LinkOperationStoreService.Status.*;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-public class AccountLinkCoordinator {
-    private final UserLinkLock lock;
+public class AccountLinkCoordinateService {
+    private final UserLinkLockService lock;
     private final UserService users;
     private final LinkedBankAccountService accounts;
     private final AccountLinkService persistence;
     private final MockBankClient bank;
-    private final LinkOperationStore operations;
+    private final LinkOperationStoreService operations;
 
     public void withdrawUser(Long userId) {
         lock.execute(userId, () -> {
@@ -50,7 +50,7 @@ public class AccountLinkCoordinator {
         });
     }
 
-    public List<LinkedBankAccount> linkSelectedAccounts(Long userId, LinkAccountRequest request) {
+    public List<LinkedBankAccount> linkSelectedAccounts(Long userId, AccountLinkRequest request) {
         return lock.execute(userId, () -> {
             requireResolved(userId);
             return accounts.linkSelectedAccounts(userId, request);
@@ -85,7 +85,7 @@ public class AccountLinkCoordinator {
             requireResolved(userId);
             users.getUser(userId);
             String previousKey = users.getUserKeyByUserId(userId);
-            var operation = new LinkOperationStore.Operation(operationId, userId, requestHash,
+            var operation = new LinkOperationStoreService.Operation(operationId, userId, requestHash,
                     previousKey, userKey, PROCESSING);
             run(operation, ids);
             return null;
@@ -104,7 +104,7 @@ public class AccountLinkCoordinator {
             for (int attempt = 0; attempt < 2; attempt++) {
                 String operationId = UUID.randomUUID().toString();
                 operations.beginIssue(operationId, userId);
-                var result = resumeIssuance(new LinkOperationStore.Operation(
+                var result = resumeIssuance(new LinkOperationStoreService.Operation(
                         operationId, userId, "ISSUE", null, null, ISSUE_PENDING));
                 if (!result.expired()) {
                     return new UserKeyResponse(result.key());
@@ -130,7 +130,7 @@ public class AccountLinkCoordinator {
         }
     }
 
-    private void recover(LinkOperationStore.Operation operation) {
+    private void recover(LinkOperationStoreService.Operation operation) {
         if (operation.status() == ISSUE_PENDING || operation.status() == ISSUED) {
             resumeIssuance(operation);
             return;
@@ -176,14 +176,14 @@ public class AccountLinkCoordinator {
         }
     }
 
-    private void run(LinkOperationStore.Operation operation, List<Long> ids) {
+    private void run(LinkOperationStoreService.Operation operation, List<Long> ids) {
         operations.begin(operation);
         runPersisted(operation, ids);
     }
 
     private record IssuanceResult(boolean expired, String key) {}
 
-    private IssuanceResult resumeIssuance(LinkOperationStore.Operation operation) {
+    private IssuanceResult resumeIssuance(LinkOperationStoreService.Operation operation) {
         if (!Objects.equals(users.getUserKeyByUserId(operation.userId()), operation.previousKey())) {
             throw AccountErrorCode.LINK_RECONCILIATION_REQUIRED.toException();
         }
@@ -228,7 +228,7 @@ public class AccountLinkCoordinator {
                 throw AccountErrorCode.INVALID_BANK_RESPONSE.toException();
             }
             operations.recordIssued(operation.id(), key, hash(key));
-            operation = new LinkOperationStore.Operation(operation.id(), operation.userId(), hash(key),
+            operation = new LinkOperationStoreService.Operation(operation.id(), operation.userId(), hash(key),
                     operation.previousKey(), key, ISSUED);
         }
         try {
@@ -244,7 +244,7 @@ public class AccountLinkCoordinator {
         return new IssuanceResult(false, operation.newKey());
     }
 
-    private void runPersisted(LinkOperationStore.Operation operation, List<Long> ids) {
+    private void runPersisted(LinkOperationStoreService.Operation operation, List<Long> ids) {
         boolean changesKey = !Objects.equals(operation.previousKey(), operation.newKey());
         if (changesKey) {
             operations.mark(operation.id(), CONFIRM_UNKNOWN);

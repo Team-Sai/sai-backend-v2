@@ -14,15 +14,15 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateSharedSettlementResponse {
+public class SharedSettlementCreateResponse {
     private Long settlementId;
     private SettlementType settlementType;
     private SettlementStatus settlementStatus;
     private String title;
     private LocalDateTime createdAt;
 
-    public static CreateSharedSettlementResponse from(Settlement settlement) {
-        return CreateSharedSettlementResponse.builder()
+    public static SharedSettlementCreateResponse from(Settlement settlement) {
+        return SharedSettlementCreateResponse.builder()
                 .settlementId(settlement.getSettlementId())
                 .settlementType(settlement.getSettlementType())
                 .settlementStatus(settlement.getSettlementStatus())

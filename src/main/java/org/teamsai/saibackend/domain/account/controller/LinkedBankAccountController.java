@@ -8,10 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
+import org.teamsai.saibackend.domain.account.dto.request.AccountLinkRequest;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinateService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
 import java.util.List;
@@ -27,16 +27,16 @@ import java.util.List;
 public class LinkedBankAccountController {
 
     private final LinkedBankAccountService linkedBankAccountService;
-    private final AccountLinkCoordinator accountLinkCoordinator;
+    private final AccountLinkCoordinateService accountLinkCoordinateService;
 
     @Operation(summary = "선택한 계좌들 등록", description = "사용자가 선택한 모의 은행 계좌들을 사이원장에 연동.")
     @PostMapping
     public ResponseEntity<List<LinkedBankAccountResponse>> linkAccounts(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody LinkAccountRequest request
+            @Valid @RequestBody AccountLinkRequest request
     ) {
         List<LinkedBankAccountResponse> responses =
-                accountLinkCoordinator.linkSelectedAccounts(userDetails.getUserId(), request)
+                accountLinkCoordinateService.linkSelectedAccounts(userDetails.getUserId(), request)
                         .stream()
                         .map(LinkedBankAccountResponse::from)
                         .toList();

@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 @Getter@Builder
 @NoArgsConstructor@AllArgsConstructor
-public class ChangeRequestDetailResponse {
+public class ContractChangeRequestDetailResponse {
 
     private Long changeRequestId;
     private Long newContractId;

@@ -9,7 +9,7 @@ import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
 import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
@@ -78,7 +78,7 @@ class SettlementAssemblerTest {
                     .title("월세 정산")
                     .build();
 
-            CreateRecurringSettlementResponse result =
+            RecurringSettlementCreateResponse result =
                     SettlementAssembler.toCreateRecurringSettlementResponse(recurring, firstSettlement);
 
             assertThat(result.getRecurringSettlementId()).isEqualTo(100L);

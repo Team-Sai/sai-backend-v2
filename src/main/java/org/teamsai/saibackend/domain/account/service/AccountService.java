@@ -3,12 +3,12 @@ package org.teamsai.saibackend.domain.account.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.link.dto.response.UserKeyResponse;
-import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinateService;
 
 @Service
 @RequiredArgsConstructor
 public class AccountService {
-    private final AccountLinkCoordinator coordinator;
+    private final AccountLinkCoordinateService coordinator;
 
     public UserKeyResponse issueOrGetUserKey(Long userId) {
         return coordinator.issueOrGetUserKey(userId);

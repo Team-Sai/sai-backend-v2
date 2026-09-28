@@ -1,11 +1,11 @@
-package org.teamsai.saibackend.domain.identity.dto.response;
+package org.teamsai.saibackend.domain.identity.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.LocalDate;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record PortOneIdentityResponse(
+public record PortOneIdentityDTO(
         String id,
         String status,
         VerifiedCustomer verifiedCustomer,

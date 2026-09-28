@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.identity.support;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,9 +17,9 @@ public class IdentityFailureReasonFormatter {
             255;
 
     public String createFailureReason(
-            PortOneIdentityResponse response
+            PortOneIdentityDTO response
     ) {
-        PortOneIdentityResponse.Failure failure =
+        PortOneIdentityDTO.Failure failure =
                 response.failure();
 
         if (failure == null) {

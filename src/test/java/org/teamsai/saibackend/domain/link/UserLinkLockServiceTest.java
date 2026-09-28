@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.link;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.teamsai.saibackend.domain.link.service.UserLinkLock;
+import org.teamsai.saibackend.domain.link.service.UserLinkLockService;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 
 import javax.sql.DataSource;
@@ -14,11 +14,11 @@ import java.sql.ResultSet;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class UserLinkLockTest {
+class UserLinkLockServiceTest {
     @ParameterizedTest
     @CsvSource({"1,1", "10,0", "10,-1", "10,6"})
     void rejectsUnsafeConcurrency(int poolSize, int permits) {
-        assertThatThrownBy(() -> new UserLinkLock(mock(DataSource.class), poolSize, permits))
+        assertThatThrownBy(() -> new UserLinkLockService(mock(DataSource.class), poolSize, permits))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -33,7 +33,7 @@ class UserLinkLockTest {
         when(statement.executeQuery()).thenReturn(result);
         when(result.next()).thenReturn(true);
         when(result.getInt(1)).thenReturn(1);
-        UserLinkLock lock = new UserLinkLock(source, 10, 1);
+        UserLinkLockService lock = new UserLinkLockService(source, 10, 1);
         IllegalStateException failure = new IllegalStateException("action failed");
 
         assertThatThrownBy(() -> lock.execute(1L, () -> {

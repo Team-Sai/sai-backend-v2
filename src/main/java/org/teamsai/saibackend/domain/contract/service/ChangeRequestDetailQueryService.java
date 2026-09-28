@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.contract.assembler.ChangeRequestDetailAssembler;
-import org.teamsai.saibackend.domain.contract.dto.response.ChangeRequestDetailResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractChangeRequestDetailResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ChangeRequestDetailErrorCode;
@@ -19,7 +19,7 @@ public class ChangeRequestDetailQueryService {
     private final ContractChangeQueryService contractChangeQueryService;
     private final MonthlyPaymentEstimateService monthlyPaymentEstimateService;
 
-    public ChangeRequestDetailResponse getDetail(Long contractId, Long changeRequestId, Long userId) {
+    public ContractChangeRequestDetailResponse getDetail(Long contractId, Long changeRequestId, Long userId) {
 
         LoanContractResponse contract = contractChangeQueryService.getContract(contractId, userId);
         LoanContractChangeRequest changeRequest = contractChangeQueryService.getChangeRequest(changeRequestId);

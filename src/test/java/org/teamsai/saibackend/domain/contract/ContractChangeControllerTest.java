@@ -9,7 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.controller.ContractChangeController;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractChangeResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractChangeRequestResponse;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRejectRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
@@ -40,8 +40,8 @@ class ContractChangeControllerTest {
     @InjectMocks
     private ContractChangeController contractChangeController;
 
-    private LoanContractChangeResponse changeResponse() {
-        return LoanContractChangeResponse.builder()
+    private ContractChangeRequestResponse changeResponse() {
+        return ContractChangeRequestResponse.builder()
                 .changeRequestId(CHANGE_REQUEST_ID)
                 .contractId(CONTRACT_ID)
                 .status(ChangeRequestStatus.PENDING)
@@ -57,7 +57,7 @@ class ContractChangeControllerTest {
         given(contractChangeService.requestChange(CONTRACT_ID, request, USER_ID))
                 .willReturn(changeResponse());
 
-        LoanContractChangeResponse result = contractChangeController.requestChange(CONTRACT_ID, request, USER_ID);
+        ContractChangeRequestResponse result = contractChangeController.requestChange(CONTRACT_ID, request, USER_ID);
 
         assertThat(result.getChangeRequestId()).isEqualTo(CHANGE_REQUEST_ID);
     }
@@ -71,7 +71,7 @@ class ContractChangeControllerTest {
         given(contractChangeService.rejectChange(CONTRACT_ID, CHANGE_REQUEST_ID, "이율이 너무 높습니다", USER_ID))
                 .willReturn(changeResponse());
 
-        LoanContractChangeResponse result =
+        ContractChangeRequestResponse result =
                 contractChangeController.rejectChange(CONTRACT_ID, CHANGE_REQUEST_ID, request, USER_ID);
 
         assertThat(result.getContractId()).isEqualTo(CONTRACT_ID);
@@ -98,7 +98,7 @@ class ContractChangeControllerTest {
                     CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID
             )).willReturn(changeResponse());
 
-            LoanContractChangeResponse result = contractChangeController.submitRequesterSignature(
+            ContractChangeRequestResponse result = contractChangeController.submitRequesterSignature(
                     CONTRACT_ID, CHANGE_REQUEST_ID, signature, IDENTITY_VERIFICATION_ID, USER_ID
             );
 

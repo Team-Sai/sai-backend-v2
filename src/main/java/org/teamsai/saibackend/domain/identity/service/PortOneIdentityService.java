@@ -8,7 +8,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 
 @Slf4j
@@ -38,11 +38,11 @@ public class PortOneIdentityService {
         this.apiSecret = apiSecret;
     }
 
-    public PortOneIdentityResponse getIdentityVerification(
+    public PortOneIdentityDTO getIdentityVerification(
             String identityVerificationId
     ) {
         try {
-            PortOneIdentityResponse response =
+            PortOneIdentityDTO response =
                     restClient.get()
                             .uri(
                                     "/identity-verifications/{identityVerificationId}",
@@ -53,7 +53,7 @@ public class PortOneIdentityService {
                                     "PortOne " + apiSecret
                             )
                             .retrieve()
-                            .body(PortOneIdentityResponse.class);
+                            .body(PortOneIdentityDTO.class);
 
             if (response == null) {
                 throw IdentityErrorCode

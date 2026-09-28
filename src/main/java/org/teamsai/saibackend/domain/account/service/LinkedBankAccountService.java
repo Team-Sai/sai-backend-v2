@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
-import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
+import org.teamsai.saibackend.domain.account.dto.request.AccountLinkRequest;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
@@ -30,11 +30,11 @@ public class LinkedBankAccountService {
     private final UserService userService;
     private final MockBankClient mockBankClient;
     private final EntityManager entityManager;
-    private final LinkedAccountWriter linkedAccountWriter;
+    private final LinkedAccountWriteService linkedAccountWriteService;
 
     public List<LinkedBankAccount> linkSelectedAccounts(
             Long userId,
-            LinkAccountRequest request
+            AccountLinkRequest request
     ) {
         String userKey = userService.getUserKeyByUserId(userId);
 
@@ -52,7 +52,7 @@ public class LinkedBankAccountService {
                 ))
                 .toList();
 
-        return linkedAccountWriter.insertAll(candidates);
+        return linkedAccountWriteService.insertAll(candidates);
     }
 
     public List<LinkedBankAccount> linkAccountsByIds(
@@ -60,7 +60,7 @@ public class LinkedBankAccountService {
             String userKey,
             List<Long> accountIds
     ) {
-        return linkedAccountWriter.insertAll(prepareAccountsByIds(userId, userKey, accountIds));
+        return linkedAccountWriteService.insertAll(prepareAccountsByIds(userId, userKey, accountIds));
     }
 
     public List<LinkedBankAccount> prepareAccountsByIds(Long userId, String userKey, List<Long> accountIds) {
@@ -257,7 +257,7 @@ public class LinkedBankAccountService {
         return value == null || value.isBlank();
     }
 
-    private Predicate<LinkAccountRequest.SelectedAccount> distinctByAccountId() {
+    private Predicate<AccountLinkRequest.SelectedAccount> distinctByAccountId() {
         Set<Long> seen = new HashSet<>();
         return selected -> seen.add(selected.accountId());
     }

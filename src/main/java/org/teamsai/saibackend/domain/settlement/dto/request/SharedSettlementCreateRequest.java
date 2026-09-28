@@ -14,7 +14,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateSharedSettlementRequest {
+public class SharedSettlementCreateRequest {
     @NotBlank(message = "정산 성격을 입력해 주세요.")
     @Size(max = 50, message = "정산 성격은 50자 이하로 입력해 주세요.")
     private String settlementCategory;
@@ -35,5 +35,5 @@ public class CreateSharedSettlementRequest {
     @NotNull(message = "정산 수취 계좌를 선택해 주세요.")
     private Long linkedAccountId;
 
-    private List<CreateSettlementParticipantRequest> participants;
+    private List<SettlementParticipantCreateRequest> participants;
 }

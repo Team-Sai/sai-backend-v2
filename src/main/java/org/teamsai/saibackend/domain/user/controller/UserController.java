@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserTokenLookupResponse;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.service.UserService;
-import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinateService;
 
 @Tag(
         name = "회원 정보 API",
@@ -26,7 +26,7 @@ import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
 public class UserController {
 
     private final UserService userService;
-    private final AccountLinkCoordinator accountLinkCoordinator;
+    private final AccountLinkCoordinateService accountLinkCoordinator;
 
     @GetMapping("/mypage")
     public String myPage() {

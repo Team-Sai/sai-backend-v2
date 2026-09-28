@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.contract.assembler;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
-import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
+import org.teamsai.saibackend.domain.contract.dto.ChangedLoanContractDTO;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 
 import java.time.LocalDateTime;
@@ -13,13 +13,13 @@ public final class ContractChangeAssembler {
     private ContractChangeAssembler() {
     }
 
-    public static ChangeLoanContractResponse toChangedContract(
+    public static ChangedLoanContractDTO toChangedContract(
             LoanContractResponse contract,
             ContractChangeRequest request,
             Long previousContractId,
             LocalDateTime now
     ) {
-        return ChangeLoanContractResponse.builder()
+        return ChangedLoanContractDTO.builder()
                 .previousContractId(previousContractId)
                 .creditorId(contract.getCreditorId())
                 .debtorId(contract.getDebtorId())

@@ -11,7 +11,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class LinkedAccountWriter {
+public class LinkedAccountWriteService {
     private final LinkedBankAccountRepository accounts;
 
     @Transactional

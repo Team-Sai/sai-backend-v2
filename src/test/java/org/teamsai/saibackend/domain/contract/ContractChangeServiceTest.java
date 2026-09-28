@@ -14,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
-import org.teamsai.saibackend.domain.contract.dto.response.ChangeLoanContractResponse;
+import org.teamsai.saibackend.domain.contract.dto.ChangedLoanContractDTO;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.LoanContractChangeRequest;
 import org.teamsai.saibackend.domain.contract.exception.ContractChangeErrorCode;
@@ -148,11 +148,11 @@ class ContractChangeServiceTest {
 
             verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequest.class));
 
-            ArgumentCaptor<ChangeLoanContractResponse> captor =
-                    ArgumentCaptor.forClass(ChangeLoanContractResponse.class);
+            ArgumentCaptor<ChangedLoanContractDTO> captor =
+                    ArgumentCaptor.forClass(ChangedLoanContractDTO.class);
             verify(loanChangeService).insertChangedContract(captor.capture());
 
-            ChangeLoanContractResponse changedContract = captor.getValue();
+            ChangedLoanContractDTO changedContract = captor.getValue();
             assertThat(changedContract.getPreviousContractId()).isEqualTo(CONTRACT_ID);
             assertThat(changedContract.getStatus()).isEqualTo(ContractStatus.PENDING);
         }

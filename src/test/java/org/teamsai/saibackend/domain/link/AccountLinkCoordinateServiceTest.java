@@ -28,18 +28,18 @@ import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.teamsai.saibackend.domain.link.service.LinkOperationStore.Status.*;
+import static org.teamsai.saibackend.domain.link.service.LinkOperationStoreService.Status.*;
 
 class AccountLinkCoordinatorTest {
-    private final UserLinkLock lock = mock(UserLinkLock.class);
+    private final UserLinkLockService lock = mock(UserLinkLockService.class);
     private final UserService users = mock(UserService.class);
     private final LinkedBankAccountService accounts = mock(LinkedBankAccountService.class);
     private final AccountLinkService persistence = mock(AccountLinkService.class);
     private final MockBankClient bank = mock(MockBankClient.class);
-    private final LinkOperationStore operations = mock(LinkOperationStore.class);
-    private final AccountLinkCoordinator coordinator = new AccountLinkCoordinator(
+    private final LinkOperationStoreService operations = mock(LinkOperationStoreService.class);
+    private final AccountLinkCoordinateService coordinator = new AccountLinkCoordinateService(
             lock, users, accounts, persistence, bank, operations);
-    private LinkOperationStore.Operation receipt;
+    private LinkOperationStoreService.Operation receipt;
 
     @BeforeEach
     void setUp() {
@@ -48,16 +48,16 @@ class AccountLinkCoordinatorTest {
         when(operations.find(anyString())).thenAnswer(i -> Optional.ofNullable(receipt));
         doAnswer(i -> { receipt = i.getArgument(0); return null; }).when(operations).begin(any());
         doAnswer(i -> {
-            receipt = new LinkOperationStore.Operation(i.getArgument(0), i.getArgument(1), "ISSUE", null, null, ISSUE_PENDING);
+            receipt = new LinkOperationStoreService.Operation(i.getArgument(0), i.getArgument(1), "ISSUE", null, null, ISSUE_PENDING);
             return null;
         }).when(operations).beginIssue(anyString(), anyLong());
         doAnswer(i -> {
-            receipt = new LinkOperationStore.Operation(receipt.id(), receipt.userId(), i.getArgument(2),
+            receipt = new LinkOperationStoreService.Operation(receipt.id(), receipt.userId(), i.getArgument(2),
                     receipt.previousKey(), i.getArgument(1), ISSUED);
             return null;
         }).when(operations).recordIssued(anyString(), anyString(), anyString());
         doAnswer(i -> {
-            receipt = new LinkOperationStore.Operation(receipt.id(), receipt.userId(), receipt.requestHash(),
+            receipt = new LinkOperationStoreService.Operation(receipt.id(), receipt.userId(), receipt.requestHash(),
                     receipt.previousKey(), receipt.newKey(), i.getArgument(1));
             return null;
         }).when(operations).mark(anyString(), any());
@@ -145,7 +145,7 @@ class AccountLinkCoordinatorTest {
     @Test
     void successfulCommitReceiptPreventsCompensationOnAmbiguousCommitError() {
         doAnswer(i -> {
-            receipt = new LinkOperationStore.Operation(receipt.id(), receipt.userId(), receipt.requestHash(),
+            receipt = new LinkOperationStoreService.Operation(receipt.id(), receipt.userId(), receipt.requestHash(),
                     receipt.previousKey(), receipt.newKey(), COMPLETED);
             throw new IllegalStateException("commit response lost");
         }).when(persistence).completeLink(anyLong(),anyString(),isNull(),anyList(),anyString());
@@ -189,10 +189,10 @@ class AccountLinkCoordinatorTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStore.Status.class,
+    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStoreService.Status.class,
             names = {"CONFIRM_UNKNOWN", "COMPENSATION_PENDING"})
-    void recoveryDoesNotNeedOriginalStateAndRestoresPreviousKey(LinkOperationStore.Status status) {
-        receipt = new LinkOperationStore.Operation("old-state", 1L, "hash", "old", "new", status);
+    void recoveryDoesNotNeedOriginalStateAndRestoresPreviousKey(LinkOperationStoreService.Status status) {
+        receipt = new LinkOperationStoreService.Operation("old-state", 1L, "hash", "old", "new", status);
         when(users.getUserKeyByUserId(1L)).thenReturn("old");
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
 
@@ -206,7 +206,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void processingRecoveryRestoresBankBeforeMarkingFailed() {
-        receipt = new LinkOperationStore.Operation(
+        receipt = new LinkOperationStoreService.Operation(
                 "id", 1L, "hash", "old", "new", PROCESSING
         );
 
@@ -261,7 +261,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void processingRecoveryCanBeRetriedAfterNetworkFailure() {
-        receipt = new LinkOperationStore.Operation(
+        receipt = new LinkOperationStoreService.Operation(
                 "id", 1L, "hash", "old", "new", PROCESSING
         );
 
@@ -312,7 +312,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void expiredBankRecoveryKeepsOperationAndBlocksNewIssuance() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", COMPENSATION_PENDING);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", null, "new", COMPENSATION_PENDING);
         when(operations.findUnresolved(1L)).thenAnswer(i -> List.of(receipt));
         doThrow(new BankKeyRecoveryException(BankKeyRecoveryException.Reason.EXPIRED, null))
                 .when(bank).recoverUserKey(eq("token"), eq("new"), isNull(), anyString());
@@ -325,7 +325,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void failedRecoveryRemainsUnresolvedAndCanBeRetried() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenAnswer(i -> List.of(receipt));
         doThrow(new RestClientException("response lost")).doNothing()
                 .when(bank).recoverUserKey(eq("token"), eq("new"), isNull(), anyString());
@@ -341,7 +341,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void recoveryNeverOverwritesAnUnexpectedLocalKey() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", "old", "new", CONFIRM_UNKNOWN);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", "old", "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
         when(users.getUserKeyByUserId(1L)).thenReturn("different");
         assertError(() -> coordinator.recoverUnresolved(1L), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
@@ -351,7 +351,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void keyIssueRecoversOldOperationBeforeRequestingAnotherKey() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
         when(bank.requestUserKey(eq("name"), eq("token"), anyString())).thenReturn("replacement");
 
@@ -369,7 +369,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void conflictingRotationStopsAutomaticRecovery() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenAnswer(i -> List.of(receipt));
         doThrow(new BankKeyRecoveryException(BankKeyRecoveryException.Reason.CONFLICT, null))
                 .when(bank).recoverUserKey("token", "new", null, "id");
@@ -403,7 +403,7 @@ class AccountLinkCoordinatorTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(ints = {408, 429, 500, 503})
     void transientHttpFailureRetainsRetryableOperation(int status) {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenAnswer(i -> List.of(receipt));
         doThrow(new org.springframework.web.client.RestClientResponseException(
                 "bank failure", status, "failure", null, null, null))
@@ -415,7 +415,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void nonRetryableHttpFailureRequiresReconciliation() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", null, "new", CONFIRM_UNKNOWN);
         when(operations.findUnresolved(1L)).thenAnswer(i -> List.of(receipt));
         doThrow(new org.springframework.web.client.RestClientResponseException(
                 "invalid request", 400, "bad request", null, null, null))
@@ -436,7 +436,7 @@ class AccountLinkCoordinatorTest {
         when(operations.findUnresolved(1L)).thenAnswer(i -> List.of(receipt));
         doAnswer(i -> {
             when(users.getUserKeyByUserId(1L)).thenReturn("new");
-            receipt = new LinkOperationStore.Operation(receipt.id(), 1L, receipt.requestHash(), null, "new", COMPLETED);
+            receipt = new LinkOperationStoreService.Operation(receipt.id(), 1L, receipt.requestHash(), null, "new", COMPLETED);
             return null;
         }).when(persistence).completeLink(eq(1L), eq("new"), isNull(), anyList(), eq(originalId));
 
@@ -449,7 +449,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void restartAfterIssuedKeyWasSavedSkipsIssuance() {
-        receipt = new LinkOperationStore.Operation("id", 1L, "hash", null, "new", ISSUED);
+        receipt = new LinkOperationStoreService.Operation("id", 1L, "hash", null, "new", ISSUED);
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
         coordinator.recoverUnresolved(1L);
         verify(bank, never()).requestUserKey(anyString(), anyString(), anyString());
@@ -540,7 +540,7 @@ class AccountLinkCoordinatorTest {
     }
 
     private void assertIssuanceStopsRetrying(RestClientResponseException failure,
-                                             LinkOperationStore.Status expectedStatus, AccountErrorCode expectedCode) {
+                                             LinkOperationStoreService.Status expectedStatus, AccountErrorCode expectedCode) {
         when(operations.findUnresolved(1L)).thenAnswer(i -> receipt == null ? List.of() : List.of(receipt));
         when(bank.requestUserKey(eq("name"), eq("token"), anyString())).thenThrow(failure);
 
@@ -575,7 +575,7 @@ class AccountLinkCoordinatorTest {
 
     @Test
     void expiredLostResponseIsClosedBeforeNewOperationIsIssued() {
-        receipt = new LinkOperationStore.Operation("expired-id", 1L, "ISSUE", null, null, ISSUE_PENDING);
+        receipt = new LinkOperationStoreService.Operation("expired-id", 1L, "ISSUE", null, null, ISSUE_PENDING);
         when(operations.findUnresolved(1L)).thenReturn(List.of(receipt));
         when(bank.requestUserKey("name", "token", "expired-id"))
                 .thenThrow(issuanceHttpFailure(409, "{\"code\":\"KEY_ISSUANCE_EXPIRED\"}"));

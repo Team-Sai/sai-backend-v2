@@ -15,14 +15,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.client.RestClientException;
-import org.teamsai.saibackend.domain.account.dto.request.LinkAccountRequest;
+import org.teamsai.saibackend.domain.account.dto.request.AccountLinkRequest;
 import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.repository.LinkedBankAccountRepository;
 import org.teamsai.saibackend.domain.account.service.*;
 import org.teamsai.saibackend.domain.link.service.*;
-import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -61,20 +61,20 @@ class AccountTransactionIntegrationTest {
     @EntityScan("org.teamsai.saibackend.domain")
     @EnableJpaRepositories(basePackageClasses = {UserRepository.class,
             LinkedBankAccountRepository.class, BankTransactionRepository.class})
-    @Import({AccountLinkCoordinator.class, AccountLinkService.class, LinkOperationStore.class,
-            UserLinkLock.class, LinkedAccountWriter.class, LinkedBankAccountService.class,
+    @Import({AccountLinkCoordinateService.class, AccountLinkService.class, LinkOperationStoreService.class,
+            UserLinkLockService.class, LinkedAccountWriteService.class, LinkedBankAccountService.class,
             UserService.class, AccountService.class, BankTransactionPersistenceService.class})
     static class Config {}
 
     @Autowired UserRepository users;
     @Autowired LinkedBankAccountRepository accounts;
-    @Autowired AccountLinkCoordinator coordinator;
+    @Autowired AccountLinkCoordinateService coordinator;
     @Autowired AccountService accountService;
     @Autowired LinkedBankAccountService accountLinks;
-    @Autowired LinkedAccountWriter writer;
+    @Autowired LinkedAccountWriteService writer;
     @Autowired AccountLinkService persistence;
-    @Autowired LinkOperationStore operations;
-    @Autowired UserLinkLock lock;
+    @Autowired LinkOperationStoreService operations;
+    @Autowired UserLinkLockService lock;
     @Autowired BankTransactionPersistenceService transactions;
     @Autowired JdbcTemplate jdbc;
     @Autowired UserService userService;
@@ -86,11 +86,11 @@ class AccountTransactionIntegrationTest {
     String key;
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStore.Status.class,
+    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStoreService.Status.class,
             names = {"COMPLETED", "FAILED"})
-    void withdrawalPreservesFinishedOperation(LinkOperationStore.Status status) {
-        operations.begin(new LinkOperationStore.Operation(state, userId, "request-hash", null, key,
-                LinkOperationStore.Status.PROCESSING));
+    void withdrawalPreservesFinishedOperation(LinkOperationStoreService.Status status) {
+        operations.begin(new LinkOperationStoreService.Operation(state, userId, "request-hash", null, key,
+                LinkOperationStoreService.Status.PROCESSING));
         operations.mark(state, status);
 
         coordinator.withdrawUser(userId);
@@ -103,12 +103,12 @@ class AccountTransactionIntegrationTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStore.Status.class,
+    @org.junit.jupiter.params.provider.EnumSource(value = LinkOperationStoreService.Status.class,
             names = {"ISSUE_PENDING", "ISSUED", "PROCESSING", "CONFIRM_UNKNOWN", "COMPENSATION_PENDING",
                     "RECOVERY_EXPIRED", "RECOVERY_CONFLICT", "RECONCILIATION_REQUIRED"})
-    void unresolvedOperationBlocksWithdrawal(LinkOperationStore.Status status) {
-        operations.begin(new LinkOperationStore.Operation(state, userId, "request-hash", null, key,
-                LinkOperationStore.Status.PROCESSING));
+    void unresolvedOperationBlocksWithdrawal(LinkOperationStoreService.Status status) {
+        operations.begin(new LinkOperationStoreService.Operation(state, userId, "request-hash", null, key,
+                LinkOperationStoreService.Status.PROCESSING));
         operations.mark(state, status);
 
         assertError(() -> coordinator.withdrawUser(userId), AccountErrorCode.LINK_RECONCILIATION_REQUIRED);
@@ -122,16 +122,16 @@ class AccountTransactionIntegrationTest {
     @org.junit.jupiter.params.provider.EnumSource(org.teamsai.saibackend.global.client.BankKeyRecoveryException.Reason.class)
     void definitiveRecoveryFailureIsPersistedAndBlocksNewIssue(
             org.teamsai.saibackend.global.client.BankKeyRecoveryException.Reason reason) {
-        operations.begin(new LinkOperationStore.Operation(state, userId, "request-hash", null, key,
-                LinkOperationStore.Status.PROCESSING));
-        operations.mark(state, LinkOperationStore.Status.CONFIRM_UNKNOWN);
+        operations.begin(new LinkOperationStoreService.Operation(state, userId, "request-hash", null, key,
+                LinkOperationStoreService.Status.PROCESSING));
+        operations.mark(state, LinkOperationStoreService.Status.CONFIRM_UNKNOWN);
         doThrow(new org.teamsai.saibackend.global.client.BankKeyRecoveryException(reason, null))
                 .when(bank).recoverUserKey(state, key, null, state);
         boolean expired = reason == org.teamsai.saibackend.global.client.BankKeyRecoveryException.Reason.EXPIRED;
         var expected = expired ? AccountErrorCode.LINK_RECOVERY_EXPIRED : AccountErrorCode.LINK_RECOVERY_CONFLICT;
         assertError(() -> coordinator.recoverUnresolved(userId), expected);
         assertThat(operations.find(state).orElseThrow().status()).isEqualTo(expired
-                ? LinkOperationStore.Status.RECOVERY_EXPIRED : LinkOperationStore.Status.RECOVERY_CONFLICT);
+                ? LinkOperationStoreService.Status.RECOVERY_EXPIRED : LinkOperationStoreService.Status.RECOVERY_CONFLICT);
         assertThat(operations.hasUnresolved(userId)).isTrue();
         assertError(() -> coordinator.issueOrGetUserKey(userId), expected);
         verify(bank, times(1)).recoverUserKey(state, key, null, state);
@@ -179,8 +179,8 @@ class AccountTransactionIntegrationTest {
         jdbc.update("UPDATE users SET user_key=? WHERE user_id=?",key,userId);
         when(bank.getAccountDetail(1L,key)).thenReturn(detail(1L));
         when(bank.getAccountDetail(2L,key)).thenReturn(detail(2L));
-        var request = new LinkAccountRequest(List.of(new LinkAccountRequest.SelectedAccount(1L,"ok"),
-                new LinkAccountRequest.SelectedAccount(2L,"x".repeat(51))));
+        var request = new AccountLinkRequest(List.of(new AccountLinkRequest.SelectedAccount(1L,"ok"),
+                new AccountLinkRequest.SelectedAccount(2L,"x".repeat(51))));
         assertThatThrownBy(() -> accountLinks.linkSelectedAccounts(userId,request))
                 .isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(accounts.findAllByUserId(userId)).isEmpty();
@@ -264,9 +264,9 @@ class AccountTransactionIntegrationTest {
     }
 
     @Test void recoveryClosesDurableOperationWithoutOriginalState() {
-        operations.begin(new LinkOperationStore.Operation(state, userId, "hash", null, key,
-                LinkOperationStore.Status.PROCESSING));
-        operations.mark(state, LinkOperationStore.Status.CONFIRM_UNKNOWN);
+        operations.begin(new LinkOperationStoreService.Operation(state, userId, "hash", null, key,
+                LinkOperationStoreService.Status.PROCESSING));
+        operations.mark(state, LinkOperationStoreService.Status.CONFIRM_UNKNOWN);
         coordinator.recoverUnresolved(userId);
         assertThat(operations.hasUnresolved(userId)).isFalse();
         assertThat(status()).isEqualTo("FAILED");
@@ -284,7 +284,7 @@ class AccountTransactionIntegrationTest {
             assertThat(entered.await(5,TimeUnit.SECONDS)).isTrue();
             assertError(() -> coordinator.completeCallback(userId,state,key,List.of(1L)),AccountErrorCode.LINK_IN_PROGRESS);
             assertError(() -> accountService.issueOrGetUserKey(userId),AccountErrorCode.LINK_IN_PROGRESS);
-            var selection = new LinkAccountRequest(List.of(new LinkAccountRequest.SelectedAccount(1L,"alias")));
+            var selection = new AccountLinkRequest(List.of(new AccountLinkRequest.SelectedAccount(1L,"alias")));
             assertError(() -> coordinator.linkSelectedAccounts(userId,selection),AccountErrorCode.LINK_IN_PROGRESS);
             release.countDown(); first.get(10,TimeUnit.SECONDS);
             coordinator.completeCallback(userId,state,key,List.of(1L));
@@ -348,14 +348,14 @@ class AccountTransactionIntegrationTest {
                 .thenThrow(new RestClientException("response lost")).thenReturn(key);
         assertError(() -> accountService.issueOrGetUserKey(userId), AccountErrorCode.BANK_SERVER_UNAVAILABLE);
         var pending = operations.findUnresolved(userId).get(0);
-        assertThat(pending.status()).isEqualTo(LinkOperationStore.Status.ISSUE_PENDING);
+        assertThat(pending.status()).isEqualTo(LinkOperationStoreService.Status.ISSUE_PENDING);
         assertThat(pending.newKey()).isNull();
         // Reconstruct the coordinator to exclude any in-memory state from the retry.
-        var restarted = new AccountLinkCoordinator(lock, userService, accountLinks, persistence, bank, operations);
+        var restarted = new AccountLinkCoordinateService(lock, userService, accountLinks, persistence, bank, operations);
         assertThat(restarted.issueOrGetUserKey(userId).userKey()).isEqualTo(key);
         verify(bank, times(2)).requestUserKey("Account Test", state, pending.id());
         verify(bank).confirmUserKey(key, pending.id());
-        assertThat(operations.find(pending.id()).orElseThrow().status()).isEqualTo(LinkOperationStore.Status.COMPLETED);
+        assertThat(operations.find(pending.id()).orElseThrow().status()).isEqualTo(LinkOperationStoreService.Status.COMPLETED);
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(key);
     }
 
@@ -390,7 +390,7 @@ class AccountTransactionIntegrationTest {
     @Test void staleExpectedKeyCannotOverwriteNewKeyOrCompleteReceipt() {
         jdbc.update("UPDATE users SET user_key=? WHERE user_id=?",key,userId);
         String operationId=UUID.randomUUID().toString();
-        operations.begin(new LinkOperationStore.Operation(operationId,userId,"hash",null,"new",LinkOperationStore.Status.PROCESSING));
+        operations.begin(new LinkOperationStoreService.Operation(operationId,userId,"hash",null,"new",LinkOperationStoreService.Status.PROCESSING));
         assertThatThrownBy(() -> persistence.completeLink(userId,"new",null,List.of(candidate(1L,"alias")),operationId))
                 .extracting("errorCode").isEqualTo(org.teamsai.saibackend.domain.user.exception.UserErrorCode.LINK_KEY_UPDATE_CONFLICT);
         assertThat(users.findUserKeyByUserId(userId)).isEqualTo(key);
@@ -413,7 +413,7 @@ class AccountTransactionIntegrationTest {
 
     @Test void invalidSecondTransactionRollsBackFirstInsertAndBalance() {
         Long id=writer.insertAll(List.of(candidate(1L,"alias"))).get(0).getLinkedAccountId();
-        var invalid=new BankTransactionResponse(2L,"bad",1L,null,BigDecimal.TEN,BigDecimal.ONE,
+        var invalid=new BankTransactionDTO(2L,"bad",1L,null,BigDecimal.TEN,BigDecimal.ONE,
                 "holder","masked","memo",LocalDateTime.now(),1L);
         assertError(() -> transactions.saveAndAdvanceCursor(id,List.of(tx(1L,BigDecimal.ONE),invalid)),AccountErrorCode.INVALID_BANK_RESPONSE);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM bank_transaction WHERE linked_account_id=?",Long.class,id)).isZero();
@@ -425,7 +425,7 @@ class AccountTransactionIntegrationTest {
     private AccountDetailResponse detail(Long id) {return new AccountDetailResponse(id,"088","masked","name","holder",BigDecimal.TEN,"ACTIVE",null,null);}
     private LinkedBankAccount candidate(Long id,String alias) {return LinkedBankAccount.builder().userId(userId).accountId(id)
             .bankCode("088").accountNumber("masked").accountAlias(alias).accountHolderName("holder").balance(BigDecimal.TEN).build();}
-    private BankTransactionResponse tx(Long id,BigDecimal balance) {return new BankTransactionResponse(id,"tx-"+id,1L,"DEPOSIT",
+    private BankTransactionDTO tx(Long id,BigDecimal balance) {return new BankTransactionDTO(id,"tx-"+id,1L,"DEPOSIT",
             BigDecimal.TEN,balance,"holder","masked","memo",LocalDateTime.now(),1L);}
     private void assertError(Runnable action,AccountErrorCode code) {assertThatThrownBy(action::run).extracting("errorCode").isEqualTo(code);}
 }

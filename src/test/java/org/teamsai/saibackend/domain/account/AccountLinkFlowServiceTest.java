@@ -15,7 +15,7 @@ import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
 import org.teamsai.saibackend.domain.link.dto.response.AccountLinkCallbackResult;
-import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinator;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinateService;
 import org.teamsai.saibackend.domain.link.service.AccountLinkFlowService;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
@@ -39,7 +39,7 @@ class AccountLinkFlowServiceTest {
     LinkedBankAccountService linkedBankAccountService;
 
     @Mock
-    AccountLinkCoordinator coordinator;
+    AccountLinkCoordinateService coordinator;
 
     @Mock
     UserService userService;

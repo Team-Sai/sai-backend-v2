@@ -18,7 +18,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TransactionSyncFacade {
+public class TransactionSyncMatchService {
 
     private final TransactionSyncService transactionSyncService;
     private final BankMatchingService bankMatchingService;

@@ -9,7 +9,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
@@ -43,7 +43,7 @@ public class TransactionSyncService {
         Long lastSyncedId = linkedBankAccountService.getLastSyncedTransactionId(linkedAccountId);
         long afterTransactionId = lastSyncedId == null ? 0L : lastSyncedId;
 
-        List<BankTransactionResponse> transactions = fetchTransactions(
+        List<BankTransactionDTO> transactions = fetchTransactions(
                 linkedAccountId,
                 linkedAccount.getAccountId(),
                 userKey,
@@ -65,7 +65,7 @@ public class TransactionSyncService {
         }
     }
 
-    private List<BankTransactionResponse> fetchTransactions(
+    private List<BankTransactionDTO> fetchTransactions(
             Long linkedAccountId,
             Long bankAccountId,
             String userKey,

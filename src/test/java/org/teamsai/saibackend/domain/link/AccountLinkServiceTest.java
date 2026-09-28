@@ -1,6 +1,6 @@
 package org.teamsai.saibackend.domain.link;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.account.service.LinkedAccountWriter;
+import org.teamsai.saibackend.domain.account.service.LinkedAccountWriteService;
 import org.teamsai.saibackend.domain.link.service.*;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -10,8 +10,8 @@ import static org.assertj.core.api.Assertions.*;
 
 class AccountLinkServiceTest {
     private final UserService users = mock(UserService.class);
-    private final LinkedAccountWriter writer = mock(LinkedAccountWriter.class);
-    private final LinkOperationStore operations = mock(LinkOperationStore.class);
+    private final LinkedAccountWriteService writer = mock(LinkedAccountWriteService.class);
+    private final LinkOperationStoreService operations = mock(LinkOperationStoreService.class);
     private final AccountLinkService service = new AccountLinkService(users, writer, operations);
     @Test void usesOriginalSnapshotAndCompletesReceiptAfterWrites() {
         when(users.updateUserKeyByUserId(1L,"new","original")).thenReturn(1);

@@ -15,7 +15,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
 import org.teamsai.saibackend.domain.transaction.service.TransactionSyncService;
@@ -153,8 +153,8 @@ class TransactionSyncServiceTest {
                 .build();
     }
 
-    private BankTransactionResponse createTransactionResponse(Long transactionId, String transactionKey) {
-        return new BankTransactionResponse(
+    private BankTransactionDTO createTransactionResponse(Long transactionId, String transactionKey) {
+        return new BankTransactionDTO(
                 transactionId,
                 transactionKey,
                 BANK_ACCOUNT_ID,
@@ -177,7 +177,7 @@ class TransactionSyncServiceTest {
         @DisplayName("커서가 없으면(null) 0부터 조회하고, 조회 결과를 저장 서비스에 그대로 위임한다")
         void syncsNewTransactionsWhenNoCursorExists() {
             LinkedBankAccount linkedAccount = createLinkedAccount();
-            List<BankTransactionResponse> transactions = List.of(
+            List<BankTransactionDTO> transactions = List.of(
                     createTransactionResponse(6L, "MOCK-TX-0001"),
                     createTransactionResponse(7L, "MOCK-TX-0002")
             );
@@ -267,7 +267,7 @@ class TransactionSyncServiceTest {
         @DisplayName("저장 단계(BankTransactionPersistenceService)에서 예외가 발생하면 그대로 전파한다")
         void propagatesExceptionWhenPersistenceFails() {
             LinkedBankAccount linkedAccount = createLinkedAccount();
-            List<BankTransactionResponse> transactions = List.of(
+            List<BankTransactionDTO> transactions = List.of(
                     createTransactionResponse(6L, "MOCK-TX-0001")
             );
             DomainException persistenceFailure = mock(DomainException.class);
