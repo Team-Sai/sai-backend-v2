@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.teamsai.saibackend.domain.settlement.type.CycleRule;
+import org.teamsai.saibackend.domain.settlement.type.SplitType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -41,6 +42,11 @@ public class RecurringSettlementCreateRequest {
     private Long linkedAccountId;
     
     private List<SettlementParticipantCreateRequest> participants;
+
+    @NotNull(message = "정산 분배 방식을 선택해 주세요.")
+    private SplitType splitType;
+
+    private BigDecimal ownerAmount;
 
     @AssertTrue(message = "종료일은 시작일보다 빠를 수 없습니다.")
     public boolean isValidPeriod() {

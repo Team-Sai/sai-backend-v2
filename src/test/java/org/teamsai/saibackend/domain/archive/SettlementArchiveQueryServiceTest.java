@@ -189,6 +189,7 @@ class SettlementArchiveQueryServiceTest {
                 "SHARED",
                 settlementStatus,
                 "EQUAL",
+                new BigDecimal("100000"),
                 LocalDate.of(2026, 8, 31),
                 null,
                 null,

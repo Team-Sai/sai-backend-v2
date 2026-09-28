@@ -16,9 +16,11 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipant
 import org.teamsai.saibackend.domain.settlement.support.SettlementParticipantValidator;
 import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.settlement.type.SplitType;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -237,6 +239,91 @@ class SettlementValidatorTest {
         );
     }
 
+    @Test
+    @DisplayName("CUSTOM 정산 금액 합이 총액과 일치하면 검증을 통과한다")
+    void validateCustomCreateRequestSuccess() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("20000"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("30000")
+                                        ),
+                                        participant(
+                                                "SAI_USER_B",
+                                                new BigDecimal("50000")
+                                        )
+                                )
+                        )
+                        .build();
+
+        settlementValidator.validateCreateRequest(request);
+    }
+
+    @Test
+    @DisplayName("CUSTOM 정산 금액 합이 총액과 다르면 검증에 실패한다")
+    void validateCustomCreateRequestFailsWhenAmountSumDoesNotMatch() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("20000"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("30000")
+                                        ),
+                                        participant(
+                                                "SAI_USER_B",
+                                                new BigDecimal("40000")
+                                        )
+                                )
+                        )
+                        .build();
+
+        assertSettlementExceptionThrownBy(
+                () ->
+                        settlementValidator.validateCreateRequest(
+                                request
+                        ),
+                SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT
+        );
+    }
+    @Test
+    @DisplayName("CUSTOM 정산 참여자 금액이 0원이면 검증에 실패한다")
+    void validateCustomCreateRequestFailsWhenParticipantAmountIsZero() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("100000"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                BigDecimal.ZERO
+                                        )
+                                )
+                        )
+                        .build();
+
+        assertSettlementExceptionThrownBy(
+                () ->
+                        settlementValidator.validateCreateRequest(
+                                request
+                        ),
+                SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT
+        );
+    }
+
 
     @Test
     @DisplayName("공동정산 생성 요청이 null이면 검증에 실패한다")
@@ -333,6 +420,7 @@ class SettlementValidatorTest {
     ) {
 
         return SharedSettlementCreateRequest.builder()
+                .splitType(SplitType.EQUAL)
                 .participants(participants)
                 .build();
     }
@@ -344,6 +432,17 @@ class SettlementValidatorTest {
 
         return SettlementParticipantCreateRequest.builder()
                 .userToken(userToken)
+                .build();
+    }
+
+    private SettlementParticipantCreateRequest participant(
+            String userToken,
+            BigDecimal amount
+    ) {
+
+        return SettlementParticipantCreateRequest.builder()
+                .userToken(userToken)
+                .amount(amount)
                 .build();
     }
 

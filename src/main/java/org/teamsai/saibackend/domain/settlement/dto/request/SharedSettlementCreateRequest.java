@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.teamsai.saibackend.domain.settlement.type.SplitType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,6 +35,11 @@ public class SharedSettlementCreateRequest {
 
     @NotNull(message = "정산 수취 계좌를 선택해 주세요.")
     private Long linkedAccountId;
+
+    @NotNull(message = "정산 분배 방식을 선택해 주세요.")
+    private SplitType splitType;
+
+    private BigDecimal ownerAmount;
 
     private List<SettlementParticipantCreateRequest> participants;
 }

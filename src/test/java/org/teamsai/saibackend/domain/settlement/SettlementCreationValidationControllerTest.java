@@ -115,6 +115,8 @@ class SettlementCreationValidationControllerTest {
         String schedule = type.equals("shared") ? "\"dueDate\":\"" + date + "\""
                 : "\"startDate\":\"" + date + "\",\"cycleRule\":\"MONTHLY\"";
         return "{\"settlementCategory\":\"test\",\"title\":\"" + title
-                + "\",\"totalAmount\":1000,\"linkedAccountId\":1," + schedule + participants + "}";
+                + "\",\"splitType\":\"EQUAL\""
+                + ",\"totalAmount\":1000,\"linkedAccountId\":1,"
+                + schedule + participants + "}";
     }
 }
