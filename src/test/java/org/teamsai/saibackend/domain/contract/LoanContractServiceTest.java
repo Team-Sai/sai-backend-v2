@@ -484,6 +484,43 @@ class LoanContractServiceTest {
         }
 
         @Test
+        @DisplayName("원계약이면 표시번호는 LC-{contractId}이다")
+        void findContractDisplayIdForOriginalContract() {
+            given(contractRepository.findById(CONTRACT_ID)).willReturn(Optional.of(contractWithParties()));
+            given(userService.getMyInfo(CREDITOR_ID)).willReturn(UserResponse.builder().name("김채권").build());
+            given(userService.getMyInfo(DEBTOR_ID)).willReturn(UserResponse.builder().name("이채무").build());
+
+            LoanContractResponse result = loanContractService.findContract(CONTRACT_ID, CREDITOR_ID);
+
+            assertThat(result.getContractDisplayId()).isEqualTo("LC-" + CONTRACT_ID);
+        }
+
+        @Test
+        @DisplayName("여러 번 변경된 계약이면 표시번호는 LC-{원계약ID}-{contractId}이다")
+        void findContractDisplayIdForChangedContract() {
+            LoanContract original = contractWithParties();
+            LoanContract firstChange = LoanContract.builder()
+                    .contractId(5L)
+                    .previousContract(original)
+                    .creditor(userRef(CREDITOR_ID))
+                    .debtor(userRef(DEBTOR_ID))
+                    .build();
+            LoanContract secondChange = LoanContract.builder()
+                    .contractId(9L)
+                    .previousContract(firstChange)
+                    .creditor(userRef(CREDITOR_ID))
+                    .debtor(userRef(DEBTOR_ID))
+                    .build();
+            given(contractRepository.findById(9L)).willReturn(Optional.of(secondChange));
+            given(userService.getMyInfo(CREDITOR_ID)).willReturn(UserResponse.builder().name("김채권").build());
+            given(userService.getMyInfo(DEBTOR_ID)).willReturn(UserResponse.builder().name("이채무").build());
+
+            LoanContractResponse result = loanContractService.findContract(9L, CREDITOR_ID);
+
+            assertThat(result.getContractDisplayId()).isEqualTo("LC-" + CONTRACT_ID + "-9");
+        }
+
+        @Test
         @DisplayName("계약서를 찾을 수 없으면 예외가 발생한다")
         void findContractFailsWhenNotFound() {
             given(contractRepository.findById(CONTRACT_ID)).willReturn(Optional.empty());

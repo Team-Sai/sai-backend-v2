@@ -23,6 +23,7 @@ public class LoanContractResponse {
 
     private Long contractId;
     private Long previousContractId;
+    private String contractDisplayId;
 
     @JsonIgnore
     private Long creditorId;

@@ -22,7 +22,6 @@ public record SettlementArchivePreviewResponse(
         BigDecimal ownerAmount,
         SettlementPaymentStatusResponse paymentStatus,
         List<SettlementPaymentHistoryResponse> paymentHistory,
-        SettlementAccountResponse settlementAccount,
-        String documentVersion
+        SettlementAccountResponse settlementAccount
 ) {
 }

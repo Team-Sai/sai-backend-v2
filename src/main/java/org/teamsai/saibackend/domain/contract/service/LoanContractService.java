@@ -156,6 +156,7 @@ public class LoanContractService {
         return ContractStatus.COMPLETED;
     }
 
+    @Transactional(readOnly = true)
     public LoanContractResponse findContract(Long contractId, Long userId) {
         LoanContract contract = contractRepository.findById(contractId)
                 .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
@@ -166,7 +167,10 @@ public class LoanContractService {
             throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
         }
 
-        return attachPartyInfo(LoanContractResponse.from(contract));
+        return LoanContractAssembler.withDisplayId(
+                attachPartyInfo(LoanContractResponse.from(contract)),
+                contract.getRootContract().getContractId()
+        );
     }
 
     public LoanContractResponse attachPartyInfo(LoanContractResponse contract) {
