@@ -149,6 +149,13 @@ public class LoanContract {
         return true;
     }
 
+    public LoanContract getRootContract() {
+        LoanContract root = this;
+        while (root.getPreviousContract() != null) {
+            root = root.getPreviousContract();
+        }
+        return root;
+    }
 
 
 

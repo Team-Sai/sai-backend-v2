@@ -166,7 +166,10 @@ public class LoanContractService {
             throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
         }
 
-        return attachPartyInfo(LoanContractResponse.from(contract));
+        return LoanContractAssembler.withDisplayId(
+                attachPartyInfo(LoanContractResponse.from(contract)),
+                contract.getRootContract().getContractId()
+        );
     }
 
     public LoanContractResponse attachPartyInfo(LoanContractResponse contract) {
