@@ -47,5 +47,4 @@ node_modules/
 npm-debug.log*
 
 ### k6 loadtest ###
-k6-loadtest/grafana/dashboards/
 k6-loadtest/reports/

@@ -2,7 +2,7 @@ services:
   influxdb:
     image: influxdb:1.8
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     environment:
       INFLUXDB_HTTP_AUTH_ENABLED: "false"
       INFLUXDB_DB: "k6"
@@ -15,7 +15,7 @@ services:
     depends_on:
       - influxdb
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -27,34 +27,13 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     networks: [k6net]
 
-  dashboard-downloader:
-    image: curlimages/curl:8.5.0
-    depends_on:
-      - grafana
-    networks: [k6net]
-    volumes:
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-    command:
-      - /bin/sh
-      - -c
-      - |
-        mkdir -p /var/lib/grafana/dashboards
-        echo "download k6 dashboard json..."
-
-        curl -fsSL "https://grafana.com/api/dashboards/14801/revisions/2/download" \
-          -o /tmp/k6-raw.json || exit 1
-
-        echo "replacing datasource name..."
-        sed "s/\$${DS_DUMMY}/InfluxDB/g" /tmp/k6-raw.json \
-          > /var/lib/grafana/dashboards/k6.json
-
-        echo "done"
-
   k6:
     image: grafana/k6:0.49.0
     depends_on:
       - influxdb
     networks: [k6net]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./scripts:/scripts
     environment:
