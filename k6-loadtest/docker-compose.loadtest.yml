@@ -27,6 +27,29 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     networks: [k6net]
 
+  dashboard-downloader:
+    image: curlimages/curl:8.5.0
+    depends_on:
+      - grafana
+    networks: [k6net]
+    volumes:
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /var/lib/grafana/dashboards
+        echo "download k6 dashboard json..."
+
+        curl -fsSL "https://grafana.com/api/dashboards/14801/revisions/2/download" \
+          -o /tmp/k6-raw.json || exit 1
+
+        echo "replacing datasource name..."
+        sed "s/\$${DS_DUMMY}/InfluxDB/g" /tmp/k6-raw.json \
+          > /var/lib/grafana/dashboards/k6.json
+
+        echo "done"
+
   k6:
     image: grafana/k6:0.49.0
     depends_on:
