@@ -156,6 +156,7 @@ public class LoanContractService {
         return ContractStatus.COMPLETED;
     }
 
+    @Transactional(readOnly = true)
     public LoanContractResponse findContract(Long contractId, Long userId) {
         LoanContract contract = contractRepository.findById(contractId)
                 .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
