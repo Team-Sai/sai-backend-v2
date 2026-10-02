@@ -45,7 +45,7 @@ app:
 link-identity:
   hash-secret: test-only-link-identity-hash-secret
 link-state:
-  secret: test-only-link-state-secret
+  secret: dGVzdC1vbmx5LWxpbmstc3RhdGUtc2VjcmV0LTMyLWJ5dGVz
   allowed-return-urls: http://localhost:8080/accounts/link/callback
 link-callback:
   api-key: test-only-link-callback-key
@@ -54,7 +54,7 @@ slack:
     webhook-url: ""
     enabled: false
 jwt:
-  secret: test-only-jwt-signing-secret-with-at-least-32-bytes
+  secret: dGVzdC1vbmx5LWp3dC1zaWduaW5nLXNlY3JldC0zMi1ieXRlcw==
   access-token-expiration-ms: 1800000
   refresh-token-expiration-ms: 1209600000
   link-state-expiration-ms: 600000
