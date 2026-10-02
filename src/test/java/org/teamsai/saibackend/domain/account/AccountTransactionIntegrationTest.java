@@ -54,6 +54,7 @@ import static org.mockito.Mockito.*;
         "spring.jpa.hibernate.ddl-auto=none", "spring.jpa.open-in-view=false",
         "spring.batch.job.enabled=false", "spring.batch.jdbc.initialize-schema=never"})
 @ActiveProfiles("account-transaction-test")
+@org.junit.jupiter.api.Tag("integration")
 class AccountTransactionIntegrationTest {
     @Configuration(proxyBeanMethods = false)
     @Profile("account-transaction-test")

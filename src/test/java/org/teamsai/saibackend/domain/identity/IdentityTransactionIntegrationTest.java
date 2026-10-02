@@ -70,20 +70,21 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Uses the development MariaDB schema without DDL or application component scanning.
+ * Uses the isolated test MariaDB schema without application component scanning.
  * Only UUID-tagged fixtures created here are removed; no real PortOne, file, or notification calls.
  * Intentionally NOT @Transactional: assertions observe real commits and rollbacks.
  */
 @SpringBootTest(classes = IdentityTransactionIntegrationTest.Config.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
-                "spring.sql.init.mode=never", "spring.jpa.hibernate.ddl-auto=none",
+                "spring.sql.init.mode=always", "spring.jpa.hibernate.ddl-auto=none",
                 "spring.jpa.open-in-view=false", "spring.batch.job.enabled=false",
                 "spring.batch.jdbc.initialize-schema=never", "slack.batch-notification.enabled=false",
                 "portone.identity.store-id=test-store", "portone.identity.channel-key=test-channel",
                 "portone.identity.valid-minutes=10"
         })
-@ActiveProfiles({"dev", "identity-transaction-test"})
+@ActiveProfiles({"test", "identity-transaction-test"})
+@org.junit.jupiter.api.Tag("integration")
 class IdentityTransactionIntegrationTest {
     @Configuration(proxyBeanMethods = false)
     @Profile("identity-transaction-test")

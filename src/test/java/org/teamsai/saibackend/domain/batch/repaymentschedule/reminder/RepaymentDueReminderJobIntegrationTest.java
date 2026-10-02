@@ -51,8 +51,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         RepaymentDueReminderJobIntegrationTest.TestSliceConfig.class
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
 @DisplayName("repaymentDueReminderJob 통합 테스트")
+@org.junit.jupiter.api.Tag("integration")
 class RepaymentDueReminderJobIntegrationTest {
 
     @TestConfiguration
