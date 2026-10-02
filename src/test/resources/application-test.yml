@@ -13,7 +13,6 @@ spring:
         - classpath:db/account_link_operation.sql
         - classpath:db/bank_transaction.sql
         - classpath:db/bank_transaction_match_candidate.sql
-        - classpath:db/payment.sql
         - classpath:db/identity.sql
         - classpath:db/01_loancontract.sql
         - classpath:db/02_repayment_schedule.sql
@@ -21,6 +20,7 @@ spring:
         - classpath:db/04_contractaccount.sql
         - classpath:db/recurring_settlement.sql
         - classpath:db/settlement.sql
+        - classpath:db/payment.sql
         - classpath:db/settlement_account.sql
         - classpath:db/settlement_invitation.sql
         - classpath:db/settlement_participant.sql
