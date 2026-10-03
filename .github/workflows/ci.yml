@@ -66,6 +66,11 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run database integration tests
+        env:
+          SAI_ACCOUNT_DB_TEST: "true"
+          SAI_ACCOUNT_TEST_DB_URL: jdbc:mariadb://localhost:3307/sai_backend_test
+          SAI_ACCOUNT_TEST_DB_USER: root
+          SAI_ACCOUNT_TEST_DB_PASSWORD: test-only
         run: ./gradlew --no-daemon integrationTest
 
       - name: Upload integration test report on failure
