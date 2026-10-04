@@ -13,6 +13,8 @@ import java.util.List;
 @Component
 public class SpringAiRepaymentAgent implements RepaymentAgent {
 
+    public static final String PROMPT_VERSION = "v1";
+
     private static final String SYSTEM_PROMPT = """
             너는 사이원장의 상환관리 안내를 작성하는 AI이다.
             제공된 서버 데이터만 근거로 한국어 안내를 작성한다.

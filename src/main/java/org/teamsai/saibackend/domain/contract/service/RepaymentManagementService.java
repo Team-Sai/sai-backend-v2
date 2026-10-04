@@ -10,10 +10,10 @@ import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementRe
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementResponse.AgentAnalysis;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementResponse.PlanItem;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -22,6 +22,9 @@ public class RepaymentManagementService {
 
     private final RepaymentAnalysisService analysisService;
     private final RepaymentAgent repaymentAgent;
+    private final RepaymentAnalysisCache analysisCache;
+    private final RepaymentAnalysisCacheKey cacheKey;
+    private final RepaymentGenerationCoordinator generationCoordinator;
 
     public RepaymentManagementResponse getManagement(Long userId) {
         RepaymentAnalysisContext context = analysisService.analyze(userId);
@@ -30,17 +33,106 @@ public class RepaymentManagementService {
             return fallback(context);
         }
 
-        RepaymentAgentDraft draft;
-        Map<Long, String> reasons;
+        String key = cacheKey.create(userId, context);
+
+        Optional<RepaymentAgentDraft> cached =
+                getValidatedCachedDraft(key, context);
+
+        if (cached.isPresent()) {
+            log.debug("상환 분석 캐시 HIT");
+
+            RepaymentAgentDraft draft = cached.get();
+
+            return buildAiResponse(
+                    context,
+                    draft,
+                    validateAndGetReasons(context, draft)
+            );
+        }
+
+        var pending = generationCoordinator.submit(
+                key,
+                cacheKey.failureScope(userId),
+                () -> {
+                    // 최초 캐시 조회 이후 다른 요청이 저장했을 수 있다.
+                    Optional<RepaymentAgentDraft> secondCheck =
+                            getValidatedCachedDraft(key, context);
+
+                    if (secondCheck.isPresent()) {
+                        return secondCheck.get();
+                    }
+
+                    log.debug("상환 분석 캐시 MISS · AI 생성");
+
+                    RepaymentAgentDraft draft;
+
+                    try {
+                        draft = repaymentAgent.generate(context);
+                        validateAndGetReasons(context, draft);
+                    } catch (RuntimeException exception) {
+                        log.warn("상환 AI 분석 실패", exception);
+                        throw exception;
+                    }
+
+                    analysisCache.put(key, draft);
+                    return draft;
+                }
+        );
+
+        Optional<RepaymentAgentDraft> generated;
 
         try {
-            draft = repaymentAgent.generate(context);
-            reasons = validateAndGetReasons(context, draft);
-        } catch (RuntimeException exception) {
-            log.warn("상환 AI 분석 실패", exception);
+            // HTTP 요청은 최대 25초까지만 결과를 기다린다.
+            generated = pending.get(25, TimeUnit.SECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return fallback(context);
+        } catch (TimeoutException exception) {
+            log.warn("상환 AI 결과 대기 시간 초과");
+            return fallback(context);
+        } catch (ExecutionException exception) {
+            log.warn("상환 AI 작업 결과 조회 실패");
             return fallback(context);
         }
 
+        if (generated.isEmpty()) {
+            return fallback(context);
+        }
+
+        RepaymentAgentDraft draft = generated.get();
+
+        return buildAiResponse(
+                context,
+                draft,
+                validateAndGetReasons(context, draft)
+        );
+    }
+
+    private Optional<RepaymentAgentDraft> getValidatedCachedDraft(
+            String key,
+            RepaymentAnalysisContext context
+    ) {
+        Optional<RepaymentAgentDraft> cached = analysisCache.get(key);
+
+        if (cached.isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            validateAndGetReasons(context, cached.get());
+            return cached;
+        } catch (RuntimeException exception) {
+            log.warn("상환 분석 캐시 검증 실패");
+            analysisCache.evict(key);
+            return Optional.empty();
+        }
+    }
+
+    private RepaymentManagementResponse buildAiResponse(
+            RepaymentAnalysisContext context,
+            RepaymentAgentDraft draft,
+            Map<Long, String> reasons
+    ) {
         AgentAnalysis analysis = new AgentAnalysis(
                 "AI",
                 determineStatus(context),
