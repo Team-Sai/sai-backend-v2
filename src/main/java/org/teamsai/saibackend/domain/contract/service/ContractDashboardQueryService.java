@@ -13,6 +13,8 @@ import org.teamsai.saibackend.domain.contract.exception.ContractDashboardErrorCo
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
 
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -138,17 +140,19 @@ public class ContractDashboardQueryService {
             String sortType,
             int page
     ) {
-        Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap = contexts.stream()
-                .collect(Collectors.toMap(
-                        context -> context.contract().getContractId(),
-                        ContractScheduleContext::schedules
-                ));
+        YearMonth targetMonth =
+                YearMonth.now(ZoneId.of("Asia/Seoul"));
 
         List<ContractDashboardRowResponse> allRows = contexts.stream()
-                .map(context -> ContractDashboardAssembler.toRow(context.contract(), context.schedules(), userId))
+                .map(context -> ContractDashboardAssembler.toRow(
+                        context.contract(),
+                        context.schedules(),
+                        userId,
+                        targetMonth))
                 .toList();
 
-        ContractDashboardSummaryResponse summary = ContractDashboardAssembler.buildSummary(allRows, scheduleMap);
+        ContractDashboardSummaryResponse summary =
+                ContractDashboardAssembler.buildSummary(allRows);
         List<ContractDashboardRowResponse> filtered = filterByKeyword(allRows, keyword);
         List<ContractDashboardRowResponse> roleFiltered = filterByRole(filtered, roleFilter);
         List<ContractDashboardRowResponse> sorted = sortRows(filterByStatus(roleFiltered, statusFilter), sortType);
