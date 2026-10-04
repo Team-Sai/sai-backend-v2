@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
+import org.teamsai.saibackend.domain.contract.calculator.RepaymentAmountCalculator;
 import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
@@ -16,7 +17,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 public final class ContractDashboardAssembler {
@@ -30,10 +30,15 @@ public final class ContractDashboardAssembler {
             Long userId,
             YearMonth targetMonth
     ) {
-        BigDecimal totalRemaining = calculateTotalRemaining(schedules);
-        BigDecimal thisMonthDue = calculateThisMonthDue(schedules, targetMonth);
+        BigDecimal totalRemaining =
+                RepaymentAmountCalculator.totalRemaining(schedules);
+
+        BigDecimal thisMonthDue =
+                RepaymentAmountCalculator.thisMonthDue(schedules, targetMonth);
+
         BigDecimal overdueAmount =
-                calculateOverdueAmount(schedules, targetMonth);
+                RepaymentAmountCalculator.previousMonthsUnpaid(
+                        schedules, targetMonth);
 
         ContractRole role = determineRole(contract, userId);
         TransactionCategory category = determineCategory(role);
@@ -42,7 +47,7 @@ public final class ContractDashboardAssembler {
         Optional<RepaymentScheduleWithRemainingProjection> nearestSchedule = findNearestSchedule(schedules);
         LocalDate nearestDueDate = nearestSchedule.map(RepaymentScheduleWithRemainingProjection::getDueDate).orElse(null);
         BigDecimal nextDueAmount = nearestSchedule
-                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
+                .map(RepaymentAmountCalculator::remainingAmount)
                 .orElse(null);
         return ContractDashboardRowResponse.builder()
                 .contractId(contract.getContractId())
@@ -132,47 +137,6 @@ public final class ContractDashboardAssembler {
                 .payableOverdueAmount(payableOverdueAmount)
                 .payableTotalRequiredAmount(payableTotalRequiredAmount)
                 .build();
-    }
-
-    private static BigDecimal calculateTotalRemaining(List<RepaymentScheduleWithRemainingProjection> schedules) {
-        return schedules.stream()
-                .filter(s -> s.getStatus().isUnresolved())
-                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private static BigDecimal calculateThisMonthDue(
-            List<RepaymentScheduleWithRemainingProjection> schedules,
-            YearMonth targetMonth
-    ) {
-        LocalDate monthStart = targetMonth.atDay(1);
-        LocalDate nextMonthStart = targetMonth.plusMonths(1).atDay(1);
-
-        return schedules.stream()
-                .filter(s -> s.getStatus().isUnresolved())
-                .filter(s ->
-                        !s.getDueDate().isBefore(monthStart)
-                                && s.getDueDate().isBefore(nextMonthStart))
-                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private static BigDecimal calculateOverdueAmount(
-            List<RepaymentScheduleWithRemainingProjection> schedules,
-            YearMonth targetMonth
-    ) {
-        LocalDate monthStart = targetMonth.atDay(1);
-
-        return schedules.stream()
-                .filter(s -> s.getStatus().isUnresolved())
-                .filter(s -> s.getDueDate().isBefore(monthStart))
-                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private static BigDecimal getRemainingPaymentAmount(RepaymentScheduleWithRemainingProjection schedule) {
-        return Optional.ofNullable(schedule.getRemainingPaymentAmount())
-                .orElse(schedule.getTotalPaymentDue());
     }
 
     private static ContractDashboardPaymentStatus determinePaymentStatus(BigDecimal totalRemaining) {
