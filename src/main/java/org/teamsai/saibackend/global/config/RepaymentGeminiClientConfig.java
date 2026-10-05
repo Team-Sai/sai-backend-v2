@@ -15,7 +15,7 @@ import java.time.Duration;
 @ConditionalOnProperty(
         name = "spring.ai.model.chat",
         havingValue = "google-genai",
-        matchIfMissing = true
+        matchIfMissing = false
 )
 public class RepaymentGeminiClientConfig {
 

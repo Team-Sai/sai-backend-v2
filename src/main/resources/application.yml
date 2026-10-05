@@ -1,0 +1,20 @@
+spring:
+  ai:
+    model:
+      chat: ${REPAYMENT_AI_PROVIDER:none}
+      embedding: none
+
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:}
+        chat:
+          model: ${REPAYMENT_AI_MODEL:}
+          response-mime-type: application/json
+          google-search-retrieval: false
+
+    retry:
+      max-attempts: 0
+
+sai:
+  repayment:
+    ai-request-timeout: PT15S
