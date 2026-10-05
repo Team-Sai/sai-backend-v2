@@ -57,7 +57,7 @@ public interface BankTransactionMatchCandidateValidationQueryRepository
                         SELECT 1
                         FROM repayment_schedule rs
                         WHERE rs.schedule_id = mc.target_id
-                        AND rs.status = 'PENDING'
+                        AND rs.status IN ('PENDING', 'OVERDUE')
                         AND rs.total_payment_due > COALESCE((
                             SELECT SUM(pr.amount)
                             FROM payment_record pr

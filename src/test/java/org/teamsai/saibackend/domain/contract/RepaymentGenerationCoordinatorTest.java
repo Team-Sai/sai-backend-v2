@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.contract;
 
 import org.junit.jupiter.api.Test;
+import org.teamsai.saibackend.domain.contract.dto.response.CachedRepaymentAnalysis;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentAgentDraft;
 import org.teamsai.saibackend.domain.contract.service.RepaymentGenerationCoordinator;
 
@@ -21,7 +22,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.teamsai.saibackend.domain.contract.service.RepaymentGenerationDeferredException;
+import java.util.concurrent.CompletionException;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RepaymentGenerationCoordinatorTest {
@@ -42,7 +46,7 @@ class RepaymentGenerationCoordinatorTest {
 
         try {
             List<Callable<
-                    CompletableFuture<Optional<RepaymentAgentDraft>>
+                    CompletableFuture<Optional<CachedRepaymentAnalysis>>
                     >> requests = new ArrayList<>();
 
             for (int index = 0; index < 20; index++) {
@@ -57,10 +61,10 @@ class RepaymentGenerationCoordinatorTest {
             }
 
             List<Future<
-                    CompletableFuture<Optional<RepaymentAgentDraft>>
+                    CompletableFuture<Optional<CachedRepaymentAnalysis>>
                     >> results = callers.invokeAll(requests);
 
-            CompletableFuture<Optional<RepaymentAgentDraft>> shared =
+            CompletableFuture<Optional<CachedRepaymentAnalysis>> shared =
                     results.get(0).get();
 
             for (var result : results) {
@@ -105,8 +109,8 @@ class RepaymentGenerationCoordinatorTest {
             return draft();
         });
 
-        assertThat(first.join()).isEmpty();
-        assertThat(blocked.join()).isEmpty();
+        assertFailure(first, "AI_UNAVAILABLE");
+        assertFailure(blocked, "COOLDOWN");
         assertThat(calls.get()).isEqualTo(1);
 
         clock.advance(Duration.ofSeconds(31));
@@ -129,9 +133,15 @@ class RepaymentGenerationCoordinatorTest {
                         Duration.ofSeconds(30)
                 );
 
-        coordinator.submit("analysis-a", "user-a", () -> {
-            throw new IllegalStateException("failure");
-        }).join();
+        var failed = coordinator.submit(
+                "analysis-a",
+                "user-a",
+                () -> {
+                    throw new IllegalStateException("failure");
+                }
+        );
+
+        assertFailure(failed, "AI_UNAVAILABLE");
 
         var result = coordinator.submit(
                 "analysis-b", "user-b", this::draft);
@@ -162,14 +172,107 @@ class RepaymentGenerationCoordinatorTest {
         assertThat(calls.get()).isEqualTo(2);
     }
 
-    private RepaymentAgentDraft draft() {
-        return new RepaymentAgentDraft(
-                "상환 안내",
-                List.of(
-                        new RepaymentAgentDraft.ActionExplanation(
-                                101L, "납기일을 확인하세요.")
+    @Test
+    void lockBusyDoesNotStartFailureCooldown() {
+        RepaymentGenerationCoordinator coordinator =
+                new RepaymentGenerationCoordinator(
+                        Runnable::run,
+                        Clock.systemUTC(),
+                        Duration.ofSeconds(30)
+                );
+
+        var first = coordinator.submit(
+                "analysis-a",
+                "user-a",
+                () -> {
+                    throw new RepaymentGenerationDeferredException(
+                            "ANALYSIS_IN_PROGRESS",
+                            5
+                    );
+                }
+        );
+
+        var second = coordinator.submit(
+                "analysis-a",
+                "user-a",
+                this::draft
+        );
+
+        assertFailure(first, "ANALYSIS_IN_PROGRESS");
+        assertThat(second.join()).contains(draft());
+    }
+
+    @Test
+    void sharedRequestsReceiveSameFailureReason() {
+        Queue<Runnable> queued = new ConcurrentLinkedQueue<>();
+
+        RepaymentGenerationCoordinator coordinator =
+                new RepaymentGenerationCoordinator(
+                        task -> queued.add(task),
+                        Clock.systemUTC(),
+                        Duration.ofSeconds(30)
+                );
+
+        var first = coordinator.submit(
+                "same-analysis",
+                "same-user",
+                () -> {
+                    throw new RepaymentGenerationDeferredException(
+                            "ANALYSIS_IN_PROGRESS",
+                            5
+                    );
+                }
+        );
+
+        var second = coordinator.submit(
+                "same-analysis",
+                "same-user",
+                this::draft
+        );
+
+        assertThat(second).isSameAs(first);
+        assertThat(queued).hasSize(1);
+
+        Runnable task = queued.poll();
+        assertThat(task).isNotNull();
+        task.run();
+
+        assertFailure(first, "ANALYSIS_IN_PROGRESS");
+        assertFailure(second, "ANALYSIS_IN_PROGRESS");
+    }
+
+    private void assertFailure(
+            CompletableFuture<Optional<CachedRepaymentAnalysis>> future,
+            String expectedReason
+    ) {
+        assertThatThrownBy(future::join)
+                .isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(
+                        RepaymentGenerationDeferredException.class
+                )
+                .satisfies(thrown -> {
+                    RepaymentGenerationDeferredException cause =
+                            (RepaymentGenerationDeferredException)
+                                    thrown.getCause();
+
+                    assertThat(cause.reason())
+                            .isEqualTo(expectedReason);
+                });
+    }
+
+    private CachedRepaymentAnalysis draft() {
+        return new CachedRepaymentAnalysis(
+                new RepaymentAgentDraft(
+                        "상환 안내",
+                        List.of(
+                                new RepaymentAgentDraft.ActionExplanation(
+                                        101L,
+                                        "납기일을 확인하세요."
+                                )
+                        ),
+                        "일정에 맞춰 준비하세요."
                 ),
-                "일정에 맞춰 준비하세요."
+                Instant.parse("2026-10-05T00:00:00Z")
         );
     }
 

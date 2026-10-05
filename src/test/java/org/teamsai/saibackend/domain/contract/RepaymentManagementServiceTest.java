@@ -7,6 +7,7 @@ import org.teamsai.saibackend.domain.contract.dto.response.RepaymentAgentDraft;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentAgentDraft.ActionExplanation;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.CachedRepaymentAnalysis;
 import org.teamsai.saibackend.domain.contract.service.*;
 
 import java.math.BigDecimal;
@@ -25,6 +26,9 @@ class RepaymentManagementServiceTest {
     private RepaymentManagementService service;
     private RepaymentAnalysisCache cache;
     private RepaymentAnalysisCacheKey cacheKey;
+    private RepaymentRedisGate redisGate;
+    private RepaymentRedisGate.Lease lease;
+    private Clock clock;
 
     @BeforeEach
     void setUp() {
@@ -41,13 +45,30 @@ class RepaymentManagementServiceTest {
         lenient().when(cache.get(anyString()))
                 .thenReturn(Optional.empty());
 
+        clock = Clock.fixed(
+                Instant.parse("2026-10-05T00:00:00Z"),
+                ZoneOffset.UTC
+        );
+
+        redisGate = mock(RepaymentRedisGate.class);
+        lease = mock(RepaymentRedisGate.Lease.class);
+
+        lenient().when(redisGate.cooldownSeconds())
+                .thenReturn(30);
+        
+        lenient().when(redisGate.tryAcquire(anyString()))
+                .thenReturn(Optional.of(lease));
+
+        lenient().when(cache.putIfOwned(
+                anyString(),
+                any(CachedRepaymentAnalysis.class),
+                any(RepaymentRedisGate.Lease.class)
+        )).thenReturn(true);
+
         RepaymentGenerationCoordinator coordinator =
                 new RepaymentGenerationCoordinator(
                         Runnable::run,
-                        Clock.fixed(
-                                Instant.parse("2026-10-05T00:00:00Z"),
-                                ZoneOffset.UTC
-                        ),
+                        clock,
                         Duration.ofSeconds(30)
                 );
 
@@ -56,7 +77,9 @@ class RepaymentManagementServiceTest {
                 agent,
                 cache,
                 cacheKey,
-                coordinator
+                coordinator,
+                redisGate,
+                clock
         );
     }
 
@@ -175,41 +198,62 @@ class RepaymentManagementServiceTest {
     @Test
     void reusesAiDraftForSameContext() {
         RepaymentAnalysisContext context = context();
-        RepaymentAgentDraft draft = validDraft();
 
-        ConcurrentHashMap<String, RepaymentAgentDraft> storage =
+        ConcurrentHashMap<String, CachedRepaymentAnalysis> storage =
                 new ConcurrentHashMap<>();
 
         when(cache.get(anyString())).thenAnswer(invocation ->
                 Optional.ofNullable(
-                        storage.get(invocation.getArgument(0, String.class))
+                        storage.get(
+                                invocation.getArgument(0, String.class)
+                        )
                 )
         );
 
-        doAnswer(invocation -> {
+        when(cache.putIfOwned(
+                anyString(),
+                any(CachedRepaymentAnalysis.class),
+                any(RepaymentRedisGate.Lease.class)
+        )).thenAnswer(invocation -> {
             storage.put(
                     invocation.getArgument(0, String.class),
-                    invocation.getArgument(1, RepaymentAgentDraft.class)
+                    invocation.getArgument(
+                            1, CachedRepaymentAnalysis.class)
             );
-            return null;
-        }).when(cache).put(anyString(), any(RepaymentAgentDraft.class));
+
+            return true;
+        });
 
         when(analysisService.analyze(1L)).thenReturn(context);
-        when(agent.generate(context)).thenReturn(draft);
+        when(agent.generate(context)).thenReturn(validDraft());
 
-        RepaymentManagementResponse first = service.getManagement(1L);
-        RepaymentManagementResponse second = service.getManagement(1L);
+        RepaymentManagementResponse first =
+                service.getManagement(1L);
 
-        assertThat(first.agentAnalysis().source()).isEqualTo("AI");
-        assertThat(second.agentAnalysis().source()).isEqualTo("AI");
+        RepaymentManagementResponse second =
+                service.getManagement(1L);
 
-        // 금융 데이터는 매번 조회한다.
+        assertThat(first.metadata().delivery())
+                .isEqualTo("GENERATED");
+        assertThat(first.metadata().reused()).isFalse();
+
+        assertThat(second.metadata().delivery())
+                .isEqualTo("CACHE");
+        assertThat(second.metadata().reused()).isTrue();
+
+        assertThat(second.metadata().analyzedAt())
+                .isEqualTo(first.metadata().analyzedAt());
+
+        assertThat(first.metadata().fallbackReason()).isNull();
+        assertThat(first.metadata().retryAfterSeconds()).isNull();
+
+        assertThat(second.metadata().fallbackReason()).isNull();
+        assertThat(second.metadata().retryAfterSeconds()).isNull();
+
         verify(analysisService, times(2)).analyze(1L);
-
-        // 동일 데이터의 AI 생성은 한 번이다.
         verify(agent, times(1)).generate(context);
-        verify(cache, times(1))
-                .put(anyString(), any(RepaymentAgentDraft.class));
+        verify(redisGate, times(1)).tryAcquire(anyString());
+        verify(lease).close();
     }
 
     @Test
@@ -241,7 +285,7 @@ class RepaymentManagementServiceTest {
 
         when(analysisService.analyze(1L)).thenReturn(before, after);
         when(cache.get(beforeKey))
-                .thenReturn(Optional.of(validDraft()));
+                .thenReturn(Optional.of(cached(validDraft())));
         when(cache.get(afterKey)).thenReturn(Optional.empty());
         when(agent.generate(after)).thenReturn(validDraft());
 
@@ -279,7 +323,7 @@ class RepaymentManagementServiceTest {
 
         when(analysisService.analyze(1L)).thenReturn(before, nextDay);
         when(cache.get(beforeKey))
-                .thenReturn(Optional.of(validDraft()));
+                .thenReturn(Optional.of(cached(validDraft())));
         when(cache.get(nextKey)).thenReturn(Optional.empty());
         when(agent.generate(nextDay)).thenReturn(validDraft());
 
@@ -306,11 +350,10 @@ class RepaymentManagementServiceTest {
         );
 
         when(analysisService.analyze(1L)).thenReturn(context);
-        when(cache.get(key))
-                .thenReturn(
-                        Optional.of(invalid), // 첫 조회: 잘못된 캐시 존재
-                        Optional.empty()     // 삭제 후 재조회: 캐시 없음
-                );
+        when(cache.get(key)).thenReturn(
+                Optional.of(cached(invalid)),
+                Optional.empty()
+        );
         when(agent.generate(context)).thenReturn(validDraft());
 
         RepaymentManagementResponse result = service.getManagement(1L);
@@ -318,7 +361,11 @@ class RepaymentManagementServiceTest {
         assertThat(result.agentAnalysis().source()).isEqualTo("AI");
         verify(cache).evict(key);
         verify(agent).generate(context);
-        verify(cache).put(key, validDraft());
+        verify(cache).putIfOwned(
+                eq(key),
+                eq(cached(validDraft())),
+                same(lease)
+        );
     }
 
     @Test
@@ -333,8 +380,11 @@ class RepaymentManagementServiceTest {
 
         assertThat(result.agentAnalysis().source()).isEqualTo("RULE_BASED");
 
-        verify(cache, never())
-                .put(anyString(), any(RepaymentAgentDraft.class));
+        verify(cache, never()).putIfOwned(
+                anyString(),
+                any(CachedRepaymentAnalysis.class),
+                any(RepaymentRedisGate.Lease.class)
+        );
     }
 
     @Test
@@ -365,12 +415,185 @@ class RepaymentManagementServiceTest {
 
         assertThat(first.agentAnalysis().source()).isEqualTo("RULE_BASED");
         assertThat(second.agentAnalysis().source()).isEqualTo("RULE_BASED");
+        assertThat(first.metadata().fallbackReason())
+                .isEqualTo("AI_UNAVAILABLE");
+
+        assertThat(second.metadata().fallbackReason())
+                .isEqualTo("COOLDOWN");
 
         verify(analysisService, times(2)).analyze(1L);
         verify(agent, times(1)).generate(context);
 
-        verify(cache, never())
-                .put(anyString(), any(RepaymentAgentDraft.class));
+        verify(cache, never()).putIfOwned(
+                anyString(),
+                any(CachedRepaymentAnalysis.class),
+                any(RepaymentRedisGate.Lease.class)
+        );
+    }
+
+    @Test
+    void doesNotCallAiWhenAnotherServerOwnsLock() {
+        RepaymentAnalysisContext context = context();
+
+        when(analysisService.analyze(1L)).thenReturn(context);
+        when(redisGate.tryAcquire(anyString()))
+                .thenReturn(Optional.empty());
+
+        RepaymentManagementResponse result =
+                service.getManagement(1L);
+
+        assertThat(result.agentAnalysis().source())
+                .isEqualTo("RULE_BASED");
+        assertThat(result.metadata().delivery())
+                .isEqualTo("FALLBACK");
+        assertThat(result.metadata().fallbackReason())
+                .isEqualTo("ANALYSIS_IN_PROGRESS");
+
+        assertThat(result.metadata().retryAfterSeconds())
+                .isEqualTo(5);
+        assertThat(result.metadata().analyzedAt()).isNull();
+        assertThat(result.metadata().reused()).isFalse();
+
+        verifyNoInteractions(agent);
+        verify(redisGate, never()).markFailure(anyString());
+    }
+
+    @Test
+    void rechecksCacheAfterAcquiringLock() {
+        RepaymentAnalysisContext context = context();
+        String key = cacheKey.create(1L, context);
+
+        CachedRepaymentAnalysis existing =
+                new CachedRepaymentAnalysis(
+                        validDraft(),
+                        Instant.parse("2026-10-04T23:00:00Z")
+                );
+
+        when(analysisService.analyze(1L)).thenReturn(context);
+
+        when(cache.get(key)).thenReturn(
+                Optional.empty(),       // 요청 시작
+                Optional.empty(),       // 로컬 supplier 시작
+                Optional.of(existing)   // 락 획득 직후
+        );
+
+        RepaymentManagementResponse result =
+                service.getManagement(1L);
+
+        assertThat(result.metadata().delivery())
+                .isEqualTo("CACHE");
+        assertThat(result.metadata().reused()).isTrue();
+        assertThat(result.metadata().analyzedAt())
+                .isEqualTo(existing.analyzedAt());
+        assertThat(result.metadata().checkedAt())
+                .isEqualTo(clock.instant());
+
+        verifyNoInteractions(agent);
+        verify(lease).close();
+    }
+
+    @Test
+    void skipsAiDuringDistributedCooldown() {
+        when(analysisService.analyze(1L))
+                .thenReturn(context());
+
+        when(redisGate.isCoolingDown(anyString()))
+                .thenReturn(true);
+
+        RepaymentManagementResponse result =
+                service.getManagement(1L);
+
+        assertThat(result.agentAnalysis().source())
+                .isEqualTo("RULE_BASED");
+        assertThat(result.metadata().fallbackReason())
+                .isEqualTo("COOLDOWN");
+
+        assertThat(result.metadata().retryAfterSeconds())
+                .isEqualTo(30);
+
+        verifyNoInteractions(agent);
+        verify(redisGate, never()).tryAcquire(anyString());
+    }
+
+    @Test
+    void doesNotCallAiWhenRedisCoordinationIsUnavailable() {
+        when(analysisService.analyze(1L))
+                .thenReturn(context());
+
+        when(redisGate.isCoolingDown(anyString()))
+                .thenThrow(
+                        new RepaymentGenerationDeferredException(
+                                "REDIS_UNAVAILABLE")
+                );
+
+        RepaymentManagementResponse result =
+                service.getManagement(1L);
+
+        assertThat(result.agentAnalysis().source())
+                .isEqualTo("RULE_BASED");
+        assertThat(result.metadata().fallbackReason())
+                .isEqualTo("REDIS_UNAVAILABLE");
+
+        assertThat(result.metadata().retryAfterSeconds()).isNull();
+
+        verifyNoInteractions(agent);
+    }
+
+    @Test
+    void discardsResultWhenOwnershipCheckedSaveFails() {
+        RepaymentAnalysisContext context = context();
+
+        when(analysisService.analyze(1L)).thenReturn(context);
+        when(agent.generate(context)).thenReturn(validDraft());
+
+        when(cache.putIfOwned(
+                anyString(),
+                any(CachedRepaymentAnalysis.class),
+                any(RepaymentRedisGate.Lease.class)
+        )).thenReturn(false);
+
+        RepaymentManagementResponse result =
+                service.getManagement(1L);
+
+        assertThat(result.agentAnalysis().source())
+                .isEqualTo("RULE_BASED");
+        assertThat(result.metadata().fallbackReason())
+                .isEqualTo("RESULT_NOT_SAVED");
+        assertThat(result.metadata().analyzedAt()).isNull();
+
+        verify(agent).generate(context);
+        verify(lease).close();
+    }
+
+    @Test
+    void recordsDistributedCooldownAndReleasesLockOnAiFailure() {
+        RepaymentAnalysisContext context = context();
+
+        when(analysisService.analyze(1L)).thenReturn(context);
+        when(agent.generate(context))
+                .thenThrow(new IllegalStateException("AI unavailable"));
+
+        RepaymentManagementResponse result =
+                service.getManagement(1L);
+
+        assertThat(result.agentAnalysis().source())
+                .isEqualTo("RULE_BASED");
+        assertThat(result.metadata().fallbackReason())
+                .isEqualTo("AI_UNAVAILABLE");
+
+        verify(redisGate).markFailure(
+                cacheKey.failureScope(1L)
+        );
+        verify(lease).close();
+    }
+
+    private CachedRepaymentAnalysis cached(
+            RepaymentAgentDraft draft
+    ) {
+        return new CachedRepaymentAnalysis(
+                draft,
+                clock.instant()
+        );
     }
 
     private RepaymentAgentDraft validDraft() {

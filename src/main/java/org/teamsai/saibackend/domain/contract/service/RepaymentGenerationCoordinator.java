@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentAgentDraft;
+import org.teamsai.saibackend.domain.contract.dto.response.CachedRepaymentAnalysis;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -25,7 +25,7 @@ public class RepaymentGenerationCoordinator {
 
     private final ConcurrentHashMap<
             String,
-            CompletableFuture<Optional<RepaymentAgentDraft>>
+            CompletableFuture<Optional<CachedRepaymentAnalysis>>
             > inFlight = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, Instant> failures =
@@ -46,19 +46,22 @@ public class RepaymentGenerationCoordinator {
         this.cooldown = cooldown;
     }
 
-    public CompletableFuture<Optional<RepaymentAgentDraft>> submit(
+    public CompletableFuture<Optional<CachedRepaymentAnalysis>> submit(
             String analysisKey,
             String failureScope,
-            Supplier<RepaymentAgentDraft> generation
+            Supplier<CachedRepaymentAnalysis> generation
     ) {
-        CompletableFuture<Optional<RepaymentAgentDraft>> mine =
+        CompletableFuture<Optional<CachedRepaymentAnalysis>> mine =
                 new CompletableFuture<>();
 
-        CompletableFuture<Optional<RepaymentAgentDraft>> existing =
+        CompletableFuture<Optional<CachedRepaymentAnalysis>> existing =
                 inFlight.putIfAbsent(analysisKey, mine);
 
         if (existing != null) {
-            log.debug("상환 AI 진행 중 작업 공유");
+            log.info(
+                    "event=REPAYMENT_LOCAL_SHARED key={}",
+                    analysisKey
+            );
             return existing;
         }
 
@@ -71,9 +74,28 @@ public class RepaymentGenerationCoordinator {
         Instant blockedUntil = failures.get(failureScope);
 
         if (blockedUntil != null && blockedUntil.isAfter(now)) {
-            log.debug("상환 AI cooldown 적용");
+            log.info(
+                    "event=REPAYMENT_LOCAL_COOLDOWN scope={}",
+                    failureScope
+            );
 
-            mine.complete(Optional.empty());
+            long milliseconds =
+                    Duration.between(now, blockedUntil).toMillis();
+
+            int retryAfterSeconds = Math.toIntExact(
+                    Math.max(
+                            1,
+                            milliseconds / 1000
+                                    + (milliseconds % 1000 == 0 ? 0 : 1)
+                    )
+            );
+
+            mine.completeExceptionally(
+                    new RepaymentGenerationDeferredException(
+                            "COOLDOWN",
+                            retryAfterSeconds
+                    )
+            );
             inFlight.remove(analysisKey, mine);
             return mine;
         }
@@ -81,7 +103,7 @@ public class RepaymentGenerationCoordinator {
         try {
             executor.execute(() -> {
                 try {
-                    RepaymentAgentDraft draft = generation.get();
+                    CachedRepaymentAnalysis draft = generation.get();
 
                     if (draft == null) {
                         throw new IllegalStateException(
@@ -89,18 +111,33 @@ public class RepaymentGenerationCoordinator {
                     }
 
                     mine.complete(Optional.of(draft));
-                } catch (RuntimeException exception) {
+                } catch (RepaymentGenerationDeferredException exception) {
+                    // 다른 서버의 작업 진행, 공유 cooldown, 락 소유권 상실 등.
+                    // AI 장애로 기록하지 않는다.
+                    log.info(
+                            "event=REPAYMENT_GENERATION_DEFERRED key={} reason={}",
+                            analysisKey,
+                            exception.getMessage()
+                    );
+
+                    mine.completeExceptionally(exception);
+                }catch (RuntimeException exception) {
                     failures.put(
                             failureScope,
                             clock.instant().plus(cooldown)
                     );
 
                     log.warn(
-                            "상환 AI 작업 실패: exceptionType={}",
+                            "event=REPAYMENT_JOB_FAILURE key={} exceptionType={}",
+                            analysisKey,
                             exception.getClass().getSimpleName()
                     );
 
-                    mine.complete(Optional.empty());
+                    mine.completeExceptionally(
+                            new RepaymentGenerationDeferredException(
+                                    "AI_UNAVAILABLE"
+                            )
+                    );
                 } catch (Error error) {
                     mine.completeExceptionally(error);
                     throw error;
@@ -115,10 +152,18 @@ public class RepaymentGenerationCoordinator {
                     clock.instant().plus(cooldown)
             );
 
-            mine.complete(Optional.empty());
+            mine.completeExceptionally(
+                    new RepaymentGenerationDeferredException(
+                            "SERVICE_BUSY"
+                    )
+            );
             inFlight.remove(analysisKey, mine);
 
-            log.warn("상환 AI 작업 등록 실패");
+            log.warn(
+                    "event=REPAYMENT_JOB_REJECTED key={} exceptionType={}",
+                    analysisKey,
+                    exception.getClass().getSimpleName()
+            );
         }
 
         return mine;

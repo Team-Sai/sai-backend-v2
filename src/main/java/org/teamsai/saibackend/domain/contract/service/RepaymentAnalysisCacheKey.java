@@ -57,10 +57,11 @@ public class RepaymentAnalysisCacheKey {
 
         String json = mapper.writeValueAsString(snapshot);
 
-        return "repayment:analysis:"
+        return "repayment:analysis:v2:{"
                 + userId
                 + ":"
-                + sha256(json);
+                + sha256(json)
+                + "}";
     }
 
     public String failureScope(Long userId) {

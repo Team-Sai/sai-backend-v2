@@ -1,15 +1,17 @@
 package org.teamsai.saibackend.domain.contract.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentAnalysisContext;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentAgentDraft;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.*;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementResponse.AgentAnalysis;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementResponse.PlanItem;
+import org.teamsai.saibackend.domain.contract.dto.response.CachedRepaymentAnalysis;
+import org.teamsai.saibackend.domain.contract.dto.response.RepaymentManagementResponse.Metadata;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -17,7 +19,6 @@ import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RepaymentManagementService {
 
     private final RepaymentAnalysisService analysisService;
@@ -25,113 +26,319 @@ public class RepaymentManagementService {
     private final RepaymentAnalysisCache analysisCache;
     private final RepaymentAnalysisCacheKey cacheKey;
     private final RepaymentGenerationCoordinator generationCoordinator;
+    private final RepaymentRedisGate redisGate;
+    private final Clock clock;
+
+    public RepaymentManagementService(
+            RepaymentAnalysisService analysisService,
+            RepaymentAgent repaymentAgent,
+            RepaymentAnalysisCache analysisCache,
+            RepaymentAnalysisCacheKey cacheKey,
+            RepaymentGenerationCoordinator generationCoordinator,
+            RepaymentRedisGate redisGate,
+            @Qualifier("repaymentClock") Clock clock
+    ) {
+        this.analysisService = analysisService;
+        this.repaymentAgent = repaymentAgent;
+        this.analysisCache = analysisCache;
+        this.cacheKey = cacheKey;
+        this.generationCoordinator = generationCoordinator;
+        this.redisGate = redisGate;
+        this.clock = clock;
+    }
 
     public RepaymentManagementResponse getManagement(Long userId) {
-        RepaymentAnalysisContext context = analysisService.analyze(userId);
+        RepaymentAnalysisContext context =
+                analysisService.analyze(userId);
+
+        Instant checkedAt = clock.instant();
+
+        log.info(
+                "event=REPAYMENT_REQUEST userId={} candidates={}",
+                userId,
+                context.candidates().size()
+        );
 
         if (context.candidates().isEmpty()) {
-            return fallback(context);
-        }
-
-        String key = cacheKey.create(userId, context);
-
-        Optional<RepaymentAgentDraft> cached =
-                getValidatedCachedDraft(key, context);
-
-        if (cached.isPresent()) {
-            log.debug("상환 분석 캐시 HIT");
-
-            RepaymentAgentDraft draft = cached.get();
-
-            return buildAiResponse(
+            return fallback(
                     context,
-                    draft,
-                    validateAndGetReasons(context, draft)
+                    new Metadata(
+                            null,
+                            checkedAt,
+                            false,
+                            "EMPTY",
+                            null,
+                            null
+                    )
             );
         }
 
+        String key = cacheKey.create(userId, context);
+        String failureScope = cacheKey.failureScope(userId);
+
+        Optional<CachedRepaymentAnalysis> cached =
+                getValidatedCachedDraft(key, context);
+
+        if (cached.isPresent()) {
+            log.info(
+                    "event=REPAYMENT_CACHE_HIT key={} stage=request",
+                    key
+            );
+
+            return aiResponse(
+                    context,
+                    cached.get(),
+                    checkedAt,
+                    "CACHE"
+            );
+        }
+
+        log.info("event=REPAYMENT_CACHE_MISS key={}", key);
+
+        // 이 요청의 supplier가 실행되지 않으면 다른 로컬 요청의 작업을 공유한 것.
+        AtomicReference<String> delivery =
+                new AtomicReference<>("SHARED");
+
         var pending = generationCoordinator.submit(
                 key,
-                cacheKey.failureScope(userId),
+                failureScope,
                 () -> {
-                    // 최초 캐시 조회 이후 다른 요청이 저장했을 수 있다.
-                    Optional<RepaymentAgentDraft> secondCheck =
+                    Optional<CachedRepaymentAnalysis> secondCheck =
                             getValidatedCachedDraft(key, context);
 
                     if (secondCheck.isPresent()) {
+                        delivery.set("CACHE");
+
+                        log.info(
+                                "event=REPAYMENT_CACHE_HIT key={} stage=before_lock",
+                                key
+                        );
+
                         return secondCheck.get();
                     }
 
-                    log.debug("상환 분석 캐시 MISS · AI 생성");
-
-                    RepaymentAgentDraft draft;
-
-                    try {
-                        draft = repaymentAgent.generate(context);
-                        validateAndGetReasons(context, draft);
-                    } catch (RuntimeException exception) {
-                        log.warn("상환 AI 분석 실패", exception);
-                        throw exception;
+                    if (redisGate.isCoolingDown(failureScope)) {
+                        throw new RepaymentGenerationDeferredException(
+                                "COOLDOWN",
+                                redisGate.cooldownSeconds()
+                        );
                     }
 
-                    analysisCache.put(key, draft);
-                    return draft;
+                    Optional<RepaymentRedisGate.Lease> acquired =
+                            redisGate.tryAcquire(key);
+
+                    if (acquired.isEmpty()) {
+                        // 다른 서버가 저장을 막 끝냈을 가능성을 한 번 확인.
+                        Optional<CachedRepaymentAnalysis> completed =
+                                getValidatedCachedDraft(key, context);
+
+                        if (completed.isPresent()) {
+                            delivery.set("CACHE");
+
+                            log.info(
+                                    "event=REPAYMENT_CACHE_HIT key={} stage=lock_busy",
+                                    key
+                            );
+
+                            return completed.get();
+                        }
+
+                        throw new RepaymentGenerationDeferredException(
+                                "ANALYSIS_IN_PROGRESS",
+                                5
+                        );
+                    }
+
+                    try (RepaymentRedisGate.Lease lease = acquired.get()) {
+                        // 락 획득 전 다른 서버가 생성·저장·해제를 끝냈을 수 있다.
+                        Optional<CachedRepaymentAnalysis> afterLock =
+                                getValidatedCachedDraft(key, context);
+
+                        if (afterLock.isPresent()) {
+                            delivery.set("CACHE");
+
+                            log.info(
+                                    "event=REPAYMENT_CACHE_HIT key={} stage=after_lock",
+                                    key
+                            );
+
+                            return afterLock.get();
+                        }
+
+                        if (redisGate.isCoolingDown(failureScope)) {
+                            throw new RepaymentGenerationDeferredException(
+                                    "COOLDOWN",
+                                    redisGate.cooldownSeconds()
+                            );
+                        }
+
+                        long started = System.nanoTime();
+
+                        log.info(
+                                "event=REPAYMENT_AI_START key={}",
+                                key
+                        );
+
+                        RepaymentAgentDraft draft;
+
+                        try {
+                            draft = repaymentAgent.generate(context);
+                            validateAndGetReasons(context, draft);
+                        } catch (RuntimeException exception) {
+                            redisGate.markFailure(failureScope);
+
+                            log.warn(
+                                    "event=REPAYMENT_AI_FAILURE key={} durationMs={} exceptionType={}",
+                                    key,
+                                    TimeUnit.NANOSECONDS.toMillis(
+                                            System.nanoTime() - started),
+                                    exception.getClass().getSimpleName()
+                            );
+
+                            throw exception;
+                        }
+
+                        CachedRepaymentAnalysis result =
+                                new CachedRepaymentAnalysis(
+                                        draft,
+                                        clock.instant()
+                                );
+
+                        if (!analysisCache.putIfOwned(key, result, lease)) {
+                            throw new RepaymentGenerationDeferredException(
+                                    "RESULT_NOT_SAVED"
+                            );
+                        }
+
+                        delivery.set("GENERATED");
+
+                        log.info(
+                                "event=REPAYMENT_AI_SUCCESS key={} durationMs={} analyzedAt={}",
+                                key,
+                                TimeUnit.NANOSECONDS.toMillis(
+                                        System.nanoTime() - started),
+                                result.analyzedAt()
+                        );
+
+                        return result;
+                    }
                 }
         );
 
-        Optional<RepaymentAgentDraft> generated;
+        String fallbackReason = "AI_UNAVAILABLE";
+        Integer retryAfterSeconds = null;
 
         try {
-            // HTTP 요청은 최대 25초까지만 결과를 기다린다.
-            generated = pending.get(25, TimeUnit.SECONDS);
+            Optional<CachedRepaymentAnalysis> generated =
+                    pending.get(25, TimeUnit.SECONDS);
+
+            if (generated.isPresent()) {
+                return aiResponse(
+                        context,
+                        generated.get(),
+                        checkedAt,
+                        delivery.get()
+                );
+            }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            return fallback(context);
+            fallbackReason = "INTERRUPTED";
         } catch (TimeoutException exception) {
-            log.warn("상환 AI 결과 대기 시간 초과");
-            return fallback(context);
+            // 작업은 취소하지 않는다.
+            // 작업이 완료되면 이후 재조회에서 캐시를 사용할 수 있다.
+            fallbackReason = "WAIT_TIMEOUT";
+            retryAfterSeconds = 5;
         } catch (ExecutionException exception) {
-            log.warn("상환 AI 작업 결과 조회 실패");
-            return fallback(context);
+            Throwable cause = exception.getCause();
+
+            if (cause instanceof
+                    RepaymentGenerationDeferredException deferred) {
+                fallbackReason = deferred.reason();
+                retryAfterSeconds = deferred.retryAfterSeconds();
+            } else {
+                fallbackReason = "JOB_FAILURE";
+            }
         }
 
-        if (generated.isEmpty()) {
-            return fallback(context);
-        }
+        log.info(
+                "event=REPAYMENT_FALLBACK key={} reason={} retryAfterSeconds={}",
+                key,
+                fallbackReason,
+                retryAfterSeconds
+        );
 
-        RepaymentAgentDraft draft = generated.get();
-
-        return buildAiResponse(
+        return fallback(
                 context,
-                draft,
-                validateAndGetReasons(context, draft)
+                new Metadata(
+                        null,
+                        checkedAt,
+                        false,
+                        "FALLBACK",
+                        fallbackReason,
+                        retryAfterSeconds
+                )
         );
     }
 
-    private Optional<RepaymentAgentDraft> getValidatedCachedDraft(
+    private Optional<CachedRepaymentAnalysis> getValidatedCachedDraft(
             String key,
             RepaymentAnalysisContext context
     ) {
-        Optional<RepaymentAgentDraft> cached = analysisCache.get(key);
+        Optional<CachedRepaymentAnalysis> cached =
+                analysisCache.get(key);
 
         if (cached.isEmpty()) {
             return Optional.empty();
         }
 
         try {
-            validateAndGetReasons(context, cached.get());
+            CachedRepaymentAnalysis value = cached.get();
+
+            if (value.analyzedAt() == null) {
+                throw new IllegalArgumentException(
+                        "Missing analysis timestamp");
+            }
+
+            validateAndGetReasons(context, value.draft());
+
             return cached;
         } catch (RuntimeException exception) {
-            log.warn("상환 분석 캐시 검증 실패");
+            log.warn(
+                    "event=REPAYMENT_CACHE_VALIDATION_FAILURE key={}",
+                    key
+            );
+
             analysisCache.evict(key);
             return Optional.empty();
         }
     }
 
+    private RepaymentManagementResponse aiResponse(
+            RepaymentAnalysisContext context,
+            CachedRepaymentAnalysis cached,
+            Instant checkedAt,
+            String delivery
+    ) {
+        return buildAiResponse(
+                context,
+                cached.draft(),
+                validateAndGetReasons(context, cached.draft()),
+                new Metadata(
+                        cached.analyzedAt(),
+                        checkedAt,
+                        !"GENERATED".equals(delivery),
+                        delivery,
+                        null,
+                        null
+                )
+        );
+    }
+
     private RepaymentManagementResponse buildAiResponse(
             RepaymentAnalysisContext context,
             RepaymentAgentDraft draft,
-            Map<Long, String> reasons
+            Map<Long, String> reasons,
+            Metadata metadata
     ) {
         AgentAnalysis analysis = new AgentAnalysis(
                 "AI",
@@ -141,7 +348,11 @@ public class RepaymentManagementService {
                 draft.recommendation()
         );
 
-        return new RepaymentManagementResponse(context, analysis);
+        return new RepaymentManagementResponse(
+                context,
+                analysis,
+                metadata
+        );
     }
 
     private Map<Long, String> validateAndGetReasons(
@@ -230,7 +441,8 @@ public class RepaymentManagementService {
     }
 
     private RepaymentManagementResponse fallback(
-            RepaymentAnalysisContext context
+            RepaymentAnalysisContext context,
+            Metadata metadata
     ) {
         Map<Long, String> reasons = new HashMap<>();
 
@@ -263,7 +475,8 @@ public class RepaymentManagementService {
                         summary,
                         createPlans(context, reasons),
                         recommendation
-                )
+                ),
+                metadata
         );
     }
 }
