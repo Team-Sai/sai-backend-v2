@@ -3,7 +3,11 @@ package org.teamsai.saibackend.domain.contract.assembler;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 
+import java.util.Objects;
+
 public final class LoanContractAssembler {
+
+    private static final String CONTRACT_DISPLAY_ID_PREFIX = "LC-";
 
     private LoanContractAssembler() {
     }
@@ -19,5 +23,15 @@ public final class LoanContractAssembler {
         }
 
         return enriched.build();
+    }
+
+    public static LoanContractResponse withDisplayId(LoanContractResponse contract, Long rootContractId) {
+        String contractDisplayId = Objects.equals(rootContractId, contract.getContractId())
+                ? CONTRACT_DISPLAY_ID_PREFIX + contract.getContractId()
+                : CONTRACT_DISPLAY_ID_PREFIX + rootContractId + "-" + contract.getContractId();
+
+        return contract.toBuilder()
+                .contractDisplayId(contractDisplayId)
+                .build();
     }
 }

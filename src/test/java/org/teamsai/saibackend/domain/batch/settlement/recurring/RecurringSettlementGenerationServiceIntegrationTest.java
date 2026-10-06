@@ -28,7 +28,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 @SpringBootTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
 @Sql(scripts = {
         "/db/user.sql",
         "/db/settlement.sql",
@@ -36,6 +36,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
         "/db/payment.sql"
 })
 @DisplayName("RecurringSettlementGenerationService 엔드투엔드 통합 테스트")
+@org.junit.jupiter.api.Tag("integration")
 class RecurringSettlementGenerationServiceIntegrationTest {
 
     @Autowired

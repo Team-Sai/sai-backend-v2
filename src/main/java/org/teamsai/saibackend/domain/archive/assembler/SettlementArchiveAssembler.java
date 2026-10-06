@@ -8,7 +8,6 @@ import java.util.List;
 
 public final class SettlementArchiveAssembler {
 
-    private static final String DOCUMENT_VERSION = "v1";
     private static final String SETTLEMENT_DISPLAY_ID_PREFIX = "ST-";
 
     private SettlementArchiveAssembler() {
@@ -42,7 +41,6 @@ public final class SettlementArchiveAssembler {
                 .paymentStatus(paymentStatus)
                 .paymentHistory(paymentHistory)
                 .settlementAccount(settlementAccount)
-                .documentVersion(DOCUMENT_VERSION)
                 .build();
     }
 }

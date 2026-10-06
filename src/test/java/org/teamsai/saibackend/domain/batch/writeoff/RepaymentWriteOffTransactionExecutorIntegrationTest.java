@@ -40,8 +40,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         RepaymentWriteOffTransactionExecutorIntegrationTest.TestSliceConfig.class
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
 @DisplayName("RepaymentWriteOffTransactionExecutor 실제 JPQL 통합 테스트")
+@org.junit.jupiter.api.Tag("integration")
 class RepaymentWriteOffTransactionExecutorIntegrationTest {
 
     @TestConfiguration

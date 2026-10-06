@@ -34,7 +34,8 @@ import static org.mockito.Mockito.*;
 
 @SpringBootTest(classes = {SettlementAbandonmentRecorder.class, SettlementAbandonmentNotifier.class,
         SettlementAbandonmentDetectionService.class, SettlementAbandonmentRecoveryIntegrationTest.Config.class})
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
+@org.junit.jupiter.api.Tag("integration")
 class SettlementAbandonmentRecoveryIntegrationTest {
     private static final long ID = 889201L;
     private static final LocalDate REFERENCE_DATE = LocalDate.of(2026, 9, 1);

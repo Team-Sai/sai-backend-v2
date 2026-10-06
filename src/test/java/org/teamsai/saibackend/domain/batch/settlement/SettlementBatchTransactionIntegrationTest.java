@@ -38,7 +38,8 @@ import static org.mockito.Mockito.*;
 
 @SpringBootTest(classes = {NotificationService.class, SettlementAbandonmentRecorder.class,
         SettlementBatchTransactionIntegrationTest.Config.class})
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
+@org.junit.jupiter.api.Tag("integration")
 class SettlementBatchTransactionIntegrationTest {
     private static final long USER_ID = 889001L;
     private static final long FIRST_ALERT = 889101L;

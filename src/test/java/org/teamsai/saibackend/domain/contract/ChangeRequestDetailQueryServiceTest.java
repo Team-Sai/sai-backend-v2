@@ -227,7 +227,7 @@ class ChangeRequestDetailQueryServiceTest {
         given(loanContractService.findContract(CONTRACT_ID, USER_ID)).willReturn(contract);
         given(contractChangeQueryService.getChangeRequest(CHANGE_REQUEST_ID)).willReturn(changeRequest);
 
-        ChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
+        ContractChangeRequestDetailResponse result = changeRequestDetailService.getDetail(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
 
         assertThat(result.getStatus()).isEqualTo("승인됨");
     }
