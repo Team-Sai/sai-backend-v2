@@ -75,6 +75,9 @@ public class SettlementQueryService {
                                     ? recurringSettlement.getEndDate()
                                     : null,
                             settlement.getCycleDate(),
+                            recurringSettlement != null
+                                    ? recurringSettlement.getRecurringSettlementId()
+                                    : null,
                             settlement.getCreatedAt()
                     );
                 })
@@ -137,7 +140,10 @@ public class SettlementQueryService {
                         ? recurringSettlement.getEndDate()
                         : null,
                 settlement.getCreatedAt(),
-                role
+                role,
+                recurringSettlement != null
+                        ? recurringSettlement.getRecurringSettlementId()
+                        : null
         );
     }
 
@@ -152,8 +158,16 @@ public class SettlementQueryService {
                         userId
                 );
 
+        return readPaymentStatus(settlement);
+    }
+
+    // 접근 권한 검증 없이 납부 현황만 계산한다 (호출하는 쪽에서 권한 검증 필요)
+    @Transactional(readOnly = true)
+    public SettlementPaymentStatusResponse readPaymentStatus(
+            Settlement settlement
+    ) {
         SettlementPaymentData paymentData =
-                settlementPaymentReader.read(settlementId);
+                settlementPaymentReader.read(settlement.getSettlementId());
 
         List<SettlementPaymentObligationResponse> obligations =
                 buildPaymentObligationResponses(paymentData);

@@ -326,7 +326,7 @@ public class CalendarTest {
     private SettlementListResponse settlement(
             Long id, String title, String role, String status, LocalDate dueDate, LocalDateTime createdAt
     ) {
-        return new SettlementListResponse(id, title, role, "ETC", "ONE_TIME", "EQUAL", status, BigDecimal.ZERO, dueDate, null, null, null, createdAt);
+        return new SettlementListResponse(id, title, role, "ETC", "ONE_TIME", "EQUAL", status, BigDecimal.ZERO, dueDate, null, null, null, null, createdAt);
     }
 
     private ContractDashboardQueryService.IntegrationDashboardData loanData(
@@ -466,6 +466,7 @@ public class CalendarTest {
                 106L, "여행 정산", "OWNER", "TRAVEL", "RECURRING", "CUSTOM",
                 "OPEN", BigDecimal.valueOf(100_000), null, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31),
                 TARGET_DATE,
+                null,
                 LocalDateTime.now()
         );
         when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));

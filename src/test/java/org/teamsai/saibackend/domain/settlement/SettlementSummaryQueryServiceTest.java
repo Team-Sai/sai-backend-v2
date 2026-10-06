@@ -86,7 +86,7 @@ class SettlementSummaryQueryServiceTest {
     private SettlementListResponse settlement(Long id, String role, SettlementStatus status) {
         return new SettlementListResponse(
                 id, null, role, null, null, null, status.name(),
-                null, null, null, null, null, null
+                null, null, null, null, null, null, null
         );
     }
 
