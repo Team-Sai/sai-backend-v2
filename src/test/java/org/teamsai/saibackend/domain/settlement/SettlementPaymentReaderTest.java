@@ -21,10 +21,13 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -282,6 +285,62 @@ class SettlementPaymentReaderTest {
 
         verify(paymentRecordService, times(1))
                 .findConfirmedRecordsByTargetIds(any(), anyList());
+    }
+
+    @Test
+    @DisplayName("정산 ID가 청크 크기를 넘으면 나눠서 조회하고 결과를 합친다")
+    void readAllSplitsSettlementIdsIntoChunks() {
+        int chunkSize = SettlementPaymentReader.IN_CLAUSE_CHUNK_SIZE;
+        List<Long> settlementIds = LongStream.rangeClosed(1, chunkSize * 2L + 1)
+                .boxed()
+                .toList();
+        Long lastSettlementId = settlementIds.get(settlementIds.size() - 1);
+
+        SettlementParticipant lastParticipant = participant(101L, lastSettlementId);
+        PaymentObligationView obligation = obligation(1001L, 101L);
+
+        given(
+                settlementParticipantRepository.findBySettlementIdInAndStatus(
+                        anyList(),
+                        eq(SettlementParticipantStatus.ACTIVE)
+                )
+        ).willReturn(List.of(), List.of(), List.of(lastParticipant));
+
+        given(
+                paymentObligationQueryService.findByParticipantIds(
+                        List.of(101L)
+                )
+        ).willReturn(
+                List.of(obligation)
+        );
+
+        given(
+                paymentRecordService.findConfirmedRecordsByTargetIds(
+                        PaymentTargetType.SETTLEMENT,
+                        List.of(1001L)
+                )
+        ).willReturn(
+                List.of()
+        );
+
+        Map<Long, SettlementPaymentData> result =
+                settlementPaymentReader.readAll(
+                        settlementIds
+                );
+
+        assertThat(result).containsOnlyKeys(lastSettlementId);
+        assertThat(result.get(lastSettlementId).obligations()).containsExactly(obligation);
+
+        verify(settlementParticipantRepository, times(2))
+                .findBySettlementIdInAndStatus(
+                        argThat(ids -> ids.size() == chunkSize),
+                        eq(SettlementParticipantStatus.ACTIVE)
+                );
+        verify(settlementParticipantRepository)
+                .findBySettlementIdInAndStatus(
+                        eq(List.of(lastSettlementId)),
+                        eq(SettlementParticipantStatus.ACTIVE)
+                );
     }
 
     @Test

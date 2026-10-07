@@ -13,6 +13,7 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipant
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -20,6 +21,8 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class SettlementPaymentReader {
+
+    public static final int IN_CLAUSE_CHUNK_SIZE = 500;
 
     private final SettlementParticipantRepository settlementParticipantRepository;
     private final PaymentObligationQueryService paymentObligationQueryService;
@@ -73,7 +76,7 @@ public class SettlementPaymentReader {
         );
     }
 
-    // 여러 정산의 결제 데이터를 쿼리 3번으로 한 번에 조회한다. (정산별 read() 반복 호출 시 N+1 발생)
+    // 여러 정산의 결제 데이터를 청크당 쿼리 3번으로 한 번에 조회한다. (정산별 read() 반복 호출 시 N+1 발생)
     // ACTIVE 참여자가 없는 정산은 결과 Map에 포함되지 않는다.
     @Transactional(readOnly = true)
     public Map<Long, SettlementPaymentData> readAll(List<Long> settlementIds) {
@@ -81,6 +84,17 @@ public class SettlementPaymentReader {
             return Map.of();
         }
 
+        // IN 절 파라미터가 과도하게 커지지 않도록 정산 ID를 나눠 조회한다.
+        // 참여자·납부의무 ID 는 정산 수에 비례하므로 정산 ID 만 나눠도 이후 IN 절 크기가 함께 제한된다.
+        Map<Long, SettlementPaymentData> result = new HashMap<>();
+        for (int from = 0; from < settlementIds.size(); from += IN_CLAUSE_CHUNK_SIZE) {
+            int to = Math.min(from + IN_CLAUSE_CHUNK_SIZE, settlementIds.size());
+            result.putAll(readChunk(settlementIds.subList(from, to)));
+        }
+        return result;
+    }
+
+    private Map<Long, SettlementPaymentData> readChunk(List<Long> settlementIds) {
         List<SettlementParticipant> participants =
                 settlementParticipantRepository.findBySettlementIdInAndStatus(
                         settlementIds,
