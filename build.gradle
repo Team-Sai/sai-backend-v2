@@ -21,6 +21,8 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    // actuator (쿠버네티스 상태 검사)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     // swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
     // thymeleaf
