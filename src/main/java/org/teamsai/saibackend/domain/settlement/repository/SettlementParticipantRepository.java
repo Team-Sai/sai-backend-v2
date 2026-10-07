@@ -34,4 +34,16 @@ public interface SettlementParticipantRepository extends JpaRepository<Settlemen
             @Param("settlementId") Long settlementId,
             @Param("status") SettlementParticipantStatus status
     );
+
+    @Query("""
+        SELECT sp
+        FROM SettlementParticipant sp
+        JOIN FETCH sp.user
+        WHERE sp.settlement.settlementId IN :settlementIds
+          AND sp.participantStatus = :status
+    """)
+    List<SettlementParticipant> findBySettlementIdInAndStatus(
+            @Param("settlementIds") List<Long> settlementIds,
+            @Param("status") SettlementParticipantStatus status
+    );
 }
