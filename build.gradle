@@ -64,6 +64,9 @@ dependencies {
     // ShedLock (여러 Pod 중 하나만 배치 실행)
     implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
     implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.10.1'
+    // AWS S3 (업로드 파일 저장)
+    implementation platform('software.amazon.awssdk:bom:2.55.11')
+    implementation 'software.amazon.awssdk:s3'
 }
 
 tasks.named('test', Test) {

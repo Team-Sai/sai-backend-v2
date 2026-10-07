@@ -3,10 +3,12 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractFileErrorCode;
+import org.teamsai.saibackend.global.storage.S3FileStorage;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,6 +25,10 @@ public class LoanContractFileService {
     @Getter
     @Value("${file.upload-dir:C:/upload/shinhan/}")
     private String uploadDir = "C:/upload/shinhan/";
+
+    // file.storage=s3 일 때만 들어온다. 없으면(null) 기존처럼 로컬 폴더에 저장한다.
+    @Autowired(required = false)
+    private S3FileStorage s3FileStorage;
 
 
     public String saveSignatureFile(Long contractId, MultipartFile file) {
@@ -44,8 +50,12 @@ public class LoanContractFileService {
 
             String savedFilename = contractId + "_" + UUID.randomUUID() + "." + ext;
 
-            Path savePath = dirPath.resolve(savedFilename);
-            Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+            if (s3FileStorage != null) {
+                s3FileStorage.save(savedFilename, file.getInputStream(), file.getSize(), file.getContentType());
+            } else {
+                Path savePath = dirPath.resolve(savedFilename);
+                Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             log.info("[Signature Saved] ContractId: {}, Original: {} -> Saved: {}",
                     contractId, originalFilename, savedFilename);
