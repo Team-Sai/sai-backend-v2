@@ -20,7 +20,7 @@ import java.io.InputStream;
  */
 @Component
 @ConditionalOnProperty(name = "file.storage", havingValue = "s3")
-public class S3FileStorage {
+public class S3FileStorage implements AutoCloseable {
 
     private final S3Client s3Client;
     private final String bucket;
@@ -58,5 +58,10 @@ public class S3FileStorage {
         } catch (SdkException e) {
             throw new IOException("S3 파일 읽기 실패: " + key, e);
         }
+    }
+
+    @Override
+    public void close() {
+        s3Client.close();
     }
 }

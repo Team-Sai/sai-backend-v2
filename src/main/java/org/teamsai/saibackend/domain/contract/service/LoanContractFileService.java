@@ -37,10 +37,6 @@ public class LoanContractFileService {
         }
 
         try {
-            Path dirPath = Paths.get(uploadDir);
-            if (!Files.exists(dirPath)) {
-                Files.createDirectories(dirPath);
-            }
 
             String originalFilename = file.getOriginalFilename();
             String ext = "png";
@@ -53,6 +49,10 @@ public class LoanContractFileService {
             if (s3FileStorage != null) {
                 s3FileStorage.save(savedFilename, file.getInputStream(), file.getSize(), file.getContentType());
             } else {
+                Path dirPath = Paths.get(uploadDir);
+                if (!Files.exists(dirPath)) {
+                    Files.createDirectories(dirPath);
+                }
                 Path savePath = dirPath.resolve(savedFilename);
                 Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
             }

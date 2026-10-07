@@ -72,10 +72,6 @@ public class ArchiveService {
     public ArchiveFile saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
                              InputStream content, long fileSize) {
         try {
-            Path dirPath = Paths.get(uploadDir);
-            if (!Files.exists(dirPath)) {
-                Files.createDirectories(dirPath);
-            }
 
             String ext = "";
             if (originalFilename != null && originalFilename.contains(".")) {
@@ -87,6 +83,10 @@ public class ArchiveService {
             if (s3FileStorage != null) {
                 s3FileStorage.save(savedFilename, content, fileSize, contentType);
             } else {
+                Path dirPath = Paths.get(uploadDir);
+                if (!Files.exists(dirPath)) {
+                    Files.createDirectories(dirPath);
+                }
                 Path savePath = dirPath.resolve(savedFilename);
                 Files.copy(content, savePath, StandardCopyOption.REPLACE_EXISTING);
             }
