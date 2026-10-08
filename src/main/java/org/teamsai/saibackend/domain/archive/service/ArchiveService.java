@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -176,7 +176,7 @@ public class ArchiveService {
     public Resource loadFileAsResource(String savedFilename) {
         if (s3FileStorage != null) {
             try {
-                return new ByteArrayResource(s3FileStorage.read(savedFilename));
+                return new InputStreamResource(s3FileStorage.openStream(savedFilename));
             } catch (IOException e) {
                 log.error("S3에서 파일을 찾을 수 없거나 읽을 수 없습니다: {}", savedFilename, e);
                 throw new RuntimeException("파일을 찾을 수 없거나 읽을 수 없습니다.", e);

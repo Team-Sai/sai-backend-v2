@@ -60,6 +60,18 @@ public class S3FileStorage implements AutoCloseable {
         }
     }
 
+    public InputStream openStream(String key) throws IOException {
+        try {
+            GetObjectRequest request = GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .build();
+            return s3Client.getObject(request);
+        } catch (SdkException e) {
+            throw new IOException("S3 파일 열기 실패: " + key, e);
+        }
+    }
+
     @Override
     public void close() {
         s3Client.close();
