@@ -73,7 +73,7 @@ public class RecurringSettlementQueryService {
                 .toList();
 
         Map<Long, SettlementPaymentStatusResponse> paymentStatusBySettlementId =
-                settlementQueryService.readPaymentStatuses(visibleSettlements);
+                settlementQueryService.readPaymentStatuses(visibleSettlements, userId);
 
         List<RecurringSettlementCycleResponse> cycles = new ArrayList<>();
 

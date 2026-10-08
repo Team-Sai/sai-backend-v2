@@ -161,9 +161,7 @@ public class SettlementQueryService {
         return readPaymentStatus(settlement);
     }
 
-    // 접근 권한 검증 없이 납부 현황만 계산한다 (호출하는 쪽에서 권한 검증 필요)
-    @Transactional(readOnly = true)
-    public SettlementPaymentStatusResponse readPaymentStatus(
+    private SettlementPaymentStatusResponse readPaymentStatus(
             Settlement settlement
     ) {
         SettlementPaymentData paymentData =
@@ -178,10 +176,10 @@ public class SettlementQueryService {
         );
     }
 
-    // 여러 정산의 납부 현황을 일괄 조회한다 (호출하는 쪽에서 권한 검증 필요)
     @Transactional(readOnly = true)
     public Map<Long, SettlementPaymentStatusResponse> readPaymentStatuses(
-            List<Settlement> settlements
+            List<Settlement> settlements,
+            Long userId
     ) {
         if (settlements.isEmpty()) {
             return Map.of();
@@ -194,7 +192,16 @@ public class SettlementQueryService {
                                 .toList()
                 );
 
+        // owner 이거나 ACTIVE 참여자인 정산만 결과에 포함한다
         return settlements.stream()
+                .filter(settlement -> isAccessible(
+                        settlement,
+                        paymentDataBySettlementId.getOrDefault(
+                                settlement.getSettlementId(),
+                                SettlementPaymentData.empty()
+                        ),
+                        userId
+                ))
                 .collect(Collectors.toMap(
                         Settlement::getSettlementId,
                         settlement -> SettlementAssembler.toPaymentStatusResponse(
@@ -207,6 +214,18 @@ public class SettlementQueryService {
                                 )
                         )
                 ));
+    }
+
+    private boolean isAccessible(
+            Settlement settlement,
+            SettlementPaymentData paymentData,
+            Long userId
+    ) {
+        return settlement.getOwner().getUserId().equals(userId)
+                || paymentData.participants().stream()
+                        .anyMatch(participant ->
+                                participant.getUser().getUserId().equals(userId)
+                        );
     }
 
     @Transactional(readOnly = true)

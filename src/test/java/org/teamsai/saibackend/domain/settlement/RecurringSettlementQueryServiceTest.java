@@ -64,7 +64,7 @@ class RecurringSettlementQueryServiceTest {
         given(recurringSettlementRepository.findById(RECURRING_ID)).willReturn(Optional.of(recurringSettlement()));
         given(settlementRepository.findAllByRecurringIdOrderByCycleDate(RECURRING_ID))
                 .willReturn(List.of(first, second, third));
-        given(settlementQueryService.readPaymentStatuses(List.of(first, second, third))).willReturn(Map.of(
+        given(settlementQueryService.readPaymentStatuses(List.of(first, second, third), OWNER_ID)).willReturn(Map.of(
                 101L, paymentStatus(),
                 102L, paymentStatus(),
                 103L, paymentStatus()
@@ -98,7 +98,7 @@ class RecurringSettlementQueryServiceTest {
         given(settlementRepository.findAllByRecurringIdOrderByCycleDate(RECURRING_ID))
                 .willReturn(List.of(first, second));
         // 참여 중인 회차만 납부 현황을 조회한다
-        given(settlementQueryService.readPaymentStatuses(List.of(second)))
+        given(settlementQueryService.readPaymentStatuses(List.of(second), MEMBER_ID))
                 .willReturn(Map.of(102L, paymentStatus()));
 
         RecurringSettlementCycleListResponse response =
