@@ -192,7 +192,6 @@ public class SettlementQueryService {
                                 .toList()
                 );
 
-        // owner 이거나 ACTIVE 참여자인 정산만 결과에 포함한다
         return settlements.stream()
                 .filter(settlement -> isAccessible(
                         settlement,
@@ -233,14 +232,11 @@ public class SettlementQueryService {
             Long settlementId,
             Long userId
     ) {
-        // getPaymentStatus()를 다시 호출하지 않고
-        // 권한 검증만 한 번 수행
         findAccessibleSettlement(
                 settlementId,
                 userId
         );
 
-        // 참여자 → obligation → paymentRecord 조회도 한 번만 수행
         SettlementPaymentData paymentData =
                 settlementPaymentReader.read(settlementId);
 

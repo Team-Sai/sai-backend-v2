@@ -96,8 +96,6 @@ public class RecurringSettlementQueryService {
             );
         }
 
-        cycles.sort((a, b) -> Integer.compare(b.getCycleNo(), a.getCycleNo()));
-
         return SettlementAssembler.toCycleListResponse(
                 recurringSettlement,
                 isOwner ? "OWNER" : "MEMBER",

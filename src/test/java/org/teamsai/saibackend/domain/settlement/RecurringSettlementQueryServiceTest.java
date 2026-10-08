@@ -56,7 +56,7 @@ class RecurringSettlementQueryServiceTest {
     private RecurringSettlementQueryService recurringSettlementQueryService;
 
     @Test
-    void ownerSeesAllCyclesIncludingInProgressLatestFirst() {
+    void ownerSeesAllCyclesIncludingInProgressInCycleOrder() {
         Settlement first = cycle(101L, LocalDate.of(2026, 8, 1), SettlementStatus.CLOSED);
         Settlement second = cycle(102L, LocalDate.of(2026, 9, 1), SettlementStatus.CLOSED);
         Settlement third = cycle(103L, LocalDate.of(2026, 10, 1), SettlementStatus.IN_PROGRESS);
@@ -77,11 +77,11 @@ class RecurringSettlementQueryServiceTest {
         assertThat(response.getTotalCycleCount()).isEqualTo(3);
         assertThat(response.getCycles())
                 .extracting(RecurringSettlementCycleResponse::getSettlementId)
-                .containsExactly(103L, 102L, 101L);
+                .containsExactly(101L, 102L, 103L);
         assertThat(response.getCycles())
                 .extracting(RecurringSettlementCycleResponse::getCycleNo)
-                .containsExactly(3, 2, 1);
-        assertThat(response.getCycles().get(0).getSettlementStatus()).isEqualTo(SettlementStatus.IN_PROGRESS);
+                .containsExactly(1, 2, 3);
+        assertThat(response.getCycles().get(2).getSettlementStatus()).isEqualTo(SettlementStatus.IN_PROGRESS);
         verify(settlementParticipantRepository, never())
                 .findSettlementIdsByRecurringIdAndUserId(any(), any(), any());
     }
@@ -97,7 +97,6 @@ class RecurringSettlementQueryServiceTest {
         )).willReturn(List.of(102L));
         given(settlementRepository.findAllByRecurringIdOrderByCycleDate(RECURRING_ID))
                 .willReturn(List.of(first, second));
-        // 참여 중인 회차만 납부 현황을 조회한다
         given(settlementQueryService.readPaymentStatuses(List.of(second), MEMBER_ID))
                 .willReturn(Map.of(102L, paymentStatus()));
 
