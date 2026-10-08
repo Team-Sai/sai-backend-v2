@@ -15,6 +15,7 @@ import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementWithPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
@@ -24,6 +25,9 @@ import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentData;
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentReader;
 import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
+import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
@@ -771,6 +775,104 @@ class SettlementQueryServicePaymentTest {
                         settlement,
                         OWNER_ID
                 );
+    }
+
+    @Test
+    @DisplayName("정산 목록과 납부 현황을 일괄 조회하고 건별 권한 검증은 하지 않는다")
+    void getSettlementListWithPaymentStatusReadsAllAtOnce() {
+        Settlement settlement = listSettlement(SETTLEMENT_ID);
+        Settlement noParticipantSettlement = listSettlement(16L);
+
+        SettlementParticipant p1 = participant(101L, OWNER_ID, "채권자");
+        SettlementParticipant p2 = participant(102L, MEMBER_ID, "참여자");
+
+        PaymentObligationView o1 = obligation(1001L, 101L, 10000, ObligationStatus.ACTIVE);
+        PaymentObligationView o2 = obligation(1002L, 102L, 20000, ObligationStatus.ACTIVE);
+
+        PaymentRecord r1 = paymentRecord(1002L, 5000);
+
+        SettlementPaymentData paymentData =
+                paymentData(List.of(p1, p2), List.of(o1, o2), List.of(r1));
+
+        given(
+                settlementRepository.findAllAccessibleByUserId(
+                        MEMBER_ID,
+                        SettlementParticipantStatus.ACTIVE
+                )
+        ).willReturn(
+                List.of(settlement, noParticipantSettlement)
+        );
+
+        given(
+                settlementPaymentReader.readAll(
+                        List.of(SETTLEMENT_ID, 16L)
+                )
+        ).willReturn(
+                Map.of(SETTLEMENT_ID, paymentData)
+        );
+
+        List<SettlementWithPaymentStatusResponse> result =
+                settlementQueryService.getSettlementListWithPaymentStatus(
+                        MEMBER_ID
+                );
+
+        assertThat(result).hasSize(2);
+
+        SettlementWithPaymentStatusResponse first = result.get(0);
+        assertThat(first.settlement().settlementId()).isEqualTo(SETTLEMENT_ID);
+        assertThat(first.settlement().role()).isEqualTo("MEMBER");
+        assertThat(first.paymentStatus().getTotalExpectedAmount()).isEqualByComparingTo("30000");
+        assertThat(first.paymentStatus().getTotalRemainingAmount()).isEqualByComparingTo("25000");
+        assertThat(first.paymentStatus().getObligations())
+                .filteredOn(obligation -> MEMBER_ID.equals(obligation.getUserId()))
+                .singleElement()
+                .satisfies(obligation ->
+                        assertThat(obligation.getRemainingAmount()).isEqualByComparingTo("15000")
+                );
+
+        // 결제 데이터가 없는 정산은 빈 납부 현황으로 채운다
+        SettlementWithPaymentStatusResponse second = result.get(1);
+        assertThat(second.settlement().settlementId()).isEqualTo(16L);
+        assertThat(second.paymentStatus().getObligations()).isEmpty();
+        assertThat(second.paymentStatus().getTotalRemainingAmount()).isEqualByComparingTo("0");
+
+        verifyNoInteractions(settlementValidator);
+        verify(settlementPaymentReader, never()).read(any());
+    }
+
+    @Test
+    @DisplayName("접근 가능한 정산이 없으면 결제 데이터를 조회하지 않는다")
+    void getSettlementListWithPaymentStatusReturnsEmptyWhenNoSettlements() {
+        given(
+                settlementRepository.findAllAccessibleByUserId(
+                        MEMBER_ID,
+                        SettlementParticipantStatus.ACTIVE
+                )
+        ).willReturn(
+                List.of()
+        );
+
+        List<SettlementWithPaymentStatusResponse> result =
+                settlementQueryService.getSettlementListWithPaymentStatus(
+                        MEMBER_ID
+                );
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(settlementPaymentReader);
+    }
+
+    private Settlement listSettlement(Long settlementId) {
+        return Settlement.builder()
+                .settlementId(settlementId)
+                .owner(
+                        User.builder()
+                                .userId(OWNER_ID)
+                                .build()
+                )
+                .title("정산 " + settlementId)
+                .settlementType(SettlementType.SHARED)
+                .settlementStatus(SettlementStatus.IN_PROGRESS)
+                .build();
     }
 
     private void preparePaymentHistoryStatus(
