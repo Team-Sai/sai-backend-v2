@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
 import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCycleListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCycleResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
@@ -17,6 +18,7 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -44,7 +46,6 @@ public class RecurringSettlementQueryService {
         boolean isOwner =
                 recurringSettlement.getOwner().getUserId().equals(userId);
 
-        // 참여자는 본인이 참여 중인 회차만 볼 수 있다
         Set<Long> participatingSettlementIds = isOwner
                 ? Set.of()
                 : new HashSet<>(
@@ -61,19 +62,28 @@ public class RecurringSettlementQueryService {
                     .toException();
         }
 
-        // 진행 중인 회차와 종료된 회차를 모두 조회한다
         List<Settlement> settlements =
                 settlementRepository.findAllByRecurringIdOrderByCycleDate(
                         recurringSettlementId
                 );
 
+        List<Settlement> visibleSettlements = settlements.stream()
+                .filter(settlement -> isOwner
+                        || participatingSettlementIds.contains(settlement.getSettlementId()))
+                .toList();
+
+        Map<Long, SettlementPaymentStatusResponse> paymentStatusBySettlementId =
+                settlementQueryService.readPaymentStatuses(visibleSettlements);
+
         List<RecurringSettlementCycleResponse> cycles = new ArrayList<>();
+
 
         for (int i = 0; i < settlements.size(); i++) {
             Settlement settlement = settlements.get(i);
+            SettlementPaymentStatusResponse paymentStatus =
+                    paymentStatusBySettlementId.get(settlement.getSettlementId());
 
-            if (!isOwner
-                    && !participatingSettlementIds.contains(settlement.getSettlementId())) {
+            if (paymentStatus == null) {
                 continue;
             }
 
@@ -81,12 +91,11 @@ public class RecurringSettlementQueryService {
                     SettlementAssembler.toCycleResponse(
                             settlement,
                             i + 1,
-                            settlementQueryService.readPaymentStatus(settlement)
+                            paymentStatus
                     )
             );
         }
 
-        // 최신 회차가 먼저 보이도록 역순 정렬
         cycles.sort((a, b) -> Integer.compare(b.getCycleNo(), a.getCycleNo()));
 
         return SettlementAssembler.toCycleListResponse(

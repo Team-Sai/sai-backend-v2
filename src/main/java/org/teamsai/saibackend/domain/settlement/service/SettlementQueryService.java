@@ -178,6 +178,37 @@ public class SettlementQueryService {
         );
     }
 
+    // 여러 정산의 납부 현황을 일괄 조회한다 (호출하는 쪽에서 권한 검증 필요)
+    @Transactional(readOnly = true)
+    public Map<Long, SettlementPaymentStatusResponse> readPaymentStatuses(
+            List<Settlement> settlements
+    ) {
+        if (settlements.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, SettlementPaymentData> paymentDataBySettlementId =
+                settlementPaymentReader.readAll(
+                        settlements.stream()
+                                .map(Settlement::getSettlementId)
+                                .toList()
+                );
+
+        return settlements.stream()
+                .collect(Collectors.toMap(
+                        Settlement::getSettlementId,
+                        settlement -> SettlementAssembler.toPaymentStatusResponse(
+                                settlement,
+                                buildPaymentObligationResponses(
+                                        paymentDataBySettlementId.getOrDefault(
+                                                settlement.getSettlementId(),
+                                                SettlementPaymentData.empty()
+                                        )
+                                )
+                        )
+                ));
+    }
+
     @Transactional(readOnly = true)
     public List<SettlementPaymentHistoryResponse> getPaymentHistory(
             Long settlementId,

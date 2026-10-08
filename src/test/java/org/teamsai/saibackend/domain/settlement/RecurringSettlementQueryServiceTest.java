@@ -23,6 +23,7 @@ import org.teamsai.saibackend.global.exception.DomainException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,7 +64,11 @@ class RecurringSettlementQueryServiceTest {
         given(recurringSettlementRepository.findById(RECURRING_ID)).willReturn(Optional.of(recurringSettlement()));
         given(settlementRepository.findAllByRecurringIdOrderByCycleDate(RECURRING_ID))
                 .willReturn(List.of(first, second, third));
-        given(settlementQueryService.readPaymentStatus(any())).willReturn(paymentStatus());
+        given(settlementQueryService.readPaymentStatuses(List.of(first, second, third))).willReturn(Map.of(
+                101L, paymentStatus(),
+                102L, paymentStatus(),
+                103L, paymentStatus()
+        ));
 
         RecurringSettlementCycleListResponse response =
                 recurringSettlementQueryService.getCycles(RECURRING_ID, OWNER_ID);
@@ -92,7 +97,9 @@ class RecurringSettlementQueryServiceTest {
         )).willReturn(List.of(102L));
         given(settlementRepository.findAllByRecurringIdOrderByCycleDate(RECURRING_ID))
                 .willReturn(List.of(first, second));
-        given(settlementQueryService.readPaymentStatus(second)).willReturn(paymentStatus());
+        // 참여 중인 회차만 납부 현황을 조회한다
+        given(settlementQueryService.readPaymentStatuses(List.of(second)))
+                .willReturn(Map.of(102L, paymentStatus()));
 
         RecurringSettlementCycleListResponse response =
                 recurringSettlementQueryService.getCycles(RECURRING_ID, MEMBER_ID);
@@ -101,7 +108,6 @@ class RecurringSettlementQueryServiceTest {
         assertThat(response.getCycles()).hasSize(1);
         assertThat(response.getCycles().get(0).getSettlementId()).isEqualTo(102L);
         assertThat(response.getCycles().get(0).getCycleNo()).isEqualTo(2);
-        verify(settlementQueryService, never()).readPaymentStatus(first);
     }
 
     @Test
