@@ -24,6 +24,19 @@ public interface SettlementParticipantRepository extends JpaRepository<Settlemen
     );
 
     @Query("""
+        SELECT sp.settlement.settlementId
+        FROM SettlementParticipant sp
+        WHERE sp.settlement.recurringSettlement.recurringSettlementId = :recurringSettlementId
+          AND sp.user.userId = :userId
+          AND sp.participantStatus = :status
+        """)
+    List<Long> findSettlementIdsByRecurringIdAndUserId(
+            @Param("recurringSettlementId") Long recurringSettlementId,
+            @Param("userId") Long userId,
+            @Param("status") SettlementParticipantStatus status
+    );
+
+    @Query("""
         SELECT sp
         FROM SettlementParticipant sp
         JOIN FETCH sp.user
@@ -32,6 +45,18 @@ public interface SettlementParticipantRepository extends JpaRepository<Settlemen
     """)
     List<SettlementParticipant> findBySettlementIdAndStatus(
             @Param("settlementId") Long settlementId,
+            @Param("status") SettlementParticipantStatus status
+    );
+
+    @Query("""
+        SELECT sp
+        FROM SettlementParticipant sp
+        JOIN FETCH sp.user
+        WHERE sp.settlement.settlementId IN :settlementIds
+          AND sp.participantStatus = :status
+    """)
+    List<SettlementParticipant> findBySettlementIdInAndStatus(
+            @Param("settlementIds") List<Long> settlementIds,
             @Param("status") SettlementParticipantStatus status
     );
 }
