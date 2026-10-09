@@ -67,6 +67,9 @@ dependencies {
     // AWS S3 (업로드 파일 저장)
     implementation platform('software.amazon.awssdk:bom:2.55.11')
     implementation 'software.amazon.awssdk:s3'
+    // AWS IAM 인증 토큰 (ElastiCache Redis IAM 인증)
+    implementation 'software.amazon.awssdk:auth'
+    implementation 'software.amazon.awssdk:http-auth-aws'
 }
 
 tasks.named('test', Test) {
