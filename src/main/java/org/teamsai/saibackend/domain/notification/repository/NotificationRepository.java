@@ -144,4 +144,27 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<NotificationResponse> findRepaymentNotificationsByUserId(
             @Param("userId") Long userId
     );
+
+    @Query(value = """
+        SELECT
+            n.notification_id AS notificationId,
+            n.notification_type AS notificationType,
+            n.title AS title,
+            n.content AS content,
+            n.reference_id AS referenceId,
+            n.secondary_reference_id AS secondaryReferenceId,
+            NULL AS referenceTitle,
+            'CALENDAR' AS referenceType,
+            NULL AS settlementType,
+            NULL AS relatedTransactionStatus,
+            FALSE AS resolvedFlag,
+            n.created_at AS createdAt
+        FROM notification n
+        WHERE n.user_id = :userId
+          AND n.notification_type = 'REPAYMENT_PREPARATION_REMINDER'
+        ORDER BY n.created_at DESC, n.notification_id DESC
+        """, nativeQuery = true)
+    List<NotificationResponse> findPreparationReminderNotificationsByUserId(
+            @Param("userId") Long userId
+    );
 }

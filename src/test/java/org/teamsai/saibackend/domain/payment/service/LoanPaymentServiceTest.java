@@ -54,7 +54,7 @@ class LoanPaymentServiceTest {
         void appliesPaymentAndMarksScheduleAsPaidWhenFullyPaid() {
             BigDecimal amount = new BigDecimal("30000");
 
-            given(repaymentScheduleService.getScheduleByScheduleId(SCHEDULE_ID))
+            given(repaymentScheduleService.getScheduleByScheduleIdForUpdate(SCHEDULE_ID))
                     .willReturn(schedule(RepaymentScheduleStatus.PENDING, new BigDecimal("100000")));
 
             given(paymentRecordService.sumConfirmedAmountByTarget(PaymentTargetType.LOAN, SCHEDULE_ID))
@@ -81,7 +81,7 @@ class LoanPaymentServiceTest {
         void appliesPaymentWithoutMarkingAsPaidWhenPartiallyPaid() {
             BigDecimal amount = new BigDecimal("10000");
 
-            given(repaymentScheduleService.getScheduleByScheduleId(SCHEDULE_ID))
+            given(repaymentScheduleService.getScheduleByScheduleIdForUpdate(SCHEDULE_ID))
                     .willReturn(schedule(RepaymentScheduleStatus.PENDING, new BigDecimal("100000")));
 
             given(paymentRecordService.sumConfirmedAmountByTarget(PaymentTargetType.LOAN, SCHEDULE_ID))
@@ -104,7 +104,7 @@ class LoanPaymentServiceTest {
         void treatsNullExistingConfirmedAmountAsZero() {
             BigDecimal amount = new BigDecimal("100000");
 
-            given(repaymentScheduleService.getScheduleByScheduleId(SCHEDULE_ID))
+            given(repaymentScheduleService.getScheduleByScheduleIdForUpdate(SCHEDULE_ID))
                     .willReturn(schedule(RepaymentScheduleStatus.PENDING, new BigDecimal("100000")));
 
             given(paymentRecordService.sumConfirmedAmountByTarget(PaymentTargetType.LOAN, SCHEDULE_ID))
@@ -130,7 +130,7 @@ class LoanPaymentServiceTest {
         @Test
         @DisplayName("PENDING 상태가 아닌 스케줄이면 예외가 발생하고 납부기록을 생성하지 않는다")
         void failsWhenScheduleIsNotPending() {
-            given(repaymentScheduleService.getScheduleByScheduleId(SCHEDULE_ID))
+            given(repaymentScheduleService.getScheduleByScheduleIdForUpdate(SCHEDULE_ID))
                     .willReturn(schedule(RepaymentScheduleStatus.PAID, new BigDecimal("100000")));
 
             assertThatThrownBy(() -> loanPaymentService.applyAutoMatchedPayment(
@@ -148,7 +148,7 @@ class LoanPaymentServiceTest {
         @Test
         @DisplayName("납부 예정 금액을 초과하여 납부하면 예외가 발생하고 납부기록을 생성하지 않는다")
         void failsWhenAmountExceedsExpectedTotal() {
-            given(repaymentScheduleService.getScheduleByScheduleId(SCHEDULE_ID))
+            given(repaymentScheduleService.getScheduleByScheduleIdForUpdate(SCHEDULE_ID))
                     .willReturn(schedule(RepaymentScheduleStatus.PENDING, new BigDecimal("100000")));
 
             given(paymentRecordService.sumConfirmedAmountByTarget(PaymentTargetType.LOAN, SCHEDULE_ID))
@@ -175,7 +175,7 @@ class LoanPaymentServiceTest {
         @DisplayName("초과입금은 현재 잔여금액까지만 수동 납부로 반영한다")
         void limitsExcessAmountToCurrentRemainingAmount() {
             given(repaymentScheduleService
-                    .getScheduleByScheduleId(SCHEDULE_ID))
+                    .getScheduleByScheduleIdForUpdate(SCHEDULE_ID))
                     .willReturn(schedule(
                             RepaymentScheduleStatus.PENDING,
                             new BigDecimal("100000")
@@ -208,7 +208,7 @@ class LoanPaymentServiceTest {
         @DisplayName("확정 납부금액상 잔여액이 없으면 수동 납부를 반영하지 않는다")
         void rejectsPaymentWhenConfirmedAmountAlreadyCoversSchedule() {
             given(repaymentScheduleService
-                    .getScheduleByScheduleId(SCHEDULE_ID))
+                    .getScheduleByScheduleIdForUpdate(SCHEDULE_ID))
                     .willReturn(schedule(
                             RepaymentScheduleStatus.PENDING,
                             new BigDecimal("100000")

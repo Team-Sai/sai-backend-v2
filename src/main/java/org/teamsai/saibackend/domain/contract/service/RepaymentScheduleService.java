@@ -48,6 +48,17 @@ public class RepaymentScheduleService {
         repaymentScheduleRepository.saveAll(schedules);
     }
 
+    @Transactional
+    public RepaymentScheduleDTO getScheduleByScheduleIdForUpdate(
+            Long scheduleId
+    ) {
+        return repaymentScheduleRepository.findByIdForUpdate(scheduleId)
+                .map(RepaymentScheduleDTO::from)
+                .orElseThrow(
+                        RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND::toException
+                );
+    }
+    
     public List<RepaymentSchedule> getSchedule(Long contractId) {
         return repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId);
     }
