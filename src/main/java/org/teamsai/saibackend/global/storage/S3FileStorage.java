@@ -24,22 +24,38 @@ public class S3FileStorage implements AutoCloseable {
 
     private final S3Client s3Client;
     private final String bucket;
+    private final String keyPrefix;
 
     public S3FileStorage(
             @Value("${file.s3.bucket}") String bucket,
-            @Value("${file.s3.region:ap-northeast-2}") String region
+            @Value("${file.s3.region:ap-northeast-2}") String region,
+            @Value("${file.s3.key-prefix:}") String keyPrefix
     ) {
         this.bucket = bucket;
+        this.keyPrefix = normalizePrefix(keyPrefix);
         this.s3Client = S3Client.builder()
                 .region(Region.of(region))
                 .build();
+    }
+
+    /** "files" → "files/", "" → "" (빈 값이면 지금처럼 버킷 맨 위) */
+    static String normalizePrefix(String prefix) {
+        if (prefix == null || prefix.isBlank()) {
+            return "";
+        }
+        String trimmed = prefix.strip();
+        return trimmed.endsWith("/") ? trimmed : trimmed + "/";
+    }
+
+    String buildKey(String filename) {
+        return keyPrefix + filename;
     }
 
     public void save(String key, InputStream content, long size, String contentType) throws IOException {
         try {
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucket)
-                    .key(key)
+                    .key(buildKey(key))
                     .contentType(contentType)
                     .build();
             s3Client.putObject(request, RequestBody.fromInputStream(content, size));
@@ -52,7 +68,7 @@ public class S3FileStorage implements AutoCloseable {
         try {
             GetObjectRequest request = GetObjectRequest.builder()
                     .bucket(bucket)
-                    .key(key)
+                    .key(buildKey(key))
                     .build();
             return s3Client.getObjectAsBytes(request).asByteArray();
         } catch (SdkException e) {
@@ -64,7 +80,7 @@ public class S3FileStorage implements AutoCloseable {
         try {
             GetObjectRequest request = GetObjectRequest.builder()
                     .bucket(bucket)
-                    .key(key)
+                    .key(buildKey(key))
                     .build();
             return s3Client.getObject(request);
         } catch (SdkException e) {
