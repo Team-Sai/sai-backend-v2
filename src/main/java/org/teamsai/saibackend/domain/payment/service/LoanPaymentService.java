@@ -57,7 +57,7 @@ public class LoanPaymentService {
             boolean limitToRemainingAmount
     ) {
 
-        RepaymentScheduleDTO schedule = repaymentScheduleService.getScheduleByScheduleId(targetId);
+        RepaymentScheduleDTO schedule = repaymentScheduleService.getScheduleByScheduleIdForUpdate(targetId);
 
         if (!schedule.getStatus().isUnresolved()) {
             log.warn("[LoanPaymentService] 처리 불가능한 스케줄 상태 - scheduleId: {}, status: {}", targetId, schedule.getStatus());

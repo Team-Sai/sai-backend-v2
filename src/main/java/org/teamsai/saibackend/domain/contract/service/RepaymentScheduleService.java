@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.contract.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
@@ -48,6 +49,17 @@ public class RepaymentScheduleService {
         repaymentScheduleRepository.saveAll(schedules);
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public RepaymentScheduleDTO getScheduleByScheduleIdForUpdate(
+            Long scheduleId
+    ) {
+        return repaymentScheduleRepository.findByIdForUpdate(scheduleId)
+                .map(RepaymentScheduleDTO::from)
+                .orElseThrow(
+                        RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND::toException
+                );
+    }
+    
     public List<RepaymentSchedule> getSchedule(Long contractId) {
         return repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId);
     }

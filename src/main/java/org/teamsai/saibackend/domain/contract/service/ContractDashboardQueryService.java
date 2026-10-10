@@ -12,7 +12,10 @@ import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSumm
 import org.teamsai.saibackend.domain.contract.exception.ContractDashboardErrorCode;
 import org.teamsai.saibackend.domain.contract.type.ContractRole;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleWithRemainingProjection;
+import org.teamsai.saibackend.domain.contract.util.VisibleContractSelector;
 
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,16 +29,9 @@ public class ContractDashboardQueryService {
     private final RepaymentScheduleService repaymentScheduleService;
 
     private List<LoanContractResponse> getVisibleContracts(Long userId) {
-        List<LoanContractResponse> contract = loanContractService.findContractsByUser(userId);
-
-        Set<Long> supersededIds = contract.stream()
-                .filter(c -> c.getPreviousContractId() != null && c.getStatus() == ContractStatus.COMPLETED)
-                .map(c -> c.getPreviousContractId())
-                .collect(Collectors.toSet());
-
-        return contract.stream()
-                .filter(c -> !supersededIds.contains(c.getContractId()) && c.getStatus() == ContractStatus.COMPLETED)
-                .toList();
+        return VisibleContractSelector.select(
+                loanContractService.findContractsByUser(userId)
+        );
     }
 
     private List<ContractDashboardRowResponse> filterByKeyword(List<ContractDashboardRowResponse> rows, String keyword) {
@@ -138,17 +134,19 @@ public class ContractDashboardQueryService {
             String sortType,
             int page
     ) {
-        Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap = contexts.stream()
-                .collect(Collectors.toMap(
-                        context -> context.contract().getContractId(),
-                        ContractScheduleContext::schedules
-                ));
+        YearMonth targetMonth =
+                YearMonth.now(ZoneId.of("Asia/Seoul"));
 
         List<ContractDashboardRowResponse> allRows = contexts.stream()
-                .map(context -> ContractDashboardAssembler.toRow(context.contract(), context.schedules(), userId))
+                .map(context -> ContractDashboardAssembler.toRow(
+                        context.contract(),
+                        context.schedules(),
+                        userId,
+                        targetMonth))
                 .toList();
 
-        ContractDashboardSummaryResponse summary = ContractDashboardAssembler.buildSummary(allRows, scheduleMap);
+        ContractDashboardSummaryResponse summary =
+                ContractDashboardAssembler.buildSummary(allRows);
         List<ContractDashboardRowResponse> filtered = filterByKeyword(allRows, keyword);
         List<ContractDashboardRowResponse> roleFiltered = filterByRole(filtered, roleFilter);
         List<ContractDashboardRowResponse> sorted = sortRows(filterByStatus(roleFiltered, statusFilter), sortType);

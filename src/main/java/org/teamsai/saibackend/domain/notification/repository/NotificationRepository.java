@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.notification.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -7,6 +8,7 @@ import org.teamsai.saibackend.domain.notification.dto.response.NotificationRespo
 import org.teamsai.saibackend.domain.notification.entity.Notification;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
@@ -143,5 +145,45 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             """, nativeQuery = true)
     List<NotificationResponse> findRepaymentNotificationsByUserId(
             @Param("userId") Long userId
+    );
+
+    @Query(value = """
+        SELECT
+            n.notification_id AS notificationId,
+            n.notification_type AS notificationType,
+            n.title AS title,
+            n.content AS content,
+            n.reference_id AS referenceId,
+            n.secondary_reference_id AS secondaryReferenceId,
+            NULL AS referenceTitle,
+            'CALENDAR' AS referenceType,
+            NULL AS settlementType,
+            NULL AS relatedTransactionStatus,
+            FALSE AS resolvedFlag,
+            n.created_at AS createdAt
+        FROM notification n
+        WHERE n.user_id = :userId
+          AND n.notification_type = 'REPAYMENT_PREPARATION_REMINDER'
+        ORDER BY n.created_at DESC, n.notification_id DESC
+        """, nativeQuery = true)
+    List<NotificationResponse> findPreparationReminderNotificationsByUserId(
+            @Param("userId") Long userId
+    );
+
+    @Query("""
+    select n
+    from Notification n
+    where n.user.userId = :userId
+      and n.notificationType = :notificationType
+      and n.createdAt >= :startInclusive
+      and n.createdAt < :endExclusive
+    order by n.createdAt desc, n.notificationId desc
+    """)
+    List<Notification> findPreparationRemindersCreatedInRange(
+            @Param("userId") Long userId,
+            @Param("notificationType") NotificationType notificationType,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive,
+            Pageable pageable
     );
 }

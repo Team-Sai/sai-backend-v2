@@ -10,11 +10,14 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarDateResponse;
 import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
 import org.teamsai.saibackend.domain.integration.service.IntegrationCalendarQueryService;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 @Tag(
@@ -43,6 +46,25 @@ public class CalendarQueryController {
             @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
         return integrationCalendarQueryService.getCalendarDayDetail(userId, date);
+    }
+
+    @Operation(
+            summary = "월별 캘린더 상세 조회",
+            description = "해당 월의 계약·정산 일정을 날짜별로 조회합니다."
+    )
+    @GetMapping("/api/dashboard/calendar")
+    public List<DashboardCalendarDateResponse> getCalendarMonthDetail(
+            @RequestParam
+            @DateTimeFormat(pattern = "yyyy-MM")
+            YearMonth yearMonth,
+
+            @AuthenticationPrincipal(expression = "userId")
+            Long userId
+    ) {
+        return integrationCalendarQueryService.getCalendarMonthDetail(
+                userId,
+                yearMonth
+        );
     }
 
 }

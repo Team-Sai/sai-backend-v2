@@ -25,6 +25,15 @@ public class ContractDashboardSummaryResponse {
     private BigDecimal payableThisMonthAmount;
     private Integer payableDueMonth;
 
+    // 받을 돈 중 이전 달까지의 미회수액
+    private BigDecimal receivableOverdueAmount;
+
+    // 갚을 돈 중 이전 달까지의 미상환액
+    private BigDecimal payableOverdueAmount;
+
+    // 이전 달 미상환액 + 이번 달 미상환액
+    private BigDecimal payableTotalRequiredAmount;
+
     private LocalDate nearestDueDate;
     private String defaultFilter;
 }
