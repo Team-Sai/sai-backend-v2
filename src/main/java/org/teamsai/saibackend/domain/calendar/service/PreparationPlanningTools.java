@@ -76,18 +76,34 @@ public class PreparationPlanningTools {
         );
     }
 
-    @Tool(description = """
-            상환 확인 알림 후보 전체를 서버 규칙으로 검증한다.
-            draft는 slots 목록이며 각 항목은
-            scheduleId, startsAt, reason을 포함한다.
-            startsAt은 UTC ISO-8601 형식이다.
-            위반 목록이 비어 있지 않으면 후보를 수정해서 다시 검증한다.
-            이 도구는 일정을 저장하거나 상환을 실행하지 않는다.
-            """)
+    @Tool(
+            returnDirect = true,
+            description = """
+                상환 확인 알림 후보 전체를 서버 규칙으로 검증한다.
+                먼저 readRepaymentFacts와 readFundingAndHistory를
+                각각 호출한 뒤 이 도구를 호출한다.
+                draft는 slots 목록이며 각 항목은
+                scheduleId, startsAt, reason을 포함한다.
+                startsAt은 UTC ISO-8601 형식이다.
+                이 도구를 호출하면 현재 생성 작업이 종료된다.
+                검증 실패 시 재생성 여부는 서버가 결정한다.
+                이 도구는 일정을 저장하거나 상환을 실행하지 않는다.
+                """
+    )
     public synchronized PreparationValidationResult validateReminderDraft(
             PreparationAgentDraft draft
     ) {
         recordCall("VALIDATE_REMINDER_DRAFT");
+
+        // 검증 전에 필수 자료를 조회했는지 확인한다.
+        if (!factsRead || !fundingAndHistoryRead) {
+            throw new IllegalStateException(
+                    "Required preparation facts were not read before validation"
+            );
+        }
+
+        // 이전 후보가 남아 있지 않도록 먼저 비운다.
+        lastCheckedDraft = null;
 
         PreparationValidationResult result =
                 validator.validate(
@@ -97,7 +113,15 @@ public class PreparationPlanningTools {
                         clock.instant()
                 );
 
-        lastCheckedDraft = draft;
+        // 모델에 전달했던 목록과 분리해 검증 대상의 복사본을 보관한다.
+        // null 항목을 포함하는 잘못된 후보도 외부 검증에서 처리할 수 있다.
+        if (draft != null && draft.slots() != null) {
+            lastCheckedDraft = new PreparationAgentDraft(
+                    java.util.Collections.unmodifiableList(
+                            new java.util.ArrayList<>(draft.slots())
+                    )
+            );
+        }
 
         log.info(
                 "event=PREPARATION_TOOL_VALIDATED valid={} violationCount={}",
@@ -108,10 +132,19 @@ public class PreparationPlanningTools {
         return result;
     }
 
-    /*
-     * @Tool이 없으므로 모델에 노출되지 않는다.
-     * 모델의 최종 반환값이 실제로 검증 도구에 전달됐는지 확인한다.
-     */
+    public synchronized PreparationAgentDraft getCheckedDraft() {
+        if (toolCalls > MAX_TOOL_CALLS
+                || !factsRead
+                || !fundingAndHistoryRead
+                || lastCheckedDraft == null) {
+            throw new IllegalStateException(
+                    "No checked preparation draft is available"
+            );
+        }
+
+        return lastCheckedDraft;
+    }
+
     public synchronized boolean wasFinalDraftChecked(
             PreparationAgentDraft finalDraft
     ) {

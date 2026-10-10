@@ -82,9 +82,15 @@ class PreparationPlanningToolsTest {
     void rejectsFinalDraftWhenFactsWereNotRead() {
         var draft = draft(10L, "납기 전에 확인하세요.");
 
-        tools.validateReminderDraft(draft);
+        assertThrows(
+                IllegalStateException.class,
+                () -> tools.validateReminderDraft(draft)
+        );
 
-        assertThat(tools.wasFinalDraftChecked(draft)).isFalse();
+        assertThrows(
+                IllegalStateException.class,
+                () -> tools.getCheckedDraft()
+        );
     }
 
     @Test
@@ -103,6 +109,9 @@ class PreparationPlanningToolsTest {
 
     @Test
     void returnsViolationForUnknownSchedule() {
+        tools.readRepaymentFacts();
+        tools.readFundingAndHistory();
+
         var result = tools.validateReminderDraft(
                 draft(999L, "알 수 없는 회차")
         );

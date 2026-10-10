@@ -4,13 +4,13 @@ spring:
       chat: ${REPAYMENT_AI_PROVIDER:none}
       embedding: none
 
-    google:
-      genai:
-        api-key: ${GEMINI_API_KEY:}
-        chat:
-          model: ${REPAYMENT_AI_MODEL:}
-          response-mime-type: application/json
-          google-search-retrieval: false
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      timeout: ${SAI_REPAYMENT_AI_REQUEST_TIMEOUT:PT1M}
+      max-retries: 0
+
+      chat:
+        model: ${REPAYMENT_AI_MODEL:gpt-4.1-mini}
 
     retry:
       max-attempts: 0

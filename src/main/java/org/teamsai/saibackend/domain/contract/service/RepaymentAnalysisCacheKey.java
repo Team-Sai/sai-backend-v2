@@ -21,7 +21,7 @@ public class RepaymentAnalysisCacheKey {
 
     public RepaymentAnalysisCacheKey(
             @Value("${spring.ai.model.chat:none}") String provider,
-            @Value("${spring.ai.google.genai.chat.model:disabled}") String model
+            @Value("${spring.ai.openai.chat.model:disabled}") String model
     ) {
         this.provider = provider;
         this.model = model;
