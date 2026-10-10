@@ -75,6 +75,9 @@ public class SettlementQueryService {
                                     ? recurringSettlement.getEndDate()
                                     : null,
                             settlement.getCycleDate(),
+                            recurringSettlement != null
+                                    ? recurringSettlement.getRecurringSettlementId()
+                                    : null,
                             settlement.getCreatedAt()
                     );
                 })
@@ -137,7 +140,10 @@ public class SettlementQueryService {
                         ? recurringSettlement.getEndDate()
                         : null,
                 settlement.getCreatedAt(),
-                role
+                role,
+                recurringSettlement != null
+                        ? recurringSettlement.getRecurringSettlementId()
+                        : null
         );
     }
 
@@ -152,8 +158,14 @@ public class SettlementQueryService {
                         userId
                 );
 
+        return readPaymentStatus(settlement);
+    }
+
+    private SettlementPaymentStatusResponse readPaymentStatus(
+            Settlement settlement
+    ) {
         SettlementPaymentData paymentData =
-                settlementPaymentReader.read(settlementId);
+                settlementPaymentReader.read(settlement.getSettlementId());
 
         List<SettlementPaymentObligationResponse> obligations =
                 buildPaymentObligationResponses(paymentData);
@@ -165,18 +177,66 @@ public class SettlementQueryService {
     }
 
     @Transactional(readOnly = true)
+    public Map<Long, SettlementPaymentStatusResponse> readPaymentStatuses(
+            List<Settlement> settlements,
+            Long userId
+    ) {
+        if (settlements.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, SettlementPaymentData> paymentDataBySettlementId =
+                settlementPaymentReader.readAll(
+                        settlements.stream()
+                                .map(Settlement::getSettlementId)
+                                .toList()
+                );
+
+        return settlements.stream()
+                .filter(settlement -> isAccessible(
+                        settlement,
+                        paymentDataBySettlementId.getOrDefault(
+                                settlement.getSettlementId(),
+                                SettlementPaymentData.empty()
+                        ),
+                        userId
+                ))
+                .collect(Collectors.toMap(
+                        Settlement::getSettlementId,
+                        settlement -> SettlementAssembler.toPaymentStatusResponse(
+                                settlement,
+                                buildPaymentObligationResponses(
+                                        paymentDataBySettlementId.getOrDefault(
+                                                settlement.getSettlementId(),
+                                                SettlementPaymentData.empty()
+                                        )
+                                )
+                        )
+                ));
+    }
+
+    private boolean isAccessible(
+            Settlement settlement,
+            SettlementPaymentData paymentData,
+            Long userId
+    ) {
+        return settlement.getOwner().getUserId().equals(userId)
+                || paymentData.participants().stream()
+                        .anyMatch(participant ->
+                                participant.getUser().getUserId().equals(userId)
+                        );
+    }
+
+    @Transactional(readOnly = true)
     public List<SettlementPaymentHistoryResponse> getPaymentHistory(
             Long settlementId,
             Long userId
     ) {
-        // getPaymentStatus()를 다시 호출하지 않고
-        // 권한 검증만 한 번 수행
         findAccessibleSettlement(
                 settlementId,
                 userId
         );
 
-        // 참여자 → obligation → paymentRecord 조회도 한 번만 수행
         SettlementPaymentData paymentData =
                 settlementPaymentReader.read(settlementId);
 
