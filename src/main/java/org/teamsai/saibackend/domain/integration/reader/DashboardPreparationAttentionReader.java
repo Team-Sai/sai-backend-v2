@@ -10,8 +10,10 @@ import org.teamsai.saibackend.domain.notification.type.NotificationType;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Component
@@ -19,6 +21,8 @@ public class DashboardPreparationAttentionReader {
 
     private static final ZoneId SEOUL =
             ZoneId.of("Asia/Seoul");
+
+    private static final int MAX_ITEMS = 10;
 
     private final NotificationRepository notifications;
     private final Clock clock;
@@ -38,16 +42,30 @@ public class DashboardPreparationAttentionReader {
                 .atZone(SEOUL)
                 .toLocalDate();
 
-        long dateKey = Long.parseLong(
-                today.format(DateTimeFormatter.BASIC_ISO_DATE)
-        );
+        /*
+         * createdAt은 LocalDateTime + @CreationTimestamp를 사용한다.
+         * 한국 날짜의 경계를 현재 JVM의 타임스탬프 시간대로 변환한다.
+         */
+        ZoneId timestampZone = ZoneId.systemDefault();
+
+        LocalDateTime startInclusive = today
+                .atStartOfDay(SEOUL)
+                .withZoneSameInstant(timestampZone)
+                .toLocalDateTime();
+
+        LocalDateTime endExclusive = today
+                .plusDays(1)
+                .atStartOfDay(SEOUL)
+                .withZoneSameInstant(timestampZone)
+                .toLocalDateTime();
 
         return notifications
-                .findByUser_UserIdAndNotificationTypeAndSecondaryReferenceIdOrderByCreatedAtDescNotificationIdDesc(
+                .findPreparationRemindersCreatedInRange(
                         userId,
                         NotificationType.REPAYMENT_PREPARATION_REMINDER,
-                        dateKey,
-                        PageRequest.of(0, 10)
+                        startInclusive,
+                        endExclusive,
+                        PageRequest.of(0, MAX_ITEMS)
                 )
                 .stream()
                 .map(notification ->
@@ -58,10 +76,36 @@ public class DashboardPreparationAttentionReader {
                                                 .REPAYMENT_PREPARATION_REMINDER
                                 )
                                 .actionUrl(
-                                        "/calendar?date=" + today
+                                        calendarUrl(
+                                                notification
+                                                        .getSecondaryReferenceId()
+                                        )
                                 )
                                 .build()
                 )
                 .toList();
+    }
+
+    private String calendarUrl(Long dateKey) {
+        if (dateKey == null) {
+            return "/calendar";
+        }
+
+        String value = dateKey.toString();
+
+        if (value.length() != 8) {
+            return "/calendar";
+        }
+
+        try {
+            LocalDate originalDate = LocalDate.parse(
+                    value,
+                    DateTimeFormatter.BASIC_ISO_DATE
+            );
+
+            return "/calendar?date=" + originalDate;
+        } catch (DateTimeParseException exception) {
+            return "/calendar";
+        }
     }
 }

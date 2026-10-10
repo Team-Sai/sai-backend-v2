@@ -8,6 +8,7 @@ import org.teamsai.saibackend.domain.notification.dto.response.NotificationRespo
 import org.teamsai.saibackend.domain.notification.entity.Notification;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
@@ -169,11 +170,20 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("userId") Long userId
     );
 
-    List<Notification>
-    findByUser_UserIdAndNotificationTypeAndSecondaryReferenceIdOrderByCreatedAtDescNotificationIdDesc(
-            Long userId,
-            NotificationType notificationType,
-            Long secondaryReferenceId,
+    @Query("""
+    select n
+    from Notification n
+    where n.user.userId = :userId
+      and n.notificationType = :notificationType
+      and n.createdAt >= :startInclusive
+      and n.createdAt < :endExclusive
+    order by n.createdAt desc, n.notificationId desc
+    """)
+    List<Notification> findPreparationRemindersCreatedInRange(
+            @Param("userId") Long userId,
+            @Param("notificationType") NotificationType notificationType,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive,
             Pageable pageable
     );
 }

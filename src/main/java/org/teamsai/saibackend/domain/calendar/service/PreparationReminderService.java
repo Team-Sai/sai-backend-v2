@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import org.teamsai.saibackend.domain.user.entity.User;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -37,6 +39,7 @@ public class PreparationReminderService {
     private final NotificationService notifications;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final Duration maxReminderDelay;
 
     public PreparationReminderService(
             RepaymentPreparationEventRepository events,
@@ -44,14 +47,25 @@ public class PreparationReminderService {
             RepaymentAnalysisService analysis,
             NotificationService notifications,
             EntityManager entityManager,
-            @Qualifier("repaymentClock") Clock clock
+            @Qualifier("repaymentClock") Clock clock,
+            @Value("${sai.calendar.preparation-reminder-max-delay:PT24H}")
+            Duration maxReminderDelay
     ) {
+        if (maxReminderDelay == null
+                || maxReminderDelay.isZero()
+                || maxReminderDelay.isNegative()) {
+            throw new IllegalArgumentException(
+                    "Preparation reminder max delay must be positive"
+            );
+        }
+
         this.events = events;
         this.schedules = schedules;
         this.analysis = analysis;
         this.notifications = notifications;
         this.entityManager = entityManager;
         this.clock = clock;
+        this.maxReminderDelay = maxReminderDelay;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -67,11 +81,48 @@ public class PreparationReminderService {
 
         List<RepaymentPreparationEvent> due =
                 events.findDueRemindersByUserId(userId, cutoff);
-        if (due.isEmpty()) return 0;
+
+        if (due.isEmpty()) {
+            return 0;
+        }
+
+        Instant evaluatedAt = clock.instant();
+        Instant oldestAllowedStart = evaluatedAt.minus(maxReminderDelay);
+
+        List<RepaymentPreparationEvent> expired = due.stream()
+                .filter(event ->
+                        event.getStartsAt().isBefore(oldestAllowedStart)
+                )
+                .toList();
+
+        List<RepaymentPreparationEvent> deliverable = due.stream()
+                .filter(event ->
+                        !event.getStartsAt().isBefore(oldestAllowedStart)
+                )
+                .toList();
+
+        expired.forEach(event ->
+                event.markReminderProcessed(evaluatedAt)
+        );
+
+        if (!expired.isEmpty()) {
+            log.info(
+                    "event=PREPARATION_REMINDER_EXPIRED "
+                            + "userId={} eventCount={} maxDelaySeconds={}",
+                    userId,
+                    expired.size(),
+                    maxReminderDelay.toSeconds()
+            );
+        }
+
+        if (deliverable.isEmpty()) {
+            events.flush();
+            return 0;
+        }
 
         Set<Long> missingScheduleIds = new HashSet<>();
 
-        List<Long> scheduleIds = due.stream()
+        List<Long> scheduleIds = deliverable.stream()
                 .map(RepaymentPreparationEvent::getScheduleId)
                 .distinct()
                 .sorted()
@@ -99,9 +150,10 @@ public class PreparationReminderService {
                 ));
 
         Map<Instant, List<RepaymentPreparationEvent>> groups =
-                due.stream().collect(Collectors.groupingBy(
+                deliverable.stream().collect(Collectors.groupingBy(
                         RepaymentPreparationEvent::getStartsAt,
-                        TreeMap::new, Collectors.toList()
+                        TreeMap::new,
+                        Collectors.toList()
                 ));
 
         int notificationGroups = 0;
@@ -151,10 +203,16 @@ public class PreparationReminderService {
             group.forEach(event -> event.markReminderProcessed(processedAt));
         }
 
-        // 관리 상태 엔티티이므로 dirty checking으로 처리 시각이 저장됩니다.
         events.flush();
-        log.info("event=PREPARATION_REMINDER_PROCESSED eventCount={} notificationGroups={}",
-                due.size(), notificationGroups);
+
+        log.info(
+                "event=PREPARATION_REMINDER_PROCESSED "
+                        + "eventCount={} expiredEventCount={} notificationGroups={}",
+                due.size(),
+                expired.size(),
+                notificationGroups
+        );
+
         return notificationGroups;
     }
 }

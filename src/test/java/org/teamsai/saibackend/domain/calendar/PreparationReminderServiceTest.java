@@ -21,7 +21,6 @@ import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
 
 class PreparationReminderServiceTest {
     private final Instant time = Instant.parse("2026-10-13T09:00:00Z");
@@ -44,8 +43,15 @@ class PreparationReminderServiceTest {
                 .thenReturn(mock(User.class));
         when(schedules.findByIdForUpdate(anyLong()))
                 .thenReturn(Optional.of(mock(RepaymentSchedule.class)));
-        service = new PreparationReminderService(events,schedules,analysis,notifications,entityManager,clock);
-    }
+        service = new PreparationReminderService(
+                events,
+                schedules,
+                analysis,
+                notifications,
+                entityManager,
+                clock,
+                Duration.ofHours(24)
+        );    }
 
     @Test
     void groupsSameTimeAndUsesLatestRemainingAmounts() {
@@ -107,10 +113,120 @@ class PreparationReminderServiceTest {
         assertThat(a.getReminderProcessedAt()).isNull();
     }
 
-    private RepaymentPreparationEvent event(Long eventId, Long scheduleId) {
-        var event = new RepaymentPreparationEvent(1L,100L,scheduleId,"확인",
-                time,time.plusSeconds(60),time.minusSeconds(3600));
-        ReflectionTestUtils.setField(event,"eventId",eventId);
+    @Test
+    void marksExpiredReminderProcessedWithoutNotificationOrAnalysis() {
+        Instant expiredStart = clock.instant()
+                .minus(Duration.ofHours(24))
+                .minusSeconds(1);
+
+        var expired = event(1L, 10L, expiredStart);
+
+        when(events.findDueRemindersByUserId(1L, clock.instant()))
+                .thenReturn(List.of(expired));
+
+        assertThat(service.processUser(1L, clock.instant())).isZero();
+
+        assertThat(expired.getReminderProcessedAt())
+                .isEqualTo(clock.instant());
+
+        verifyNoInteractions(notifications, analysis);
+        verify(schedules, never()).findByIdForUpdate(anyLong());
+        verify(events).flush();
+    }
+
+    @Test
+    void deliversReminderAtExactMaxDelayBoundary() {
+        Instant boundaryStart = clock.instant()
+                .minus(Duration.ofHours(24));
+
+        var reminder = event(1L, 10L, boundaryStart);
+
+        when(events.findDueRemindersByUserId(1L, clock.instant()))
+                .thenReturn(List.of(reminder));
+
+        stubAnalysis(List.of(candidate(10L, "40000")));
+
+        assertThat(service.processUser(1L, clock.instant())).isEqualTo(1);
+
+        verify(notifications).createIfAbsent(
+                eq(1L),
+                eq(NotificationType.REPAYMENT_PREPARATION_REMINDER),
+                anyString(),
+                argThat(content ->
+                        content.contains("1건")
+                                && content.contains("40000원")
+                ),
+                eq(1L),
+                anyLong()
+        );
+
+        assertThat(reminder.getReminderProcessedAt())
+                .isEqualTo(clock.instant());
+    }
+
+    @Test
+    void skipsExpiredReminderAndDeliversOnlyRecentReminder() {
+        Instant expiredStart = clock.instant()
+                .minus(Duration.ofHours(24))
+                .minusSeconds(1);
+
+        var expired = event(1L, 10L, expiredStart);
+        var recent = event(2L, 11L);
+
+        when(events.findDueRemindersByUserId(1L, clock.instant()))
+                .thenReturn(List.of(expired, recent));
+
+        stubAnalysis(List.of(
+                candidate(10L, "20000"),
+                candidate(11L, "60000")
+        ));
+
+        assertThat(service.processUser(1L, clock.instant())).isEqualTo(1);
+
+        verify(schedules, never()).findByIdForUpdate(10L);
+        verify(schedules).findByIdForUpdate(11L);
+
+        verify(notifications).createIfAbsent(
+                eq(1L),
+                eq(NotificationType.REPAYMENT_PREPARATION_REMINDER),
+                anyString(),
+                argThat(content ->
+                        content.contains("1건")
+                                && content.contains("60000원")
+                ),
+                eq(2L),
+                eq(20261013L)
+        );
+
+        assertThat(expired.getReminderProcessedAt())
+                .isEqualTo(clock.instant());
+        assertThat(recent.getReminderProcessedAt())
+                .isEqualTo(clock.instant());
+    }
+
+    private RepaymentPreparationEvent event(
+            Long eventId,
+            Long scheduleId
+    ) {
+        return event(eventId, scheduleId, time);
+    }
+
+    private RepaymentPreparationEvent event(
+            Long eventId,
+            Long scheduleId,
+            Instant startsAt
+    ) {
+        var event = new RepaymentPreparationEvent(
+                1L,
+                100L,
+                scheduleId,
+                "확인",
+                startsAt,
+                startsAt.plusSeconds(60),
+                startsAt.minusSeconds(3600)
+        );
+
+        ReflectionTestUtils.setField(event, "eventId", eventId);
         return event;
     }
     private RepaymentCandidate candidate(Long scheduleId,String amount) {
