@@ -1,10 +1,10 @@
-package org.teamsai.saibackend.domain.calendar.service;
+package org.teamsai.saibackend.domain.calendar.calculator;
 
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationCoordinationFacts;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationPlanningContext;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalItem;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationCoordinationFactsResponse;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalItemResponse;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,17 +12,17 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Service
-public class PreparationCoordinationFactsService {
+@Component
+public class PreparationCoordinationFactsCalculator {
 
-    public PreparationCoordinationFacts calculate(
+    public PreparationCoordinationFactsResponse calculate(
             PreparationPlanningContext context,
             PreparationProposalRequest request,
-            List<PreparationProposalItem> validatedItems,
+            List<PreparationProposalItemResponse> validatedItems,
             boolean reschedule
     ) {
         Map<Instant, Long> countsByTime = validatedItems.stream()
-                .map(PreparationProposalItem::startsAt)
+                .map(PreparationProposalItemResponse::startsAt)
                 .collect(Collectors.groupingBy(
                         Function.identity(),
                         Collectors.counting()
@@ -41,7 +41,7 @@ public class PreparationCoordinationFactsService {
                         .sum()
         );
 
-        return new PreparationCoordinationFacts(
+        return new PreparationCoordinationFactsResponse(
                 context.allCandidates().size(),
                 context.existingEvents().size(),
                 context.candidates().size(),

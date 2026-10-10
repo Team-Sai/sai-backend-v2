@@ -5,11 +5,14 @@ import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalItemResponse;
+import org.teamsai.saibackend.domain.calendar.dto.internal.StoredPreparationProposal;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.*;
 import org.teamsai.saibackend.domain.calendar.entity.*;
 import org.teamsai.saibackend.domain.calendar.repository.*;
 import org.teamsai.saibackend.domain.calendar.service.*;
+import org.teamsai.saibackend.domain.calendar.support.PreparationPlanningValidator;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
@@ -153,8 +156,8 @@ class PreparationProposalConfirmationServiceTest {
                         null
                 );
 
-        PreparationProposalItem item =
-                new PreparationProposalItem(
+        PreparationProposalItemResponse item =
+                new PreparationProposalItemResponse(
                         100L,
                         10L,
                         "계약 A",

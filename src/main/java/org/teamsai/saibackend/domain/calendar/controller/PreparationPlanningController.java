@@ -6,7 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
 import org.teamsai.saibackend.domain.calendar.dto.response.PreparationConfirmationResponse;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationPlanningContext;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
 import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalResponse;
 import org.teamsai.saibackend.domain.calendar.service.PreparationPlanningContextService;
 import org.teamsai.saibackend.domain.calendar.service.PreparationProposalConfirmationService;

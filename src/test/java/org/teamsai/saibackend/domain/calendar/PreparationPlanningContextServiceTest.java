@@ -7,7 +7,7 @@ import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalReq
 import org.teamsai.saibackend.domain.calendar.dto.response.PreparationEventResponse;
 import org.teamsai.saibackend.domain.calendar.entity.RepaymentPreparationEvent;
 import org.teamsai.saibackend.domain.calendar.repository.RepaymentPreparationEventRepository;
-import org.teamsai.saibackend.domain.calendar.service.PreparationFundingAssessmentService;
+import org.teamsai.saibackend.domain.calendar.calculator.PreparationFundingAssessmentCalculator;
 import org.teamsai.saibackend.domain.calendar.service.PreparationPlanningContextService;
 import org.teamsai.saibackend.domain.calendar.service.PreparationRepaymentHistoryService;
 import org.teamsai.saibackend.domain.calendar.service.RepaymentPreparationEventService;
@@ -46,7 +46,7 @@ class PreparationPlanningContextServiceTest {
                 analysisService,
                 eventService,
                 eventRepository,
-                new PreparationFundingAssessmentService(),
+                new PreparationFundingAssessmentCalculator(),
                 historyService
         );
     }

@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.calendar;
 
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationFundingRequest;
-import org.teamsai.saibackend.domain.calendar.service.PreparationFundingAssessmentService;
+import org.teamsai.saibackend.domain.calendar.calculator.PreparationFundingAssessmentCalculator;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 
 import java.math.BigDecimal;
@@ -12,10 +12,10 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class PreparationFundingAssessmentServiceTest {
+class PreparationFundingAssessmentCalculatorTest {
 
-    private final PreparationFundingAssessmentService service =
-            new PreparationFundingAssessmentService();
+    private final PreparationFundingAssessmentCalculator service =
+            new PreparationFundingAssessmentCalculator();
 
     private final LocalDate today = LocalDate.of(2026, 10, 10);
     private final YearMonth month = YearMonth.of(2026, 10);

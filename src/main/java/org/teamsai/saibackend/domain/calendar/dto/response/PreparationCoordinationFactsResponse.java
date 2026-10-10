@@ -4,7 +4,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
 
-public record PreparationCoordinationFacts(
+public record PreparationCoordinationFactsResponse(
         int outstandingScheduleCount,
         int existingPreparationEventCount,
         int targetScheduleCount,

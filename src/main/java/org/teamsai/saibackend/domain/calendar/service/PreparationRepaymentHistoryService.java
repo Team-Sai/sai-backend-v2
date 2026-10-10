@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.calendar.service;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationRepaymentHistory;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationRepaymentHistory;
 import org.teamsai.saibackend.domain.calendar.exception.PreparationEventErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
 

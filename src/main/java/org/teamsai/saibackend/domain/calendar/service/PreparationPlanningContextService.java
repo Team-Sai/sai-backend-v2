@@ -2,8 +2,9 @@ package org.teamsai.saibackend.domain.calendar.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.calendar.calculator.PreparationFundingAssessmentCalculator;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationPlanningContext;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
 import org.teamsai.saibackend.domain.calendar.dto.response.PreparationEventResponse;
 import org.teamsai.saibackend.domain.calendar.entity.RepaymentPreparationEvent;
 import org.teamsai.saibackend.domain.calendar.exception.PreparationEventErrorCode;
@@ -24,14 +25,14 @@ public class PreparationPlanningContextService {
     private final RepaymentAnalysisService analysisService;
     private final RepaymentPreparationEventService eventService;
     private final RepaymentPreparationEventRepository eventRepository;
-    private final PreparationFundingAssessmentService fundingAssessmentService;
+    private final PreparationFundingAssessmentCalculator fundingAssessmentService;
     private final PreparationRepaymentHistoryService historyService;
 
     public PreparationPlanningContextService(
             RepaymentAnalysisService analysisService,
             RepaymentPreparationEventService eventService,
             RepaymentPreparationEventRepository eventRepository,
-            PreparationFundingAssessmentService fundingAssessmentService,
+            PreparationFundingAssessmentCalculator fundingAssessmentService,
             PreparationRepaymentHistoryService historyService
     ) {
         this.analysisService = analysisService;

@@ -1,16 +1,19 @@
 package org.teamsai.saibackend.domain.calendar;
 
 import org.junit.jupiter.api.Test;
+import org.teamsai.saibackend.domain.calendar.calculator.PreparationCoordinationFactsCalculator;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationAgentDraft;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.*;
 import org.teamsai.saibackend.domain.calendar.service.*;
+import org.teamsai.saibackend.domain.calendar.support.PreparationPlanningValidator;
+import org.teamsai.saibackend.domain.calendar.type.PreparationProposalStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
 
 class PreparationAgentRequestedVerificationTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-08T00:00:00Z"), ZoneId.of("Asia/Seoul"));
@@ -67,11 +70,12 @@ class PreparationAgentRequestedVerificationTest {
                 mock(PreparationRescheduleContextService.class),
                 new PreparationPlanningValidator(),
                 store,
-                new PreparationCoordinationFactsService(),
+                new PreparationCoordinationFactsCalculator(),
                 clock
         );
         var response = service.propose(1L,request);
-        assertThat(response.status()).isEqualTo("AI_UNAVAILABLE");
+        assertThat(response.status())
+                .isEqualTo(PreparationProposalStatus.AI_UNAVAILABLE);
         assertThat(response.attempts()).isEqualTo(1);
         assertThat(response.items()).isEmpty();
         assertThat(response.proposalId()).isNull();

@@ -6,12 +6,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.calendar.dto.internal.*;
 import org.teamsai.saibackend.domain.calendar.dto.response.*;
 import org.teamsai.saibackend.domain.calendar.entity.PreparationProposal;
 import org.teamsai.saibackend.domain.calendar.entity.RepaymentPreparationEvent;
 import org.teamsai.saibackend.domain.calendar.exception.PreparationEventErrorCode;
 import org.teamsai.saibackend.domain.calendar.repository.PreparationProposalRepository;
 import org.teamsai.saibackend.domain.calendar.repository.RepaymentPreparationEventRepository;
+import org.teamsai.saibackend.domain.calendar.support.PreparationPlanningValidator;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.user.entity.User;
@@ -122,7 +124,7 @@ public class PreparationProposalConfirmationService {
             );
         }
 
-        List<PreparationProposalItem> originals = stored.items();
+        List<PreparationProposalItemResponse> originals = stored.items();
 
         if (originals == null
                 || originals.isEmpty()
@@ -131,7 +133,7 @@ public class PreparationProposalConfirmationService {
         }
 
         List<Long> scheduleIds = originals.stream()
-                .map(PreparationProposalItem::scheduleId)
+                .map(PreparationProposalItemResponse::scheduleId)
                 .distinct()
                 .sorted()
                 .toList();
@@ -177,7 +179,7 @@ public class PreparationProposalConfirmationService {
         List<RepaymentCandidate> selectedCandidates =
                 new ArrayList<>();
 
-        for (PreparationProposalItem original : originals) {
+        for (PreparationProposalItemResponse original : originals) {
             RepaymentCandidate current =
                     latestCandidates.get(original.scheduleId());
 
@@ -301,10 +303,10 @@ public class PreparationProposalConfirmationService {
             PreparationProposal proposal,
             StoredPreparationProposal stored
     ) {
-        PreparationRescheduleTarget target =
+        PreparationRescheduleTargetResponse target =
                 stored.rescheduleTarget();
 
-        List<PreparationProposalItem> originals =
+        List<PreparationProposalItemResponse> originals =
                 stored.items();
 
         if (originals == null
@@ -315,7 +317,7 @@ public class PreparationProposalConfirmationService {
                     .toException();
         }
 
-        PreparationProposalItem original = originals.get(0);
+        PreparationProposalItemResponse original = originals.get(0);
 
         RepaymentPreparationEvent event =
                 eventRepository.findOwnedEventForUpdate(
@@ -452,7 +454,7 @@ public class PreparationProposalConfirmationService {
                     .toException();
         }
 
-        PreparationProposalItem item =
+        PreparationProposalItemResponse item =
                 validation.items().get(0);
 
         Instant confirmedAt = clock.instant();

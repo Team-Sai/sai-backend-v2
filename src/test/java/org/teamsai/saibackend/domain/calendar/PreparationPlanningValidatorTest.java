@@ -2,7 +2,7 @@ package org.teamsai.saibackend.domain.calendar;
 
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.service.PreparationPlanningValidator;
+import org.teamsai.saibackend.domain.calendar.support.PreparationPlanningValidator;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;

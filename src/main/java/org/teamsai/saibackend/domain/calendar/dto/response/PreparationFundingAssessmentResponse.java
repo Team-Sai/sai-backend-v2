@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-public record PreparationFundingAssessment(
+public record PreparationFundingAssessmentResponse(
         LocalDate analysisDate,
         BigDecimal totalRequiredAmount,
         BigDecimal remainingMonthlyBudget,

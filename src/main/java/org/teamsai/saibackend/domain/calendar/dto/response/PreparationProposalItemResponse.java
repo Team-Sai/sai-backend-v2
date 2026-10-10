@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
-public record PreparationProposalItem(
+public record PreparationProposalItemResponse(
         Long contractId,
         Long scheduleId,
         String contractName,

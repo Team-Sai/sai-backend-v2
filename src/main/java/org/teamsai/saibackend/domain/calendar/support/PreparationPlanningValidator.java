@@ -1,8 +1,10 @@
-package org.teamsai.saibackend.domain.calendar.service;
+package org.teamsai.saibackend.domain.calendar.support;
 
 import org.springframework.stereotype.Component;
+import org.teamsai.saibackend.domain.calendar.dto.internal.*;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.*;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationPlanningViolationResponse;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalItemResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 
 import java.time.*;
@@ -64,20 +66,31 @@ public class PreparationPlanningValidator {
         validateFunding(request);
     }
 
+    /**
+     * 상환 확인 알림 후보를 검증한다.
+     *
+     * 서로 다른 회차의 확인 알림은 같은 시각 또는 일부 겹치는 구간에
+     * 배치할 수 있다. 확인 알림은 사용자의 시간을 독점하는 예약이 아니다.
+     *
+     * 같은 회차의 중복 제안은 금지한다.
+     * 기존 등록 여부는 컨텍스트 조회와 승인 시 재검증으로 확인한다.
+     *
+     * 알림 발송 시 startsAt이 정확히 같은 일정만 하나의 그룹으로 묶는다.
+     */
     public PreparationValidationResult validate(
             PreparationPlanningContext context,
             PreparationProposalRequest request,
             PreparationAgentDraft draft,
             Instant now
     ) {
-        List<PreparationPlanningViolation> violations =
+        List<PreparationPlanningViolationResponse> violations =
                 new ArrayList<>();
 
-        List<PreparationProposalItem> items =
+        List<PreparationProposalItemResponse> items =
                 new ArrayList<>();
 
         if (draft == null || draft.slots() == null) {
-            violations.add(new PreparationPlanningViolation(
+            violations.add(new PreparationPlanningViolationResponse(
                     null,
                     "INVALID_DRAFT",
                     "일정 후보 목록이 없습니다."
@@ -90,7 +103,7 @@ public class PreparationPlanningValidator {
         }
 
         if (draft.slots().size() > 20) {
-            violations.add(new PreparationPlanningViolation(
+            violations.add(new PreparationPlanningViolationResponse(
                     null,
                     "TOO_MANY_SLOTS",
                     "한 번에 제안할 수 있는 일정은 최대 20개입니다."
@@ -286,7 +299,7 @@ public class PreparationPlanningValidator {
             }
 
             if (violations.size() == previousViolationCount) {
-                items.add(new PreparationProposalItem(
+                items.add(new PreparationProposalItemResponse(
                         candidate.contractId(),
                         candidate.scheduleId(),
                         candidate.contractName(),
@@ -324,9 +337,9 @@ public class PreparationPlanningValidator {
 
         items.sort(
                 Comparator.comparing(
-                        PreparationProposalItem::startsAt
+                        PreparationProposalItemResponse::startsAt
                 ).thenComparing(
-                        PreparationProposalItem::scheduleId
+                        PreparationProposalItemResponse::scheduleId
                 )
         );
 
@@ -337,13 +350,13 @@ public class PreparationPlanningValidator {
     }
 
     private void add(
-            List<PreparationPlanningViolation> violations,
+            List<PreparationPlanningViolationResponse> violations,
             Long scheduleId,
             String code,
             String message
     ) {
         violations.add(
-                new PreparationPlanningViolation(
+                new PreparationPlanningViolationResponse(
                         scheduleId,
                         code,
                         message

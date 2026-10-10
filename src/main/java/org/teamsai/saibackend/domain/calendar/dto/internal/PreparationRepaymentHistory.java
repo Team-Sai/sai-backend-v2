@@ -1,4 +1,4 @@
-package org.teamsai.saibackend.domain.calendar.dto.response;
+package org.teamsai.saibackend.domain.calendar.dto.internal;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

@@ -2,27 +2,56 @@ package org.teamsai.saibackend.domain.calendar;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.teamsai.saibackend.domain.calendar.calculator.PreparationCoordinationFactsCalculator;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationAgentDraft;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.*;
-import org.teamsai.saibackend.domain.calendar.service.*;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalItemResponse;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalResponse;
+import org.teamsai.saibackend.domain.calendar.service.PreparationPlanningAgent;
+import org.teamsai.saibackend.domain.calendar.service.PreparationPlanningContextService;
+import org.teamsai.saibackend.domain.calendar.service.PreparationProposalService;
+import org.teamsai.saibackend.domain.calendar.service.PreparationProposalStore;
+import org.teamsai.saibackend.domain.calendar.service.PreparationRescheduleContextService;
+import org.teamsai.saibackend.domain.calendar.support.PreparationPlanningValidator;
+import org.teamsai.saibackend.domain.calendar.type.PreparationProposalStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 
 import java.math.BigDecimal;
-import java.time.*;
+import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class PreparationProposalServiceTest {
 
+    private static final Long USER_ID = 1L;
+
+    private static final String PROPOSAL_ID =
+            "00000000-0000-0000-0000-000000000001";
+
     private PreparationPlanningContextService contextService;
     private PreparationPlanningAgent agent;
-
-    private PreparationProposalService service;
     private PreparationProposalStore proposalStore;
+    private PreparationProposalService service;
 
     private final Clock clock = Clock.fixed(
             Instant.parse("2026-10-08T00:00:00Z"),
@@ -31,11 +60,8 @@ class PreparationProposalServiceTest {
 
     @BeforeEach
     void setUp() {
-        contextService =
-                mock(PreparationPlanningContextService.class);
-
+        contextService = mock(PreparationPlanningContextService.class);
         agent = mock(PreparationPlanningAgent.class);
-
         proposalStore = mock(PreparationProposalStore.class);
 
         service = new PreparationProposalService(
@@ -44,52 +70,35 @@ class PreparationProposalServiceTest {
                 mock(PreparationRescheduleContextService.class),
                 new PreparationPlanningValidator(),
                 proposalStore,
-                new PreparationCoordinationFactsService(),
+                new PreparationCoordinationFactsCalculator(),
                 clock
         );
-
-        when(proposalStore.save(
-                anyLong(),
-                any(),
-                anyList(),
-                anyInt()
-        )).thenAnswer(invocation -> {
-            List<PreparationProposalItem> items =
-                    invocation.getArgument(2);
-
-            int attempts = invocation.getArgument(3);
-
-            return new PreparationProposalResponse(
-                    "READY",
-                    clock.instant(),
-                    attempts,
-                    "검증된 제안입니다.",
-                    items,
-                    List.of(),
-                    "00000000-0000-0000-0000-000000000001",
-                    clock.instant().plusSeconds(900)
-            );
-        });
     }
 
     @Test
     void skipsAiWhenNoNewCandidatesExist() {
         when(contextService.loadForProposal(
-                1L,
+                USER_ID,
                 request()
         )).thenReturn(context(List.of()));
 
-        var response = service.propose(1L, request());
+        PreparationProposalResponse response =
+                service.propose(USER_ID, request());
 
-        assertThat(response.status()).isEqualTo("NO_TARGET");
+        assertThat(response.status())
+                .isEqualTo(PreparationProposalStatus.NO_TARGET);
         assertThat(response.attempts()).isZero();
+        assertThat(response.items()).isEmpty();
+        assertThat(response.proposalId()).isNull();
+        assertThat(response.coordinationFacts()).isNotNull();
 
-        verifyNoInteractions(agent);
+        verifyNoInteractions(agent, proposalStore);
     }
 
     @Test
     void returnsValidatedProposal() {
         stubContext();
+        stubProposalSave();
 
         when(agent.generate(
                 any(),
@@ -99,30 +108,48 @@ class PreparationProposalServiceTest {
                 anyList()
         )).thenReturn(draft("2026-10-13T09:00:00Z"));
 
-        var response = service.propose(1L, request());
+        PreparationProposalResponse response =
+                service.propose(USER_ID, request());
 
-        assertThat(response.status()).isEqualTo("READY");
+        assertThat(response.status())
+                .isEqualTo(PreparationProposalStatus.READY);
         assertThat(response.attempts()).isEqualTo(1);
         assertThat(response.items()).hasSize(1);
+        assertThat(response.violations()).isEmpty();
 
-        var item = response.items().get(0);
+        PreparationProposalItemResponse item = response.items().get(0);
 
         assertThat(item.contractId()).isEqualTo(100L);
+        assertThat(item.scheduleId()).isEqualTo(10L);
         assertThat(item.remainingAmount())
                 .isEqualByComparingTo("120000");
-
+        assertThat(item.startsAt())
+                .isEqualTo(Instant.parse("2026-10-13T09:00:00Z"));
         assertThat(item.endsAt())
-                .isEqualTo(
-                        Instant.parse("2026-10-13T09:30:00Z")
-                );
-        assertThat(response.proposalId()).isNotBlank();
-        assertThat(response.expiresAt()).isAfter(response.proposedAt());
+                .isEqualTo(Instant.parse("2026-10-13T09:30:00Z"));
+
+        assertThat(response.proposalId()).isEqualTo(PROPOSAL_ID);
+        assertThat(response.expiresAt())
+                .isEqualTo(clock.instant().plusSeconds(900));
+        assertThat(response.coordinationFacts()).isNotNull();
+
+        verify(proposalStore).save(
+                eq(USER_ID),
+                eq(request()),
+                argThat(items ->
+                        items.size() == 1
+                                && items.get(0).scheduleId().equals(10L)
+                ),
+                eq(1)
+        );
     }
 
     @Test
     void sendsValidationFeedbackAndRegenerates() {
         stubContext();
+        stubProposalSave();
 
+        // 납기 10월 15일의 2일 전은 10월 13일이다.
         PreparationAgentDraft invalid =
                 draft("2026-10-14T09:00:00Z");
 
@@ -137,10 +164,13 @@ class PreparationProposalServiceTest {
                 anyList()
         )).thenReturn(invalid, valid);
 
-        var response = service.propose(1L, request());
+        PreparationProposalResponse response =
+                service.propose(USER_ID, request());
 
-        assertThat(response.status()).isEqualTo("READY");
+        assertThat(response.status())
+                .isEqualTo(PreparationProposalStatus.READY);
         assertThat(response.attempts()).isEqualTo(2);
+        assertThat(response.items()).hasSize(1);
 
         verify(agent).generate(
                 any(),
@@ -148,13 +178,27 @@ class PreparationProposalServiceTest {
                 any(),
                 eq(invalid),
                 argThat(feedback ->
-                        feedback.stream().anyMatch(
-                                violation ->
-                                        violation.code().equals(
-                                                "AFTER_PREPARATION_DEADLINE"
-                                        )
+                        feedback.stream().anyMatch(violation ->
+                                violation.code().equals(
+                                        "AFTER_PREPARATION_DEADLINE"
+                                )
                         )
                 )
+        );
+
+        verify(agent, times(2)).generate(
+                any(),
+                any(),
+                any(),
+                any(),
+                anyList()
+        );
+
+        verify(proposalStore).save(
+                eq(USER_ID),
+                eq(request()),
+                anyList(),
+                eq(2)
         );
     }
 
@@ -168,17 +212,22 @@ class PreparationProposalServiceTest {
                 any(),
                 any(),
                 anyList()
-        )).thenReturn(
-                draft("2026-10-14T09:00:00Z")
-        );
+        )).thenReturn(draft("2026-10-14T09:00:00Z"));
 
-        var response = service.propose(1L, request());
+        PreparationProposalResponse response =
+                service.propose(USER_ID, request());
 
         assertThat(response.status())
-                .isEqualTo("REVIEW_REQUIRED");
-
+                .isEqualTo(PreparationProposalStatus.REVIEW_REQUIRED);
+        assertThat(response.attempts()).isEqualTo(2);
         assertThat(response.items()).isEmpty();
-        assertThat(response.violations()).isNotEmpty();
+        assertThat(response.proposalId()).isNull();
+        assertThat(response.violations())
+                .anyMatch(violation ->
+                        violation.code().equals(
+                                "AFTER_PREPARATION_DEADLINE"
+                        )
+                );
 
         verify(agent, times(2)).generate(
                 any(),
@@ -187,6 +236,8 @@ class PreparationProposalServiceTest {
                 any(),
                 anyList()
         );
+
+        verifyNoInteractions(proposalStore);
     }
 
     @Test
@@ -199,16 +250,16 @@ class PreparationProposalServiceTest {
                 any(),
                 any(),
                 anyList()
-        )).thenThrow(
-                new IllegalStateException("AI unavailable")
-        );
+        )).thenThrow(new IllegalStateException("AI unavailable"));
 
-        var response = service.propose(1L, request());
+        PreparationProposalResponse response =
+                service.propose(USER_ID, request());
 
         assertThat(response.status())
-                .isEqualTo("AI_UNAVAILABLE");
-
+                .isEqualTo(PreparationProposalStatus.AI_UNAVAILABLE);
+        assertThat(response.attempts()).isEqualTo(1);
         assertThat(response.items()).isEmpty();
+        assertThat(response.proposalId()).isNull();
 
         verify(agent, times(1)).generate(
                 any(),
@@ -217,21 +268,90 @@ class PreparationProposalServiceTest {
                 any(),
                 anyList()
         );
+
+        verifyNoInteractions(proposalStore);
+    }
+
+    @Test
+    void releasesInProgressStateAfterAiFailure() {
+        stubContext();
+        stubProposalSave();
+
+        when(agent.generate(
+                any(),
+                any(),
+                any(),
+                any(),
+                anyList()
+        ))
+                .thenThrow(new IllegalStateException("AI unavailable"))
+                .thenReturn(draft("2026-10-13T09:00:00Z"));
+
+        PreparationProposalResponse failed =
+                service.propose(USER_ID, request());
+
+        PreparationProposalResponse succeeded =
+                service.propose(USER_ID, request());
+
+        assertThat(failed.status())
+                .isEqualTo(PreparationProposalStatus.AI_UNAVAILABLE);
+        assertThat(succeeded.status())
+                .isEqualTo(PreparationProposalStatus.READY);
+        assertThat(succeeded.attempts()).isEqualTo(1);
+
+        verify(agent, times(2)).generate(
+                any(),
+                any(),
+                any(),
+                any(),
+                anyList()
+        );
+
+        verify(proposalStore, times(1)).save(
+                eq(USER_ID),
+                eq(request()),
+                anyList(),
+                eq(1)
+        );
+    }
+
+    private void stubProposalSave() {
+        when(proposalStore.save(
+                anyLong(),
+                any(),
+                anyList(),
+                anyInt()
+        )).thenAnswer(invocation -> {
+            List<PreparationProposalItemResponse> items =
+                    invocation.getArgument(2);
+
+            int attempts = invocation.getArgument(3);
+
+            return PreparationProposalResponse.builder()
+                    .status(PreparationProposalStatus.READY)
+                    .proposedAt(clock.instant())
+                    .attempts(attempts)
+                    .message("검증된 제안입니다.")
+                    .items(List.copyOf(items))
+                    .violations(List.of())
+                    .proposalId(PROPOSAL_ID)
+                    .expiresAt(clock.instant().plusSeconds(900))
+                    .build();
+        });
     }
 
     private void stubContext() {
-        RepaymentCandidate candidate =
-                new RepaymentCandidate(
-                        100L,
-                        10L,
-                        "계약 A",
-                        LocalDate.of(2026, 10, 15),
-                        new BigDecimal("120000"),
-                        false
-                );
+        RepaymentCandidate candidate = new RepaymentCandidate(
+                100L,
+                10L,
+                "계약 A",
+                LocalDate.of(2026, 10, 15),
+                new BigDecimal("120000"),
+                false
+        );
 
         when(contextService.loadForProposal(
-                1L,
+                USER_ID,
                 request()
         )).thenReturn(context(List.of(candidate)));
     }

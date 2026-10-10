@@ -2,8 +2,10 @@ package org.teamsai.saibackend.domain.calendar.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
+import org.teamsai.saibackend.domain.calendar.dto.internal.*;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
 import org.teamsai.saibackend.domain.calendar.dto.response.*;
+import org.teamsai.saibackend.domain.calendar.support.PreparationPlanningValidator;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 
 import java.time.Clock;
@@ -183,7 +185,7 @@ public class PreparationPlanningTools {
     }
 
     public record FundingAndHistory(
-            PreparationFundingAssessment fundingAssessment,
+            PreparationFundingAssessmentResponse fundingAssessment,
             PreparationRepaymentHistory repaymentHistory
     ) {
     }

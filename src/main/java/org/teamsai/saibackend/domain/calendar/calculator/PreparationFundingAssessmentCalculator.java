@@ -1,8 +1,8 @@
-package org.teamsai.saibackend.domain.calendar.service;
+package org.teamsai.saibackend.domain.calendar.calculator;
 
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationFundingRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationFundingAssessment;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationFundingAssessmentResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 
 import java.math.BigDecimal;
@@ -14,15 +14,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-@Service
-public class PreparationFundingAssessmentService {
+@Component
+public class PreparationFundingAssessmentCalculator {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     private static final BigDecimal MAX_INPUT =
             new BigDecimal("999999999999.99");
 
-    public PreparationFundingAssessment assess(
+    public PreparationFundingAssessmentResponse assess(
             List<RepaymentCandidate> allCandidates,
             PreparationFundingRequest funding,
             LocalDate today,
@@ -87,7 +87,7 @@ public class PreparationFundingAssessmentService {
                 )
         );
 
-        List<PreparationFundingAssessment.DeadlineAssessment>
+        List<PreparationFundingAssessmentResponse.DeadlineAssessment>
                 deadlines = new ArrayList<>();
 
         BigDecimal cumulativeRequired = ZERO;
@@ -116,7 +116,7 @@ public class PreparationFundingAssessmentService {
             );
 
             deadlines.add(
-                    new PreparationFundingAssessment.DeadlineAssessment(
+                    new PreparationFundingAssessmentResponse.DeadlineAssessment(
                             date,
                             cumulativeRequired,
                             availableAmount,
@@ -125,7 +125,7 @@ public class PreparationFundingAssessmentService {
             );
         }
 
-        return new PreparationFundingAssessment(
+        return new PreparationFundingAssessmentResponse(
                 today,
                 totalRequiredAmount,
                 funding.remainingMonthlyBudget(),

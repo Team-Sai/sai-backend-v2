@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.calendar.repository;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -56,14 +57,18 @@ public interface RepaymentPreparationEventRepository
     );
 
     @Query("""
-        select distinct e.userId
-        from RepaymentPreparationEvent e
-        where e.reminderProcessedAt is null
-          and e.startsAt <= :cutoff
-        order by e.userId
-        """)
-    List<Long> findDueReminderUserIds(@Param("cutoff") Instant cutoff);
-
+    select distinct e.userId
+    from RepaymentPreparationEvent e
+    where e.reminderProcessedAt is null
+      and e.startsAt <= :cutoff
+      and e.userId > :afterUserId
+    order by e.userId asc
+    """)
+    List<Long> findDueReminderUserIdsAfter(
+            @Param("cutoff") Instant cutoff,
+            @Param("afterUserId") Long afterUserId,
+            Pageable pageable
+    );
     @Query("""
         select e
         from RepaymentPreparationEvent e

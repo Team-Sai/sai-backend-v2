@@ -1,148 +1,46 @@
 package org.teamsai.saibackend.domain.calendar.dto.response;
 
+import lombok.Builder;
+import org.teamsai.saibackend.domain.calendar.type.PreparationProposalStatus;
+
 import java.time.Instant;
 import java.util.List;
 
+@Builder(toBuilder = true)
 public record PreparationProposalResponse(
-        String status,
+        PreparationProposalStatus status,
         Instant proposedAt,
         int attempts,
         String message,
-        List<PreparationProposalItem> items,
-        List<PreparationPlanningViolation> violations,
+        List<PreparationProposalItemResponse> items,
+        List<PreparationPlanningViolationResponse> violations,
         String proposalId,
         Instant expiresAt,
-        PreparationFundingAssessment fundingAssessment,
-        PreparationRescheduleTarget rescheduleTarget,
-        PreparationCoordinationFacts coordinationFacts
+        PreparationFundingAssessmentResponse fundingAssessment,
+        PreparationRescheduleTargetResponse rescheduleTarget,
+        PreparationCoordinationFactsResponse coordinationFacts
 ) {
-    public PreparationProposalResponse(
-            String status,
-            Instant proposedAt,
-            int attempts,
-            String message,
-            List<PreparationProposalItem> items,
-            List<PreparationPlanningViolation> violations,
-            String proposalId,
-            Instant expiresAt
-    ) {
-        this(
-                status,
-                proposedAt,
-                attempts,
-                message,
-                items,
-                violations,
-                proposalId,
-                expiresAt,
-                null,
-                null
-        );
-    }
-
-    public PreparationProposalResponse(
-            String status,
-            Instant proposedAt,
-            int attempts,
-            String message,
-            List<PreparationProposalItem> items,
-            List<PreparationPlanningViolation> violations,
-            String proposalId,
-            Instant expiresAt,
-            PreparationFundingAssessment fundingAssessment
-    ) {
-        this(
-                status,
-                proposedAt,
-                attempts,
-                message,
-                items,
-                violations,
-                proposalId,
-                expiresAt,
-                fundingAssessment,
-                null
-        );
-    }
-
     public PreparationProposalResponse withFundingAssessment(
-            PreparationFundingAssessment assessment
+            PreparationFundingAssessmentResponse assessment
     ) {
-        return new PreparationProposalResponse(
-                status,
-                proposedAt,
-                attempts,
-                message,
-                items,
-                violations,
-                proposalId,
-                expiresAt,
-                assessment,
-                rescheduleTarget,
-                coordinationFacts
-        );
+        return toBuilder()
+                .fundingAssessment(assessment)
+                .build();
     }
 
     public PreparationProposalResponse withRescheduleTarget(
-            PreparationRescheduleTarget target
+            PreparationRescheduleTargetResponse target
     ) {
-        return new PreparationProposalResponse(
-                status,
-                proposedAt,
-                attempts,
-                message,
-                items,
-                violations,
-                proposalId,
-                expiresAt,
-                fundingAssessment,
-                target,
-                coordinationFacts
-        );
+        return toBuilder()
+                .rescheduleTarget(target)
+                .build();
     }
 
     public PreparationProposalResponse withCoordinationFacts(
-            PreparationCoordinationFacts facts
+            PreparationCoordinationFactsResponse facts
     ) {
-        return new PreparationProposalResponse(
-                status,
-                proposedAt,
-                attempts,
-                message,
-                items,
-                violations,
-                proposalId,
-                expiresAt,
-                fundingAssessment,
-                rescheduleTarget,
-                facts
-        );
-    }
-
-    public PreparationProposalResponse(
-            String status,
-            Instant proposedAt,
-            int attempts,
-            String message,
-            List<PreparationProposalItem> items,
-            List<PreparationPlanningViolation> violations,
-            String proposalId,
-            Instant expiresAt,
-            PreparationFundingAssessment fundingAssessment,
-            PreparationRescheduleTarget rescheduleTarget
-    ) {
-        this(
-                status,
-                proposedAt,
-                attempts,
-                message,
-                items,
-                violations,
-                proposalId,
-                expiresAt,
-                fundingAssessment,
-                rescheduleTarget,
-                null
-        );
+        return toBuilder()
+                .coordinationFacts(facts)
+                .build();
     }
 }

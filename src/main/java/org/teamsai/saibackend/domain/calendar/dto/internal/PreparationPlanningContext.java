@@ -1,5 +1,7 @@
-package org.teamsai.saibackend.domain.calendar.dto.response;
+package org.teamsai.saibackend.domain.calendar.dto.internal;
 
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationEventResponse;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationFundingAssessmentResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 
 import java.time.LocalDate;
@@ -19,7 +21,7 @@ public record PreparationPlanningContext(
         // 알림 등록 여부와 관계없는 전체 관리 대상 미상환 회차
         List<RepaymentCandidate> allCandidates,
 
-        PreparationFundingAssessment fundingAssessment,
+        PreparationFundingAssessmentResponse fundingAssessment,
         PreparationRepaymentHistory repaymentHistory
 ) {
     public PreparationPlanningContext(
@@ -48,7 +50,7 @@ public record PreparationPlanningContext(
             List<PreparationEventResponse> existingEvents,
             List<Long> alreadyPlannedScheduleIds,
             List<RepaymentCandidate> allCandidates,
-            PreparationFundingAssessment fundingAssessment
+            PreparationFundingAssessmentResponse fundingAssessment
     ) {
         this(
                 analysisDate,

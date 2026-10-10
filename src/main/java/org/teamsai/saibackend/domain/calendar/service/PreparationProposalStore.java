@@ -3,10 +3,14 @@ package org.teamsai.saibackend.domain.calendar.service;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationProposalItemResponse;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationRescheduleTargetResponse;
+import org.teamsai.saibackend.domain.calendar.dto.internal.StoredPreparationProposal;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
 import org.teamsai.saibackend.domain.calendar.dto.response.*;
 import org.teamsai.saibackend.domain.calendar.entity.PreparationProposal;
 import org.teamsai.saibackend.domain.calendar.repository.PreparationProposalRepository;
+import org.teamsai.saibackend.domain.calendar.type.PreparationProposalStatus;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
@@ -35,7 +39,7 @@ public class PreparationProposalStore {
     public PreparationProposalResponse save(
             Long userId,
             PreparationProposalRequest request,
-            List<PreparationProposalItem> items,
+            List<PreparationProposalItemResponse> items,
             int attempts
     ) {
         return save(
@@ -51,9 +55,9 @@ public class PreparationProposalStore {
     public PreparationProposalResponse save(
             Long userId,
             PreparationProposalRequest request,
-            List<PreparationProposalItem> items,
+            List<PreparationProposalItemResponse> items,
             int attempts,
-            PreparationRescheduleTarget target
+            PreparationRescheduleTargetResponse target
     ) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(Duration.ofMinutes(15));
@@ -76,17 +80,20 @@ public class PreparationProposalStore {
                 )
         );
 
-        return new PreparationProposalResponse(
-                "READY",
-                now,
-                attempts,
-                target == null
-                        ? "검증된 제안입니다. 확인 후 15분 이내에 등록하세요."
-                        : "검증된 변경 제안입니다. 승인 전에는 기존 일정이 유지됩니다.",
-                items,
-                List.of(),
-                proposalId,
-                expiresAt
-        ).withRescheduleTarget(target);
+        return PreparationProposalResponse.builder()
+                .status(PreparationProposalStatus.READY)
+                .proposedAt(now)
+                .attempts(attempts)
+                .message(
+                        target == null
+                                ? "검증된 제안입니다. 확인 후 15분 이내에 등록하세요."
+                                : "검증된 변경 제안입니다. 승인 전에는 기존 일정이 유지됩니다."
+                )
+                .items(items)
+                .violations(List.of())
+                .proposalId(proposalId)
+                .expiresAt(expiresAt)
+                .rescheduleTarget(target)
+                .build();
     }
 }

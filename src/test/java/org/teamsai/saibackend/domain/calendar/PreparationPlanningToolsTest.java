@@ -2,10 +2,12 @@ package org.teamsai.saibackend.domain.calendar;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationAgentDraft;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationPlanningViolationResponse;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.*;
 import org.teamsai.saibackend.domain.calendar.service.PreparationPlanningTools;
-import org.teamsai.saibackend.domain.calendar.service.PreparationPlanningValidator;
+import org.teamsai.saibackend.domain.calendar.support.PreparationPlanningValidator;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentCandidate;
 
 import java.math.BigDecimal;
@@ -119,7 +121,7 @@ class PreparationPlanningToolsTest {
         assertThat(result.valid()).isFalse();
 
         assertThat(result.violations())
-                .extracting(PreparationPlanningViolation::code)
+                .extracting(PreparationPlanningViolationResponse::code)
                 .contains("UNKNOWN_SCHEDULE");
     }
 

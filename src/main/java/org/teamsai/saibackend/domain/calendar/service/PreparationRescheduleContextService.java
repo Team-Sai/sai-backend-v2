@@ -4,8 +4,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationPlanningContext;
-import org.teamsai.saibackend.domain.calendar.dto.response.PreparationRescheduleTarget;
+import org.teamsai.saibackend.domain.calendar.dto.internal.PreparationPlanningContext;
+import org.teamsai.saibackend.domain.calendar.dto.response.PreparationRescheduleTargetResponse;
 import org.teamsai.saibackend.domain.calendar.exception.PreparationEventErrorCode;
 import org.teamsai.saibackend.domain.calendar.repository.RepaymentPreparationEventRepository;
 
@@ -79,7 +79,7 @@ public class PreparationRescheduleContextService {
                 base.repaymentHistory()
         );
 
-        var target = new PreparationRescheduleTarget(
+        var target = new PreparationRescheduleTargetResponse(
                 event.getEventId(),
                 event.getScheduleId(),
                 event.getRevision(),
@@ -92,7 +92,7 @@ public class PreparationRescheduleContextService {
 
     public record Plan(
             PreparationPlanningContext context,
-            PreparationRescheduleTarget target
+            PreparationRescheduleTargetResponse target
     ) {
     }
 }
