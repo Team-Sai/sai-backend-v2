@@ -21,9 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -71,15 +69,26 @@ public class PreparationReminderService {
                 events.findDueRemindersByUserId(userId, cutoff);
         if (due.isEmpty()) return 0;
 
-        // 상환 처리와 경합할 수 있으므로 회차도 잠급니다.
-        // 여러 회차를 잠글 때는 항상 ID 오름차순을 사용합니다.
-        due.stream()
+        Set<Long> missingScheduleIds = new HashSet<>();
+
+        List<Long> scheduleIds = due.stream()
                 .map(RepaymentPreparationEvent::getScheduleId)
-                .distinct().sorted()
-                .forEach(id -> schedules.findByIdForUpdate(id)
-                        .orElseThrow(() -> new IllegalStateException(
-                                "Reminder schedule does not exist"
-                        )));
+                .distinct()
+                .sorted()
+                .toList();
+
+        for (Long scheduleId : scheduleIds) {
+            if (schedules.findByIdForUpdate(scheduleId).isEmpty()) {
+                missingScheduleIds.add(scheduleId);
+
+                log.warn(
+                        "event=PREPARATION_REMINDER_SCHEDULE_MISSING "
+                                + "userId={} scheduleId={}",
+                        userId,
+                        scheduleId
+                );
+            }
+        }
 
         // 잠금 획득 이후 확정 상환 기록 기준으로 금액을 다시 읽습니다.
         // READ_COMMITTED로 잠금 대기 전에 만들어진 오래된 스냅샷을 피합니다.
@@ -99,6 +108,9 @@ public class PreparationReminderService {
         for (var entry : groups.entrySet()) {
             List<RepaymentPreparationEvent> group = entry.getValue();
             List<RepaymentPreparationEvent> active = group.stream()
+                    .filter(event ->
+                            !missingScheduleIds.contains(event.getScheduleId())
+                    )
                     .filter(event -> {
                         RepaymentCandidate candidate =
                                 current.get(event.getScheduleId());
