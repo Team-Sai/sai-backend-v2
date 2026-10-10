@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.notification.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -166,5 +167,13 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         """, nativeQuery = true)
     List<NotificationResponse> findPreparationReminderNotificationsByUserId(
             @Param("userId") Long userId
+    );
+
+    List<Notification>
+    findByUser_UserIdAndNotificationTypeAndSecondaryReferenceIdOrderByCreatedAtDescNotificationIdDesc(
+            Long userId,
+            NotificationType notificationType,
+            Long secondaryReferenceId,
+            Pageable pageable
     );
 }
