@@ -176,7 +176,13 @@ public class PreparationPlanningValidator {
                         violations,
                         scheduleId,
                         "PAST_TIME",
-                        "현재 시각 이후로 배치하세요."
+                        "제안한 한국 시각 "
+                                + localStart.toLocalDateTime()
+                                + "는 현재 한국 시각 "
+                                + now.atZone(ZONE).toLocalDateTime()
+                                + "보다 늦지 않습니다. "
+                                + "오늘의 가능 시간대가 남아 있으면 미래 시각을 선택하고, "
+                                + "남아 있지 않으면 준비 기한 내 다음 가능한 날짜를 선택하세요."
                 );
             }
 
@@ -228,7 +234,15 @@ public class PreparationPlanningValidator {
                         violations,
                         scheduleId,
                         "OUTSIDE_TIME_WINDOW",
-                        "전체 일정이 사용자의 가능 시간대 안에 있어야 합니다."
+                        "한국 시간 후보 "
+                                + localStart.toLocalDateTime()
+                                + " ~ "
+                                + localEnd.toLocalDateTime()
+                                + "는 가능 시간 "
+                                + request.windowStart()
+                                + " ~ "
+                                + request.windowEnd()
+                                + " 안에 있어야 합니다."
                 );
             }
 
@@ -247,7 +261,15 @@ public class PreparationPlanningValidator {
                             violations,
                             scheduleId,
                             "AFTER_PREPARATION_DEADLINE",
-                            "납기에서 준비 기간을 뺀 날짜까지 배치하세요."
+                            "한국 날짜 "
+                                    + localEnd.toLocalDate()
+                                    + "는 준비 기한 "
+                                    + preparationDeadline
+                                    + "을 넘습니다. 납기 "
+                                    + candidate.dueDate()
+                                    + "의 "
+                                    + request.leadDays()
+                                    + "일 전까지 배치하세요."
                     );
                 }
             }

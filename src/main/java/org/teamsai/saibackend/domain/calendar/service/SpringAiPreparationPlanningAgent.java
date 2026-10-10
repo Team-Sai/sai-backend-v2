@@ -6,6 +6,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.calendar.dto.request.PreparationProposalRequest;
 import org.teamsai.saibackend.domain.calendar.dto.response.PreparationAgentDraft;
@@ -14,6 +15,7 @@ import org.teamsai.saibackend.domain.calendar.dto.response.PreparationPlanningVi
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -53,7 +55,38 @@ public class SpringAiPreparationPlanningAgent
         3. startsAt은 UTC ISO-8601 문자열이다.
            예: 2026-10-13T09:00:00Z
         4. 요일과 가능 시간은 Asia/Seoul 기준이다.
+            Asia/Seoul은 UTC보다 9시간 빠르다.
+            한국 시간으로 날짜와 시각을 먼저 선택한 다음 UTC로 변환한다.
+            예: 한국 시간 2026-10-13 18:00은
+            2026-10-13T09:00:00Z이다.
+            한국 시간 18:00을 18:00:00Z로 제출하면 안 된다.
+            
+            가능 시간의 종료 경계는 서버가 계산한 종료 시각에도 적용된다.
+            예: 가능 시간이 18:00~21:00이고 durationMinutes가 30이면
+            한국 시간 시작 시각은 18:00~20:30 안에서 선택한다.
+            
+            같은 시각으로 묶을 때도 각 회차의 준비 기한을 모두 충족해야 한다.
+            예: 정상 납기가 10월 15일이고 leadDays가 2이면
+            한국 날짜 10월 13일까지 배치해야 한다.
+            서로 다른 회차를 묶기 위해 가장 이른 준비 기한을 넘기지 않는다.
         5. 현재 시각 이후이며 대상 월 안에 배치한다.
+            입력의 now는 UTC 현재 시각이다.
+            Asia/Seoul로 변환하여 오늘 날짜와 현재 시간을 판단한다.
+            오늘에 배치할 때 windowStart가 이미 지났으면
+            windowStart를 그대로 선택하지 않는다.
+            
+            생성 및 사용자 승인 시간을 고려하여
+            입력 now보다 최소 5분 뒤의 분 단위 시각을 선택한다.
+            이 5분은 후보 선택을 위한 여유 시간이며 서버 검증을 대체하지 않는다.
+            서버가 계산하는 종료 시각도 windowEnd를 넘지 않아야 한다.
+            
+            예: 현재 한국 시간이 18:11이고 가능 시간이 18:00~21:00이면
+            오늘 18:00을 선택하지 않는다.
+            18:20처럼 현재 시각에서 충분히 여유 있는 시각을 선택한다.
+            오늘 배치가 불가능하면 준비 기한 안에서 다음 가능한 날짜를 선택한다.
+            
+            feedback에 PAST_TIME이 있으면 해당 회차의 startsAt을 반드시 수정한다.
+            이전 후보의 과거 시각을 그대로 다시 제출하지 않는다.
         6. allowedDays와 windowStart/windowEnd를 지킨다.
         7. startsAt은 확인 알림 시각이다.
            durationMinutes는 기존 저장 형식의 호환용 값이다.
@@ -125,17 +158,21 @@ public class SpringAiPreparationPlanningAgent
     private final ObjectProvider<ChatModel> chatModelProvider;
     private final PreparationPlanningValidator validator;
     private final Clock clock;
+    private final Duration requestTimeout;
     private final JsonMapper jsonMapper =
             JsonMapper.builder().build();
 
     public SpringAiPreparationPlanningAgent(
             ObjectProvider<ChatModel> chatModelProvider,
             PreparationPlanningValidator validator,
-            @Qualifier("repaymentClock") Clock clock
+            @Qualifier("repaymentClock") Clock clock,
+            @Value("${spring.ai.openai.timeout:PT1M}")
+            Duration requestTimeout
     ) {
         this.chatModelProvider = chatModelProvider;
         this.validator = validator;
         this.clock = clock;
+        this.requestTimeout = requestTimeout;
     }
 
     @Override
@@ -202,6 +239,7 @@ public class SpringAiPreparationPlanningAgent
                 .prompt()
                 .options(
                         defaultOptions.mutate()
+                                .timeout(requestTimeout)
                                 .toolChoice("required")
                                 .parallelToolCalls(false)
                 )
