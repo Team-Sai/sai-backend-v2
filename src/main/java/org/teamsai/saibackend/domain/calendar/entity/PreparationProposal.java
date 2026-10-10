@@ -14,6 +14,11 @@ import java.time.Instant;
                 @Index(
                         name = "idx_proposal_user_created",
                         columnList = "user_id,created_at"
+                ),
+                @Index(
+                        name = "idx_proposal_cleanup",
+                        columnList =
+                                "confirmed_at,expires_at,proposal_id"
                 )
         }
 )

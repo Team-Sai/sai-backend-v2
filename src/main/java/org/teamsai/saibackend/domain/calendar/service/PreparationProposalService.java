@@ -26,6 +26,7 @@ public class PreparationProposalService {
     private final PreparationRescheduleContextService rescheduleContexts;
     private final PreparationPlanningValidator validator;
     private final PreparationProposalStore proposalStore;
+    private final PreparationCoordinationFactsService coordinationFactsService;
     private final Clock clock;
 
     /*
@@ -41,6 +42,7 @@ public class PreparationProposalService {
             PreparationRescheduleContextService rescheduleContexts,
             PreparationPlanningValidator validator,
             PreparationProposalStore proposalStore,
+            PreparationCoordinationFactsService coordinationFactsService,
             @Qualifier("repaymentClock") Clock clock
     ) {
         this.contextService = contextService;
@@ -48,6 +50,7 @@ public class PreparationProposalService {
         this.rescheduleContexts = rescheduleContexts;
         this.validator = validator;
         this.proposalStore = proposalStore;
+        this.coordinationFactsService = coordinationFactsService;
         this.clock = clock;
     }
 
@@ -126,7 +129,15 @@ public class PreparationProposalService {
                     "신규 확인 알림이 필요한 미상환 회차가 없습니다.",
                     List.of(),
                     List.of()
-            ).withFundingAssessment(context.fundingAssessment());
+            ).withFundingAssessment(context.fundingAssessment())
+                    .withCoordinationFacts(
+                            coordinationFactsService.calculate(
+                                    context,
+                                    request,
+                                    List.of(),
+                                    target != null
+                            )
+                    );
         }
 
         if (context.candidates().size() > 20) {
@@ -174,7 +185,15 @@ public class PreparationProposalService {
                         "일정 제안을 생성하지 못했습니다. 잠시 후 다시 시도하세요.",
                         List.of(),
                         List.of()
-                ).withFundingAssessment(context.fundingAssessment());
+                ).withFundingAssessment(context.fundingAssessment())
+                        .withCoordinationFacts(
+                                coordinationFactsService.calculate(
+                                        context,
+                                        request,
+                                        List.of(),
+                                        target != null
+                                )
+                        );
             }
 
             PreparationValidationResult validation =
@@ -224,9 +243,16 @@ public class PreparationProposalService {
                                 target
                         );
 
-                return saved.withFundingAssessment(
-                        context.fundingAssessment()
-                );
+                return saved
+                        .withFundingAssessment(context.fundingAssessment())
+                        .withCoordinationFacts(
+                                coordinationFactsService.calculate(
+                                        context,
+                                        request,
+                                        validation.items(),
+                                        target != null
+                                )
+                        );
             }
 
             log.info(
@@ -245,7 +271,15 @@ public class PreparationProposalService {
                 "검증을 통과한 제안을 얻지 못했습니다. 조건을 조정하거나 다시 시도하세요.",
                 List.of(),
                 feedback
-        ).withFundingAssessment(context.fundingAssessment());
+        ).withFundingAssessment(context.fundingAssessment())
+                .withCoordinationFacts(
+                        coordinationFactsService.calculate(
+                                context,
+                                request,
+                                List.of(),
+                                target != null
+                        )
+                );
     }
 
     private PreparationProposalResponse response(

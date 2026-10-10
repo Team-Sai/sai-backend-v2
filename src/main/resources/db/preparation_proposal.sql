@@ -10,7 +10,19 @@ CREATE TABLE IF NOT EXISTS preparation_proposal (
                                       PRIMARY KEY (proposal_id),
 
                                       INDEX idx_proposal_user_created (user_id, created_at),
+                                      INDEX idx_proposal_cleanup (
+                                                                   confirmed_at,
+                                                                   expires_at,
+                                                                   proposal_id
+                                                               ),
 
                                       CONSTRAINT fk_preparation_proposal_user
                                           FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_proposal_cleanup
+    ON preparation_proposal (
+    confirmed_at,
+    expires_at,
+    proposal_id
+    );

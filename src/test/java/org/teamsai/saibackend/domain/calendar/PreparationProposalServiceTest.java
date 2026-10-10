@@ -44,6 +44,7 @@ class PreparationProposalServiceTest {
                 mock(PreparationRescheduleContextService.class),
                 new PreparationPlanningValidator(),
                 proposalStore,
+                new PreparationCoordinationFactsService(),
                 clock
         );
 

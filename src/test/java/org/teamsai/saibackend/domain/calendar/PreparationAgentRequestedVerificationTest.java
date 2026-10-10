@@ -67,6 +67,7 @@ class PreparationAgentRequestedVerificationTest {
                 mock(PreparationRescheduleContextService.class),
                 new PreparationPlanningValidator(),
                 store,
+                new PreparationCoordinationFactsService(),
                 clock
         );
         var response = service.propose(1L,request);

@@ -17,4 +17,11 @@ spring:
 
 sai:
   repayment:
-    ai-request-timeout: PT15S
+    ai-request-timeout: PT1M
+  calendar:
+    proposal-cleanup:
+      enabled: ${PREPARATION_PROPOSAL_CLEANUP_ENABLED:false}
+      retention: P7D
+      chunk-size: 200
+      max-chunks: 10
+      cron: "0 30 3 * * *"

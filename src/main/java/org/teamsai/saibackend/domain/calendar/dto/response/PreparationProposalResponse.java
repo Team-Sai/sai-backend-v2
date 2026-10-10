@@ -13,7 +13,8 @@ public record PreparationProposalResponse(
         String proposalId,
         Instant expiresAt,
         PreparationFundingAssessment fundingAssessment,
-        PreparationRescheduleTarget rescheduleTarget
+        PreparationRescheduleTarget rescheduleTarget,
+        PreparationCoordinationFacts coordinationFacts
 ) {
     public PreparationProposalResponse(
             String status,
@@ -77,7 +78,8 @@ public record PreparationProposalResponse(
                 proposalId,
                 expiresAt,
                 assessment,
-                rescheduleTarget
+                rescheduleTarget,
+                coordinationFacts
         );
     }
 
@@ -94,7 +96,53 @@ public record PreparationProposalResponse(
                 proposalId,
                 expiresAt,
                 fundingAssessment,
-                target
+                target,
+                coordinationFacts
+        );
+    }
+
+    public PreparationProposalResponse withCoordinationFacts(
+            PreparationCoordinationFacts facts
+    ) {
+        return new PreparationProposalResponse(
+                status,
+                proposedAt,
+                attempts,
+                message,
+                items,
+                violations,
+                proposalId,
+                expiresAt,
+                fundingAssessment,
+                rescheduleTarget,
+                facts
+        );
+    }
+
+    public PreparationProposalResponse(
+            String status,
+            Instant proposedAt,
+            int attempts,
+            String message,
+            List<PreparationProposalItem> items,
+            List<PreparationPlanningViolation> violations,
+            String proposalId,
+            Instant expiresAt,
+            PreparationFundingAssessment fundingAssessment,
+            PreparationRescheduleTarget rescheduleTarget
+    ) {
+        this(
+                status,
+                proposedAt,
+                attempts,
+                message,
+                items,
+                violations,
+                proposalId,
+                expiresAt,
+                fundingAssessment,
+                rescheduleTarget,
+                null
         );
     }
 }
