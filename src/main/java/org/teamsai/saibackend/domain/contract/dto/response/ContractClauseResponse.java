@@ -84,6 +84,11 @@ public class ContractClauseResponse {
 
         private String articleTitle;
 
+        /**
+         * RAG가 실제로 검색한 법령 조문 원문
+         */
+        private String content;
+
         private Double vectorScore;
 
         private Double rerankScore;
