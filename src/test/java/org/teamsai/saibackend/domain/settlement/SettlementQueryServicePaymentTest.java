@@ -555,6 +555,56 @@ class SettlementQueryServicePaymentTest {
     }
 
     @Test
+    @DisplayName("여러 정산의 납부 현황은 owner 이거나 ACTIVE 참여자인 정산만 반환한다")
+    void readPaymentStatusesReturnsOnlyAccessibleSettlements() {
+        Settlement ownedSettlement =
+                settlementOwnedBy(15L, OWNER_ID);
+
+        Settlement participatingSettlement =
+                settlementOwnedBy(16L, OTHER_USER_ID);
+
+        Settlement unrelatedSettlement =
+                settlementOwnedBy(17L, OTHER_USER_ID);
+
+        List<Settlement> settlements =
+                List.of(
+                        ownedSettlement,
+                        participatingSettlement,
+                        unrelatedSettlement
+                );
+
+        Map<Long, SettlementPaymentData> paymentDataBySettlementId =
+                Map.of(
+                        15L, paymentData(List.of(participant(101L, MEMBER_ID, "참여자")), List.of(), List.of()),
+                        16L, paymentData(List.of(participant(201L, MEMBER_ID, "참여자")), List.of(), List.of()),
+                        17L, paymentData(List.of(participant(301L, OTHER_USER_ID, "다른사용자")), List.of(), List.of())
+                );
+
+        given(
+                settlementPaymentReader.readAll(
+                        List.of(15L, 16L, 17L)
+                )
+        ).willReturn(
+                paymentDataBySettlementId
+        );
+
+        Map<Long, SettlementPaymentStatusResponse> ownerResult =
+                settlementQueryService.readPaymentStatuses(
+                        settlements,
+                        OWNER_ID
+                );
+
+        Map<Long, SettlementPaymentStatusResponse> memberResult =
+                settlementQueryService.readPaymentStatuses(
+                        settlements,
+                        MEMBER_ID
+                );
+
+        assertThat(ownerResult).containsOnlyKeys(15L);
+        assertThat(memberResult).containsOnlyKeys(15L, 16L);
+    }
+
+    @Test
     @DisplayName("납부의무의 참여자 이름과 거래정보를 조합해 납부 내역을 만든다")
     void getPaymentHistoryComposesPayerNameAndTransactionInfo() {
         SettlementParticipant participant =
@@ -791,6 +841,20 @@ class SettlementQueryServicePaymentTest {
                                 .userId(
                                         OWNER_ID
                                 )
+                                .build()
+                )
+                .build();
+    }
+
+    private Settlement settlementOwnedBy(
+            Long settlementId,
+            Long ownerId
+    ) {
+        return Settlement.builder()
+                .settlementId(settlementId)
+                .owner(
+                        User.builder()
+                                .userId(ownerId)
                                 .build()
                 )
                 .build();

@@ -18,6 +18,11 @@ public enum SettlementErrorCode implements BaseErrorCode<DomainException> {
             "존재하지 않는 정산입니다."
     ),
 
+    RECURRING_SETTLEMENT_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "존재하지 않는 정기정산입니다."
+    ),
+
     SETTLEMENT_ACCESS_DENIED(
             HttpStatus.FORBIDDEN,
             "해당 정산에 대한 접근 권한이 없습니다."

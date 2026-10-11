@@ -24,6 +24,9 @@ public class NotificationQueryService {
         notifications.addAll(notificationRepository.findSettlementNotificationsByUserId(userId));
         notifications.addAll(notificationRepository.findContractNotificationsByUserId(userId));
         notifications.addAll(notificationRepository.findRepaymentNotificationsByUserId(userId));
+        notifications.addAll(
+                notificationRepository.findPreparationReminderNotificationsByUserId(userId)
+        );
 
         notifications.sort(
                 Comparator.comparing(NotificationResponse::getCreatedAt)

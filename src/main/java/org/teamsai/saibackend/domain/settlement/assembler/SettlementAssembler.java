@@ -5,6 +5,8 @@ import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.type.ObligationStatus;
 import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCycleListResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCycleResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
@@ -41,6 +43,47 @@ public final class SettlementAssembler {
                 .startDate(recurringSettlement.getStartDate())
                 .endDate(recurringSettlement.getEndDate())
                 .createdAt(recurringSettlement.getCreatedAt())
+                .build();
+    }
+
+    public static RecurringSettlementCycleResponse toCycleResponse(
+            Settlement settlement,
+            int cycleNo,
+            SettlementPaymentStatusResponse paymentStatus
+    ) {
+        return RecurringSettlementCycleResponse.builder()
+                .settlementId(settlement.getSettlementId())
+                .cycleNo(cycleNo)
+                .cycleDate(settlement.getCycleDate())
+                .settlementStatus(settlement.getSettlementStatus())
+                .closedAt(settlement.getClosedAt())
+                .totalExpectedAmount(paymentStatus.getTotalExpectedAmount())
+                .totalPaidAmount(paymentStatus.getTotalPaidAmount())
+                .totalRemainingAmount(paymentStatus.getTotalRemainingAmount())
+                .paidCount(paymentStatus.getPaidCount())
+                .partiallyPaidCount(paymentStatus.getPartiallyPaidCount())
+                .unpaidCount(paymentStatus.getUnpaidCount())
+                .progressRate(paymentStatus.getProgressRate())
+                .build();
+    }
+
+    public static RecurringSettlementCycleListResponse toCycleListResponse(
+            RecurringSettlement recurringSettlement,
+            String role,
+            int totalCycleCount,
+            List<RecurringSettlementCycleResponse> cycles
+    ) {
+        return RecurringSettlementCycleListResponse.builder()
+                .recurringSettlementId(recurringSettlement.getRecurringSettlementId())
+                .title(recurringSettlement.getTitle())
+                .settlementCategory(recurringSettlement.getSettlementCategory())
+                .role(role)
+                .cycleRule(recurringSettlement.getCycleRule())
+                .totalAmount(recurringSettlement.getTotalAmount())
+                .startDate(recurringSettlement.getStartDate())
+                .endDate(recurringSettlement.getEndDate())
+                .totalCycleCount(totalCycleCount)
+                .cycles(cycles)
                 .build();
     }
 
