@@ -89,7 +89,7 @@ class SettlementAccountServiceTest {
 
             when(
                     settlementAccountRepository
-                            .findBySettlementIdAndStatusForUpdate(
+                            .findBySettlementIdAndStatus(
                                     SETTLEMENT_ID,
                                     SettlementAccountStatus.ACTIVE
                             )
@@ -216,7 +216,7 @@ class SettlementAccountServiceTest {
 
             when(
                     settlementAccountRepository
-                            .findBySettlementIdAndStatusForUpdate(
+                            .findBySettlementIdAndStatus(
                                     SETTLEMENT_ID,
                                     SettlementAccountStatus.ACTIVE
                             )
@@ -310,7 +310,7 @@ class SettlementAccountServiceTest {
 
             when(
                     settlementAccountRepository
-                            .findBySettlementIdAndStatusForUpdate(
+                            .findBySettlementIdAndStatus(
                                     SETTLEMENT_ID,
                                     SettlementAccountStatus.ACTIVE
                             )
@@ -610,7 +610,7 @@ class SettlementAccountServiceTest {
 
             when(
                     settlementAccountRepository
-                            .findBySettlementIdAndStatusForUpdate(
+                            .findBySettlementIdAndStatus(
                                     SETTLEMENT_ID,
                                     SettlementAccountStatus.ACTIVE
                             )

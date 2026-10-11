@@ -61,7 +61,7 @@ public class SettlementAccountService {
 
         Optional<SettlementAccount> currentAccount =
                 settlementAccountRepository
-                        .findBySettlementIdAndStatusForUpdate(
+                        .findBySettlementIdAndStatus(
                                 settlementId,
                                 SettlementAccountStatus.ACTIVE
                         );
