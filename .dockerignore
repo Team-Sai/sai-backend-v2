@@ -6,4 +6,7 @@ out
 .github
 *.iml
 .env
-src/main/resources/application*.yml
+# 로컬·운영 설정(비밀번호 포함)만 제외. application.yml(기본 설정)은 Git에 있고 이미지에 필요함
+src/main/resources/application-dev.yml
+src/main/resources/application-prod.yml
+src/main/resources/application-local*.yml
