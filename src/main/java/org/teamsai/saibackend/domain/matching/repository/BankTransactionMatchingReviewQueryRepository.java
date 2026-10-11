@@ -70,7 +70,14 @@ public class BankTransactionMatchingReviewQueryRepository {
                         SELECT 1
                         FROM repayment_schedule review_schedule
                         WHERE review_schedule.schedule_id = available_candidate.target_id
-                        AND review_schedule.status = 'PENDING'
+                        AND review_schedule.status IN ('PENDING', 'OVERDUE')
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM repayment_schedule earlier
+                            WHERE earlier.contract_id = review_schedule.contract_id
+                                AND earlier.status IN ('PENDING', 'OVERDUE')
+                                AND earlier.sequence < review_schedule.sequence
+                        )
                         AND review_schedule.total_payment_due > COALESCE((
                             SELECT SUM(pr.amount)
                             FROM payment_record pr

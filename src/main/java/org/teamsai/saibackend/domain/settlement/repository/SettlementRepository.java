@@ -50,6 +50,16 @@ public interface SettlementRepository extends JpaRepository<Settlement,Long> {
             Pageable pageable
     );
 
+    @Query("""
+        SELECT s
+        FROM Settlement s
+        WHERE s.recurringSettlement.recurringSettlementId = :recurringSettlementId
+        ORDER BY s.cycleDate ASC, s.settlementId ASC
+        """)
+    List<Settlement> findAllByRecurringIdOrderByCycleDate(
+            @Param("recurringSettlementId") Long recurringSettlementId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT s

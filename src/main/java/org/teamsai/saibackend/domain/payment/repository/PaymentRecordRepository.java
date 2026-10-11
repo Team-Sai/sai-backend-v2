@@ -8,6 +8,7 @@ import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface PaymentRecordRepository
@@ -52,5 +53,27 @@ public interface PaymentRecordRepository
 
             @Param("recordStatus")
             RecordStatus recordStatus
+    );
+
+    @Query(value = """
+        SELECT
+            COUNT(*) AS confirmedRecordCount,
+            COALESCE(SUM(pr.amount), 0) AS confirmedRecordedAmount,
+            COUNT(DISTINCT pr.target_id) AS recordedScheduleCount
+        FROM payment_record pr
+        JOIN repayment_schedule rs
+          ON rs.schedule_id = pr.target_id
+        JOIN loan_contract lc
+          ON lc.contract_id = rs.contract_id
+        WHERE pr.payment_target_type = 'LOAN'
+          AND pr.record_status = 'CONFIRMED'
+          AND lc.debtor_id = :userId
+          AND pr.recorded_at >= :fromInclusive
+          AND pr.recorded_at < :toExclusive
+        """, nativeQuery = true)
+    PreparationRepaymentHistoryProjection summarizePreparationHistory(
+            @Param("userId") Long userId,
+            @Param("fromInclusive") LocalDateTime fromInclusive,
+            @Param("toExclusive") LocalDateTime toExclusive
     );
 }

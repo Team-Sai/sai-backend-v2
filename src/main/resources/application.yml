@@ -1,0 +1,28 @@
+spring:
+  ai:
+    model:
+      chat: ${REPAYMENT_AI_PROVIDER:none}
+      embedding: none
+
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      timeout: ${SAI_REPAYMENT_AI_REQUEST_TIMEOUT:PT1M}
+      max-retries: 0
+
+      chat:
+        model: ${REPAYMENT_AI_MODEL:gpt-4.1-mini}
+
+    retry:
+      max-attempts: 0
+
+sai:
+  repayment:
+    ai-request-timeout: PT1M
+  calendar:
+    preparation-reminder-max-delay: ${PREPARATION_REMINDER_MAX_DELAY:PT24H}
+    proposal-cleanup:
+      enabled: ${PREPARATION_PROPOSAL_CLEANUP_ENABLED:false}
+      retention: P7D
+      chunk-size: 200
+      max-chunks: 10
+      cron: "0 30 3 * * *"
