@@ -83,9 +83,10 @@ public class SettlementAccountService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        currentAccount.ifPresent(
-                account -> account.replace(now)
-        );
+        currentAccount.ifPresent(account -> {
+            account.replace(now);
+            settlementAccountRepository.flush();
+        });
 
         SettlementAccount newAccount =
                 SettlementAccount.create(
