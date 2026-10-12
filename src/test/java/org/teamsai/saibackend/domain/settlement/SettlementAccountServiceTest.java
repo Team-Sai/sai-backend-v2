@@ -81,9 +81,6 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
-                    .thenReturn(Optional.of(settlement));
-
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
@@ -208,9 +205,6 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse linkedAccount =
                     linkedAccount(FIRST_LINKED_ACCOUNT_ID);
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
-                    .thenReturn(Optional.of(settlement));
-
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(Optional.of(settlement));
 
@@ -296,11 +290,6 @@ class SettlementAccountServiceTest {
             LinkedBankAccountResponse secondLinkedAccount =
                     linkedAccount(
                             SECOND_LINKED_ACCOUNT_ID
-                    );
-
-            when(settlementRepository.findById(SETTLEMENT_ID))
-                    .thenReturn(
-                            Optional.of(settlement)
                     );
 
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
@@ -422,7 +411,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -468,7 +457,7 @@ class SettlementAccountServiceTest {
             verify(
                     settlementRepository,
                     never()
-            ).findByIdForUpdate(
+            ).findById(
                     SETTLEMENT_ID
             );
 
@@ -490,7 +479,7 @@ class SettlementAccountServiceTest {
                             SECOND_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.of(settlement)
                     );
@@ -534,7 +523,7 @@ class SettlementAccountServiceTest {
             verify(
                     settlementRepository,
                     never()
-            ).findByIdForUpdate(
+            ).findById(
                     SETTLEMENT_ID
             );
 
@@ -553,7 +542,7 @@ class SettlementAccountServiceTest {
                             FIRST_LINKED_ACCOUNT_ID
                     );
 
-            when(settlementRepository.findById(SETTLEMENT_ID))
+            when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
                     .thenReturn(
                             Optional.empty()
                     );
@@ -575,7 +564,7 @@ class SettlementAccountServiceTest {
             verify(
                     settlementRepository,
                     never()
-            ).findByIdForUpdate(
+            ).findById(
                     SETTLEMENT_ID
             );
 
@@ -596,11 +585,6 @@ class SettlementAccountServiceTest {
             SettlementAccountSelectRequest request =
                     createRequest(
                             FIRST_LINKED_ACCOUNT_ID
-                    );
-
-            when(settlementRepository.findById(SETTLEMENT_ID))
-                    .thenReturn(
-                            Optional.of(settlement)
                     );
 
             when(settlementRepository.findByIdForUpdate(SETTLEMENT_ID))
