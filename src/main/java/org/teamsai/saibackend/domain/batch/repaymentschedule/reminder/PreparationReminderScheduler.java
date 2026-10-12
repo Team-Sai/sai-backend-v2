@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.batch.repaymentschedule.reminder;
 
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,6 +35,7 @@ public class PreparationReminderScheduler {
             cron = "${sai.calendar.preparation-reminder-cron:0 * * * * *}",
             zone = "Asia/Seoul"
     )
+    @SchedulerLock(name = "preparationReminder", lockAtLeastFor = "30s", lockAtMostFor = "5m")
     public void runReminders() {
         Instant cutoff = clock.instant();
         long startedAt = System.nanoTime();

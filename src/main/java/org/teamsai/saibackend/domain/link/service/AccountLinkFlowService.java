@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AccountLinkFlowService {
 
-    @Value("${sai.mock-bank.base-url}")
+    @Value("${sai.mock-bank.public-base-url:${sai.mock-bank.base-url}}")
     private String mockBankBaseUrl;
 
     @Value("${sai.backend.base-url}")

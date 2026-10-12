@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.batch.calendar.cleanup;
 
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -68,6 +69,7 @@ public class PreparationProposalCleanupScheduler {
             cron = "${sai.calendar.proposal-cleanup.cron:0 30 3 * * *}",
             zone = "Asia/Seoul"
     )
+    @SchedulerLock(name = "preparationProposalCleanup", lockAtLeastFor = "5m", lockAtMostFor = "30m")
     public void runCleanup() {
         Instant cutoff = clock.instant().minus(retention);
         long startedAt = System.nanoTime();
