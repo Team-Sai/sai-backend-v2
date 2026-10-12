@@ -12,6 +12,7 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListRespo
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentHistoryResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementWithPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
 import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.entity.SettlementParticipant;
@@ -47,41 +48,82 @@ public class SettlementQueryService {
                         SettlementParticipantStatus.ACTIVE
                 )
                 .stream()
-                .map(settlement -> {
-                    RecurringSettlement recurringSettlement =
-                            settlement.getRecurringSettlement();
-
-                    String role =
-                            settlement.getOwner().getUserId().equals(userId)
-                                    ? "OWNER"
-                                    : "MEMBER";
-
-                    return new SettlementListResponse(
-                            settlement.getSettlementId(),
-                            settlement.getTitle(),
-                            role,
-                            settlement.getSettlementCategory(),
-                            settlement.getSettlementType().name(),
-                            settlement.getSplitType() != null
-                                    ? settlement.getSplitType().name()
-                                    : null,
-                            settlement.getSettlementStatus().name(),
-                            settlement.getTotalAmount(),
-                            settlement.getDueDate(),
-                            recurringSettlement != null
-                                    ? recurringSettlement.getStartDate()
-                                    : null,
-                            recurringSettlement != null
-                                    ? recurringSettlement.getEndDate()
-                                    : null,
-                            settlement.getCycleDate(),
-                            recurringSettlement != null
-                                    ? recurringSettlement.getRecurringSettlementId()
-                                    : null,
-                            settlement.getCreatedAt()
-                    );
-                })
+                .map(settlement -> toListResponse(settlement, userId))
                 .toList();
+    }
+
+    // 통합 대시보드용: 정산 목록과 정산별 납부 현황을 일괄 조회한다.
+    @Transactional(readOnly = true)
+    public List<SettlementWithPaymentStatusResponse> getSettlementListWithPaymentStatus(Long userId) {
+        List<Settlement> settlements =
+                settlementRepository.findAllAccessibleByUserId(
+                        userId,
+                        SettlementParticipantStatus.ACTIVE
+                );
+
+        if (settlements.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, SettlementPaymentData> paymentDataBySettlementId =
+                settlementPaymentReader.readAll(
+                        settlements.stream()
+                                .map(Settlement::getSettlementId)
+                                .toList()
+                );
+
+        return settlements.stream()
+                .map(settlement -> new SettlementWithPaymentStatusResponse(
+                        toListResponse(settlement, userId),
+                        SettlementAssembler.toPaymentStatusResponse(
+                                settlement,
+                                buildPaymentObligationResponses(
+                                        paymentDataBySettlementId.getOrDefault(
+                                                settlement.getSettlementId(),
+                                                SettlementPaymentData.empty()
+                                        )
+                                )
+                        )
+                ))
+                .toList();
+    }
+
+    private SettlementListResponse toListResponse(
+            Settlement settlement,
+            Long userId
+    ) {
+        RecurringSettlement recurringSettlement =
+                settlement.getRecurringSettlement();
+
+        String role =
+                settlement.getOwner().getUserId().equals(userId)
+                        ? "OWNER"
+                        : "MEMBER";
+
+        return new SettlementListResponse(
+                settlement.getSettlementId(),
+                settlement.getTitle(),
+                role,
+                settlement.getSettlementCategory(),
+                settlement.getSettlementType().name(),
+                settlement.getSplitType() != null
+                        ? settlement.getSplitType().name()
+                        : null,
+                settlement.getSettlementStatus().name(),
+                settlement.getTotalAmount(),
+                settlement.getDueDate(),
+                recurringSettlement != null
+                        ? recurringSettlement.getStartDate()
+                        : null,
+                recurringSettlement != null
+                        ? recurringSettlement.getEndDate()
+                        : null,
+                settlement.getCycleDate(),
+                recurringSettlement != null
+                        ? recurringSettlement.getRecurringSettlementId()
+                        : null,
+                settlement.getCreatedAt()
+        );
     }
 
     @Transactional(readOnly = true)
