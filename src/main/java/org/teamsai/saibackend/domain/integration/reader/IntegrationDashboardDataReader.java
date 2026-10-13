@@ -6,8 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
 import org.teamsai.saibackend.domain.integration.model.DashboardSourceData;
 import org.teamsai.saibackend.domain.integration.model.SettlementDashboardContext;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementWithPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.util.List;
@@ -25,16 +24,15 @@ public class IntegrationDashboardDataReader {
     }
 
     private List<SettlementDashboardContext> getSettlements(Long userId) {
-        List<SettlementListResponse> settlements = settlementQueryService.getSettlementList(userId);
+        List<SettlementWithPaymentStatusResponse> settlements =
+                settlementQueryService.getSettlementListWithPaymentStatus(userId);
         if (settlements == null) {
             return List.of();
         }
         return settlements.stream()
-                .map(settlement -> {
-                    SettlementPaymentStatusResponse paymentStatus = settlementQueryService
-                            .getPaymentStatus(settlement.settlementId(), userId);
-                    return SettlementDashboardContext.from(settlement, paymentStatus, userId);
-                })
+                .map(settlement -> SettlementDashboardContext.from(
+                        settlement.settlement(), settlement.paymentStatus(), userId
+                ))
                 .toList();
     }
 }

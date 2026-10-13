@@ -23,6 +23,7 @@ public class ContractDashboardRowResponse {
     private BigDecimal principalAmount;
     private BigDecimal totalRemainingAmount;
     private BigDecimal thisMonthDueAmount;
+    private BigDecimal overdueAmount;  // 이번 달 시작일 이전 납기인 미상환액
     private ContractDashboardStatus contractStatus;
     private String repaymentStatus;
     private ContractDashboardPaymentStatus paymentStatus;

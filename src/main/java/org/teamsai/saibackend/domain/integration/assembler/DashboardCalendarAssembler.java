@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.integration.assembler;
 
 import org.teamsai.saibackend.domain.calendar.dto.response.DashboardCalendarItemResponse;
+import org.teamsai.saibackend.domain.contract.calculator.RepaymentAmountCalculator;
 import org.teamsai.saibackend.domain.contract.service.ContractDashboardQueryService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.integration.dto.response.DashboardCalendarDayResponse;
@@ -69,7 +70,11 @@ public final class DashboardCalendarAssembler {
         Map<LocalDate, CalendarDirection> directionsByDate = new TreeMap<>();
 
         loanSchedules.stream()
-                .filter(context -> context.schedule().getStatus() == RepaymentScheduleStatus.PENDING)
+                .filter(context ->
+                        context.schedule().getStatus().isUnresolved())
+                .filter(context ->
+                        RepaymentAmountCalculator.remainingAmount(context.schedule())
+                                .compareTo(BigDecimal.ZERO) > 0)
                 .filter(context -> YearMonth.from(context.schedule().getDueDate()).equals(yearMonth))
                 .forEach(context -> {
                     CalendarDirection direction = directionsByDate.computeIfAbsent(
@@ -121,7 +126,11 @@ public final class DashboardCalendarAssembler {
         LocalDate today = LocalDate.now();
 
         return loanSchedules.stream()
-                .filter(context -> context.schedule().getStatus() == RepaymentScheduleStatus.PENDING)
+                .filter(context ->
+                        context.schedule().getStatus().isUnresolved())
+                .filter(context ->
+                        RepaymentAmountCalculator.remainingAmount(context.schedule())
+                                .compareTo(BigDecimal.ZERO) > 0)
                 .filter(context -> date.equals(context.schedule().getDueDate()))
                 .map(context -> {
                     boolean isCreditor = userId.equals(context.contract().getCreditorId());
@@ -132,7 +141,9 @@ public final class DashboardCalendarAssembler {
                             .type(PaymentTargetType.LOAN)
                             .title(context.contract().getContractAlias())
                             .subLabel(isCreditor ? "수취예정" : "납부예정")
-                            .amount(context.schedule().getTotalPaymentDue())
+                            .amount(
+                                    RepaymentAmountCalculator.remainingAmount(context.schedule())
+                            )
                             .detailUrl("/contracts/" + context.contract().getContractId() + "/schedule")
                             .counterpartyName(isCreditor
                                     ? context.contract().getDebtorName()
