@@ -70,7 +70,6 @@ dependencies {
     // AWS IAM 인증 토큰 (ElastiCache Redis IAM 인증)
     implementation 'software.amazon.awssdk:auth'
     implementation 'software.amazon.awssdk:http-auth-aws'
-    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 }
 
 tasks.named('test', Test) {
