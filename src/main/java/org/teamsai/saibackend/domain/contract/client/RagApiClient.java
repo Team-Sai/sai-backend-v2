@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.contract.client;
 
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
+import java.time.Duration;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,13 +30,15 @@ public class RagApiClient {
     private final RestClient restClient;
 
     public RagApiClient(
-            @Value("${ai.rag.base-url}") String ragBaseUrl
+            @Value("${ai.rag.base-url}") String ragBaseUrl,
+            @Value("${ai.rag.connect-timeout:5s}") Duration connectTimeout,
+            @Value("${ai.rag.read-timeout:30s}") Duration readTimeout
     ) {
         SimpleClientHttpRequestFactory requestFactory =
                 new SimpleClientHttpRequestFactory();
 
-        requestFactory.setConnectTimeout(5000);
-        requestFactory.setReadTimeout(90000);
+        requestFactory.setConnectTimeout(connectTimeout);
+        requestFactory.setReadTimeout(readTimeout);
 
         this.restClient = RestClient.builder()
                 .baseUrl(ragBaseUrl)
@@ -43,8 +46,10 @@ public class RagApiClient {
                 .build();
 
         log.info(
-                "RAG API Client initialized - baseUrl={}",
-                ragBaseUrl
+                "RAG API Client initialized - baseUrl={}, connectTimeout={}, readTimeout={}",
+                ragBaseUrl,
+                connectTimeout,
+                readTimeout
         );
     }
 
@@ -90,7 +95,9 @@ public class RagApiClient {
                 );
 
         boolean hasClause =
-                StringUtils.hasText(response.getSuggestedClause());
+                StringUtils.hasText(
+                        response.getSuggestedClause()
+                );
 
         boolean isRejected =
                 response.getValidation() != null
