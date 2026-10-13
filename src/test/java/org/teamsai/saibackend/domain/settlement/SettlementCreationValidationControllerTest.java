@@ -64,7 +64,7 @@ class SettlementCreationValidationControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(
                         new SettlementController(shared, mock(SettlementCloseService.class),
                                 mock(SettlementQueryService.class), mock(SettlementSummaryQueryService.class)),
-                        new RecurringSettlementController(recurring))
+                        new RecurringSettlementController(recurring, mock(RecurringSettlementQueryService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override

@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.batch.orchestration;
 
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
@@ -35,7 +36,8 @@ public class DailyBatchPipelineScheduler {
     @Autowired
     private Job repaymentWriteOffJob;
 
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
+    @SchedulerLock(name = "dailyBatchPipeline", lockAtLeastFor = "5m", lockAtMostFor = "2h")
     public void runPipeline() {
         LocalDate baseDate = LocalDate.now();
         runStep("transactionSync", transactionSyncJob, baseDate);
