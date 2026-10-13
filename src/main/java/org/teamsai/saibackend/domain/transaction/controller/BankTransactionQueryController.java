@@ -25,6 +25,7 @@ import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
 import java.time.LocalDate;
+import org.teamsai.saibackend.domain.transaction.dto.response.IntegratedBankTransactionResponse;
 
 @Tag(name = "은행 거래 조회 API")
 @RestController
@@ -34,6 +35,36 @@ public class BankTransactionQueryController {
     private final BankTransactionQueryService bankTransactionQueryService;
     private final BankTransactionMatchingReviewQueryService
             matchingReviewQueryService;
+
+    @Operation(summary = "전체 연동계좌 거래 통합 조회",
+            description = "본인의 AVAILABLE 계좌에 저장된 거래를 최신순으로 조회합니다. "
+                    + "linkedAccountId 생략 시 전체 계좌를 조회합니다. keyword는 상대방·메모 검색이며 "
+                    + "fromDate와 toDate는 양 끝 날짜를 포함합니다. page는 0부터 시작합니다. "
+                    + "응답은 계좌 ID, 은행명, 마스킹 계좌번호와 페이지 정보를 포함합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공, 결과가 없으면 빈 페이지"),
+            @ApiResponse(responseCode = "400", description = "잘못된 검색 조건"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "타인 계좌 접근"),
+            @ApiResponse(responseCode = "404", description = "계좌 없음")
+    })
+    @GetMapping("/api/linked-accounts/transactions")
+    public ResponseEntity<PageResponse<IntegratedBankTransactionResponse>> getIntegratedTransactions(
+            @RequestParam(required = false) Long linkedAccountId,
+            @RequestParam(required = false) BankTransactionProcessingStatus processingStatus,
+            @RequestParam(required = false) BankTransactionType transactionType,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        var condition = new BankTransactionSearchCondition(
+                processingStatus, transactionType, keyword, fromDate, toDate, page, size);
+        return ResponseEntity.ok(bankTransactionQueryService.getIntegratedTransactions(
+                userDetails.getUserId(), linkedAccountId, condition));
+    }
 
     @Operation(summary = "연동계좌 거래 목록 조회/검색")
     @GetMapping("/api/linked-accounts/{linkedAccountId}/transactions")

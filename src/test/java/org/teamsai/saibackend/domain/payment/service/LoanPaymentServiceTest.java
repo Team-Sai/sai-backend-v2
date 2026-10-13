@@ -9,9 +9,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
-import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
+import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
@@ -242,8 +242,8 @@ class LoanPaymentServiceTest {
     private RepaymentScheduleDTO schedule(RepaymentScheduleStatus status, BigDecimal totalPaymentDue) {
         return RepaymentScheduleDTO.builder()
                 .scheduleId(SCHEDULE_ID)
-                .status(status)
                 .totalPaymentDue(totalPaymentDue)
+                .status(status)
                 .build();
     }
 }

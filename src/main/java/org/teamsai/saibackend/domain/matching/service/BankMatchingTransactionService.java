@@ -1,39 +1,45 @@
 package org.teamsai.saibackend.domain.matching.service;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateDTO;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingExecutionResult;
-import org.teamsai.saibackend.domain.matching.service.AutoMatchingTransactionResult;
-import org.teamsai.saibackend.domain.matching.service.MatchingCandidate;
-import org.teamsai.saibackend.domain.matching.service.MatchingTransaction;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
+import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
+import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
+import org.teamsai.saibackend.domain.matching.model.MatchingTransaction;
+import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateRepository;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
-import org.teamsai.saibackend.domain.payment.mapper.PaymentObligationMapper;
-import org.teamsai.saibackend.domain.settlement.service.SettlementPaymentStatusService;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryService;
+import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
+
 import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class BankMatchingTransactionService {
-    private final PaymentObligationMapper paymentObligationMapper;
+
+    private final MatchingCandidateRepository matchingCandidateRepository;
+    private final PaymentObligationQueryService paymentObligationQueryService;
     private final AutoMatchingService autoMatchingService;
     private final BankTransactionService bankTransactionService;
     private final BankTransactionMatchCandidateService candidateService;
     private final NotificationService notificationService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
+    private final SettlementPaymentStatusChecker paymentStatusChecker;
     @Transactional
     public AutoMatchingTransactionResult process(
             Long userId,
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransaction bankTransaction,
             boolean isBatch
     ) {
         return process(userId, linkedAccountId, bankTransaction, null, null, isBatch);
@@ -42,12 +48,12 @@ public class BankMatchingTransactionService {
     public AutoMatchingTransactionResult process(
             Long userId,
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransaction bankTransaction,
             MatchingTargetType targetType,
             Long aggregateId,
             boolean isBatch
     ) {
-        BankTransactionDTO lockedTransaction =
+        BankTransaction lockedTransaction =
                 bankTransactionService
                         .findByIdAndLinkedAccountIdForUpdate(
                                 bankTransaction.getBankTransactionId(),
@@ -89,7 +95,7 @@ public class BankMatchingTransactionService {
     private void createMatchingReviewNotificationIfRequired(
             Long userId,
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransaction bankTransaction,
             AutoMatchingTransactionResult result,
             boolean isBatch
     ) {
@@ -97,7 +103,7 @@ public class BankMatchingTransactionService {
                 != AutoMatchingProcessStatus.NEEDS_CHECK) {
             return;
         }
-        List<BankTransactionMatchCandidateDTO> candidates =
+        List<BankTransactionMatchCandidate> candidates =
                 candidateService.findAllByBankTransactionId(
                         bankTransaction.getBankTransactionId()
                 );
@@ -123,14 +129,14 @@ public class BankMatchingTransactionService {
         if (isBatch) {
             List<Long> settlementObligationIds = candidates.stream()
                     .filter(c -> c.getTargetType() == MatchingTargetType.SETTLEMENT)
-                    .map(BankTransactionMatchCandidateDTO::getTargetId)
+                    .map(BankTransactionMatchCandidate::getTargetId)
                     .toList();
             if (!settlementObligationIds.isEmpty()) {
                 List<Long> settlementIds =
-                        paymentObligationMapper.findSettlementIdsByObligationIds(settlementObligationIds);
+                        paymentObligationQueryService.findSettlementIdsByObligationIds(settlementObligationIds);
                 boolean hasUnresolvedSettlement = settlementIds.stream()
                         .anyMatch(settlementId ->
-                                !settlementPaymentStatusService.areAllObligationsResolved(settlementId));
+                                !paymentStatusChecker.areAllObligationsResolved(settlementId));
                 if (hasUnresolvedSettlement) {
                     notificationService.createIfAbsent(
                             userId, NotificationType.BANK_TRANSACTION_MATCHING_REVIEW,
@@ -143,7 +149,7 @@ public class BankMatchingTransactionService {
         }
     }
     private String createBothFoundContent(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         String counterpartyName = resolveCounterpartyName(bankTransaction);
         return counterpartyName
@@ -152,7 +158,7 @@ public class BankMatchingTransactionService {
                 + "원 입금에 정산과 차용증 후보가 모두 발견되었습니다.";
     }
     private String createUnresolvedSettlementContent(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         String counterpartyName = resolveCounterpartyName(bankTransaction);
         return counterpartyName
@@ -161,7 +167,7 @@ public class BankMatchingTransactionService {
                 + "원 입금이 정산 금액과 일치하지 않아 확인이 필요합니다.";
     }
     private String resolveCounterpartyName(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         String counterpartyName = bankTransaction.getCounterpartyName();
         if (counterpartyName == null || counterpartyName.isBlank()) {
@@ -171,7 +177,7 @@ public class BankMatchingTransactionService {
     }
     private AutoMatchingTransactionResult processMatching(
             Long linkedAccountId,
-            BankTransactionDTO bankTransaction,
+            BankTransaction bankTransaction,
             MatchingTargetType targetType,
             Long aggregateId
     ) {
@@ -212,12 +218,12 @@ public class BankMatchingTransactionService {
             Long aggregateId
     ) {
         if (targetType == null) {
-            return paymentObligationMapper.findMatchCandidatesByLinkedAccountId(
+            return matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
                     linkedAccountId,
                     transaction.transactionAt()
             );
         }
-        return paymentObligationMapper.findMatchCandidatesByLinkedAccountIdAndTarget(
+        return matchingCandidateRepository.findMatchCandidatesByLinkedAccountIdAndTarget(
                 linkedAccountId,
                 transaction.transactionAt(),
                 targetType,
@@ -225,13 +231,13 @@ public class BankMatchingTransactionService {
         );
     }
     private boolean hasMatchableCounterpartyName(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         String counterpartyName = bankTransaction.getCounterpartyName();
         return counterpartyName != null && !counterpartyName.isBlank();
     }
     private MatchingTransaction toMatchingTransaction(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         return new MatchingTransaction(
                 bankTransaction.getBankTransactionId(),

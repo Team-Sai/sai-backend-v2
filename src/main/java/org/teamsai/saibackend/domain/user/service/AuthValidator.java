@@ -5,17 +5,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.repository.UserRepository;
 
 @Component
 @RequiredArgsConstructor
 public class AuthValidator {
 
-    private final UserMapper userMapper;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public void validateSignUp(String email) {
-        validateDuplicateEmail(email);
+    public void validateEmailAvailable(String email) {
+        if (userRepository.existsByEmail(email)) {
+            throw UserErrorCode.DUPLICATE_EMAIL.toException();
+        }
     }
 
     public void validateLoginPassword(
@@ -26,12 +28,4 @@ public class AuthValidator {
             throw UserErrorCode.INVALID_LOGIN_CREDENTIALS.toException();
         }
     }
-
-    private void validateDuplicateEmail(String email) {
-        if (userMapper.existsByEmail(email)) {
-            throw UserErrorCode.DUPLICATE_EMAIL.toException();
-        }
-    }
-
-
 }

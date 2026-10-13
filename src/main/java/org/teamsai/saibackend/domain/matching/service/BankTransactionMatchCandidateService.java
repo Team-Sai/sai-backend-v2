@@ -1,16 +1,20 @@
 package org.teamsai.saibackend.domain.matching.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateDTO;
+import org.teamsai.saibackend.domain.matching.model.EvaluatedMatchingCandidate;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.mapper.BankTransactionMatchCandidateMapper;
-import org.teamsai.saibackend.domain.matching.service.EvaluatedMatchingCandidate;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateQueryRepository;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateRepository;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateValidationQueryRepository;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateInvalidationReason;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateStatus;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
+import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,7 +24,9 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class BankTransactionMatchCandidateService {
 
-    private final BankTransactionMatchCandidateMapper candidateMapper;
+    private final BankTransactionMatchCandidateRepository candidateRepository;
+    private final BankTransactionMatchCandidateQueryRepository candidateQueryRepository;
+    private final BankTransactionMatchCandidateValidationQueryRepository candidateValidationQueryRepository;
 
     @Transactional
     public void saveAll(
@@ -35,29 +41,30 @@ public class BankTransactionMatchCandidateService {
 
         LocalDateTime createdAt = LocalDateTime.now();
 
-        List<BankTransactionMatchCandidateDTO> candidates =
+        List<BankTransactionMatchCandidate> candidates =
                 evaluatedCandidates.stream()
-                        .map(candidate -> toDto(
+                        .map(candidate -> toEntity(
                                 bankTransactionId,
                                 candidate,
                                 createdAt
                         ))
                         .toList();
 
-        int insertedCount = candidateMapper.insertAll(candidates);
-
-        if (insertedCount != candidates.size()) {
-            throw MatchingErrorCode
-                    .MATCHING_CANDIDATE_SAVE_FAILED
-                    .toException();
+        try {
+            // 건수 비교 대신 실제 저장 실패를 처리한다. flush는 커밋이 아니며 실패하면 롤백된다.
+            candidateRepository.saveAllAndFlush(candidates);
+        } catch (DataAccessException exception) {
+            DomainException failure = MatchingErrorCode.MATCHING_CANDIDATE_SAVE_FAILED.toException();
+            failure.initCause(exception);
+            throw failure;
         }
     }
 
-    public List<BankTransactionMatchCandidateDTO>
+    public List<BankTransactionMatchCandidate>
     findAllByBankTransactionId(Long bankTransactionId) {
         validateBankTransactionId(bankTransactionId);
 
-        return candidateMapper.findAllByBankTransactionId(
+        return candidateRepository.findAllByBankTransactionIdOrderByMatchCandidateIdAsc(
                 bankTransactionId
         );
     }
@@ -66,7 +73,7 @@ public class BankTransactionMatchCandidateService {
     findAllForReviewByBankTransactionId(Long bankTransactionId) {
         validateBankTransactionId(bankTransactionId);
 
-        return candidateMapper.findAllForReviewByBankTransactionId(
+        return candidateQueryRepository.findAllForReviewByBankTransactionId(
                 bankTransactionId
         );
     }
@@ -84,14 +91,14 @@ public class BankTransactionMatchCandidateService {
             throw MatchingErrorCode.INVALID_MATCHING_REQUEST.toException();
         }
 
-        return candidateMapper.findAllForReviewByBankTransactionIds(
+        return candidateQueryRepository.findAllForReviewByBankTransactionIds(
                 bankTransactionIds,
                 targetType,
                 aggregateId
         );
     }
 
-    public BankTransactionMatchCandidateDTO
+    public BankTransactionMatchCandidate
     findByIdAndBankTransactionId(
             Long matchCandidateId,
             Long bankTransactionId
@@ -99,7 +106,7 @@ public class BankTransactionMatchCandidateService {
         validateMatchCandidateId(matchCandidateId);
         validateBankTransactionId(bankTransactionId);
 
-        return candidateMapper.findByIdAndBankTransactionId(
+        return candidateValidationQueryRepository.findByIdAndBankTransactionId(
                         matchCandidateId,
                         bankTransactionId
                 )
@@ -125,34 +132,38 @@ public class BankTransactionMatchCandidateService {
                     .toException();
         }
 
-        int updatedCount = candidateMapper.invalidate(
+        BankTransactionMatchCandidate candidate = candidateRepository.findAvailableForUpdate(
                 matchCandidateId,
                 bankTransactionId,
-                invalidationReason,
-                LocalDateTime.now()
-        );
+                MatchingCandidateStatus.AVAILABLE
+        ).orElseThrow(MatchingErrorCode.MATCHING_CANDIDATE_INVALIDATION_FAILED::toException);
 
-        if (updatedCount != 1) {
-            throw MatchingErrorCode
-                    .MATCHING_CANDIDATE_INVALIDATION_FAILED
-                    .toException();
-        }
+        // 잠금을 보유한 트랜잭션에서 변경한다. UPDATE는 JPA 변경 감지가 처리한다.
+        candidate.invalidate(invalidationReason, LocalDateTime.now());
     }
 
     public int countAvailableCandidates(Long bankTransactionId) {
         validateBankTransactionId(bankTransactionId);
 
-        return candidateMapper.countAvailableByBankTransactionId(
-                bankTransactionId
-        );
+        return Math.toIntExact(candidateRepository.countByBankTransactionIdAndCandidateStatus(
+                bankTransactionId,
+                MatchingCandidateStatus.AVAILABLE
+        ));
     }
 
-    private BankTransactionMatchCandidateDTO toDto(
+    @Transactional
+    public void deleteAllByBankTransactionId(Long bankTransactionId) {
+        validateBankTransactionId(bankTransactionId);
+        // 재시도 서비스가 트랜잭션 없이 호출하더라도 삭제는 쓰기 트랜잭션 안에서 수행한다.
+        candidateRepository.deleteAllByBankTransactionId(bankTransactionId);
+    }
+
+    private BankTransactionMatchCandidate toEntity(
             Long bankTransactionId,
             EvaluatedMatchingCandidate evaluatedCandidate,
             LocalDateTime createdAt
     ) {
-        return BankTransactionMatchCandidateDTO.builder()
+        return BankTransactionMatchCandidate.builder()
                 .bankTransactionId(bankTransactionId)
                 .targetType(
                         evaluatedCandidate.candidate().targetType()

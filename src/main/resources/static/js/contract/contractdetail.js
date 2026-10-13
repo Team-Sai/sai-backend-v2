@@ -9,7 +9,7 @@ const REPAYMENT_TYPE_LABELS = {
 };
 
 authFetch(
-    `/api/contracts/${contractId}/contract-detail`
+    `/api/contracts/${contractId}/document`
 )
     .then(response => {
         if (!response.ok) {

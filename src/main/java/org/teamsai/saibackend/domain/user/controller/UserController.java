@@ -11,10 +11,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
 import org.teamsai.saibackend.domain.user.dto.response.UserTokenLookupResponse;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.service.UserService;
+import org.teamsai.saibackend.domain.link.service.AccountLinkCoordinateService;
 
 @Tag(
         name = "회원 정보 API",
@@ -25,6 +26,7 @@ import org.teamsai.saibackend.domain.user.service.UserService;
 public class UserController {
 
     private final UserService userService;
+    private final AccountLinkCoordinateService accountLinkCoordinator;
 
     @GetMapping("/mypage")
     public String myPage() {
@@ -81,7 +83,7 @@ public class UserController {
             @AuthenticationPrincipal(expression = "userId")
             Long userId
     ) {
-        userService.withdraw(userId);
+        accountLinkCoordinator.withdrawUser(userId);
     }
     @Operation(
             summary = "토큰 기반 회원 정보 조회",
@@ -114,7 +116,7 @@ public class UserController {
             @Parameter(description = "요청 대상 회원 토큰", example = "SAI_ABCD1234")
             @PathVariable String userToken
     ){
-        UserDTO targetUser = userService.findRequestTarget(userId, userToken);
+        User targetUser = userService.findRequestTarget(userId, userToken);
 
         UserTokenLookupResponse response = UserTokenLookupResponse.from(targetUser);
 

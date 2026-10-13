@@ -106,7 +106,7 @@
       identityVerificationId,
     };
 
-    const response = await authFetch("/api/contracts/write", {
+    const response = await authFetch("/api/contracts", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

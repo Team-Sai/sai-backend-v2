@@ -1,38 +1,38 @@
 package org.teamsai.saibackend.domain.notification.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.notification.dto.NotificationDTO;
-import org.teamsai.saibackend.domain.notification.dto.response.NotificationResponse;
-import org.teamsai.saibackend.domain.notification.mapper.NotificationMapper;
+import org.teamsai.saibackend.domain.notification.entity.Notification;
+import org.teamsai.saibackend.domain.notification.repository.NotificationRepository;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
+import org.teamsai.saibackend.domain.user.entity.User;
 
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
-    private final NotificationMapper notificationMapper;
+    private final NotificationRepository notificationRepository;
+    private final EntityManager entityManager;
 
     public void create(Long userId, NotificationType type, String title, String content, Long referenceId){
         create(userId, type, title, content, referenceId, null);
     }
 
     public void create(Long userId, NotificationType type, String title, String content, Long referenceId, Long secondaryReferenceId){
-        NotificationDTO notification = NotificationDTO.builder()
-                .userId(userId)
-                .notificationType(type)
-                .title(title)
-                .content(content)
-                .referenceId(referenceId)
-                .secondaryReferenceId(secondaryReferenceId)
-                .createdAt(LocalDateTime.now())
-                .build();
+        Notification notification = Notification.from(
+                entityManager.getReference(User.class, userId),
+                type,
+                title,
+                content,
+                referenceId,
+                secondaryReferenceId
+        );
 
-        notificationMapper.insert(notification);
+        notificationRepository.save(notification);
     }
 
     @Transactional
@@ -44,7 +44,7 @@ public class NotificationService {
             Long referenceId,
             Long secondaryReferenceId
     ) {
-        if (notificationMapper.existsByUserIdAndTypeAndReferenceId(
+        if (notificationRepository.existsByUser_UserIdAndNotificationTypeAndReferenceId(
                 userId,
                 type,
                 referenceId
@@ -62,8 +62,16 @@ public class NotificationService {
         );
     }
 
-    @Transactional(readOnly = true)
-    public List<NotificationResponse> getNotifications(Long userId) {
-        return notificationMapper.findAllByUserId(userId);
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void createIfAbsentInNewTransaction(
+            Long userId,
+            NotificationType type,
+            String title,
+            String content,
+            Long referenceId,
+            Long secondaryReferenceId
+    ) {
+        createIfAbsent(userId, type, title, content, referenceId, secondaryReferenceId);
     }
+
 }

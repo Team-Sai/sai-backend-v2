@@ -8,9 +8,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
-import org.teamsai.saibackend.domain.account.dto.response.AccountDetailResponse;
 import org.teamsai.saibackend.domain.account.dto.response.LinkableAccountResponse;
 import org.teamsai.saibackend.global.client.MockBankClient;
+import org.teamsai.saibackend.global.client.BankKeyRecoveryException;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.util.List;
@@ -41,16 +41,42 @@ class MockBankClientTest {
     }
 
     @Test
+    void recoverySendsOwnershipAndKeysWithInternalAuthentication() {
+        mockServer.expect(requestTo(BASE_URL + "/api/link/recover-key"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(header("X-Internal-Api-Key", API_KEY))
+                .andExpect(jsonPath("$.userToken").value("token"))
+                .andExpect(jsonPath("$.currentUserKey").value("new"))
+                .andExpect(jsonPath("$.previousUserKey").value("old"))
+                .andExpect(jsonPath("$.operationId").value("op"))
+                .andRespond(withNoContent());
+        mockBankClient.recoverUserKey("token", "new", "old", "op");
+        mockServer.verify();
+    }
+
+    @Test
+    void recoveryConflictIsNotTreatedAsSuccess() {
+        mockServer.expect(requestTo(BASE_URL + "/api/link/recover-key"))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+        assertThatThrownBy(() -> mockBankClient.recoverUserKey("token", "new", null, "op"))
+                .isInstanceOf(BankKeyRecoveryException.class)
+                .extracting("reason").isEqualTo(BankKeyRecoveryException.Reason.CONFLICT);
+        mockServer.verify();
+    }
+
+    @Test
     @DisplayName("requestUserKey - 성공 시 userKey를 반환한다")
     void requestUserKey_성공() {
         mockServer.expect(requestTo(BASE_URL + "/api/mock-bank/link"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(header("X-Internal-Api-Key", API_KEY))
+                .andExpect(jsonPath("$.operationId").value("op"))
                 .andRespond(withSuccess(
                         "{\"userKey\":\"mb_abc123\",\"issuedAt\":\"2026-08-16T10:00:00\"}",
                         MediaType.APPLICATION_JSON
                 ));
 
-        String userKey = mockBankClient.requestUserKey("홍길동", "token-abc");
+        String userKey = mockBankClient.requestUserKey("홍길동", "token-abc", "op");
 
         assertThat(userKey).isEqualTo("mb_abc123");
         mockServer.verify();
@@ -62,7 +88,7 @@ class MockBankClientTest {
         mockServer.expect(requestTo(BASE_URL + "/api/mock-bank/link"))
                 .andRespond(withSuccess().contentType(MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> mockBankClient.requestUserKey("홍길동", "token-abc"))
+        assertThatThrownBy(() -> mockBankClient.requestUserKey("홍길동", "token-abc", "op"))
                 .isInstanceOf(DomainException.class);
 
         mockServer.verify();
@@ -75,10 +101,40 @@ class MockBankClientTest {
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andExpect(header("X-Internal-Api-Key", API_KEY))
                 .andExpect(jsonPath("$.userKey").value("mb_rawkey"))
+                .andExpect(jsonPath("$.operationId").value("op"))
                 .andRespond(withSuccess());
 
-        mockBankClient.confirmUserKey("mb_rawkey");
+        mockBankClient.confirmUserKey("mb_rawkey", "op");
 
+        mockServer.verify();
+    }
+
+    @Test
+    void expiryIsIdentifiedByErrorCodeRatherThan409Alone() {
+        mockServer.expect(requestTo(BASE_URL + "/api/link/recover-key"))
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"status\":409,\"code\":\"KEY_RECOVERY_EXPIRED\",\"message\":\"expired\",\"timestamp\":\"2026-09-26T00:00:00\"}"));
+        assertThatThrownBy(() -> mockBankClient.recoverUserKey("token", "new", "old", "op"))
+                .isInstanceOf(BankKeyRecoveryException.class)
+                .extracting("reason").isEqualTo(BankKeyRecoveryException.Reason.EXPIRED);
+        mockServer.verify();
+    }
+
+    @Test
+    void recoveryServerFailureRemainsRetryable() {
+        mockServer.expect(requestTo(BASE_URL + "/api/link/recover-key"))
+                .andRespond(withServerError());
+        assertThatThrownBy(() -> mockBankClient.recoverUserKey("token", "new", null, "op"))
+                .isInstanceOf(org.springframework.web.client.HttpServerErrorException.class);
+        mockServer.verify();
+    }
+
+    @Test
+    void recoveryTimeoutRemainsUncertain() {
+        mockServer.expect(requestTo(BASE_URL + "/api/link/recover-key"))
+                .andRespond(withException(new java.net.SocketTimeoutException("timeout")));
+        assertThatThrownBy(() -> mockBankClient.recoverUserKey("token", "new", null, "op"))
+                .isInstanceOf(org.springframework.web.client.ResourceAccessException.class);
         mockServer.verify();
     }
 
@@ -88,7 +144,7 @@ class MockBankClientTest {
         mockServer.expect(requestTo(BASE_URL + "/api/link/confirm-key"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
-        assertThatThrownBy(() -> mockBankClient.confirmUserKey("mb_rawkey"))
+        assertThatThrownBy(() -> mockBankClient.confirmUserKey("mb_rawkey", "op"))
                 .isInstanceOf(Exception.class);
 
         mockServer.verify();
@@ -100,7 +156,7 @@ class MockBankClientTest {
         mockServer.expect(requestTo(BASE_URL + "/api/link/confirm-key"))
                 .andRespond(withServerError());
 
-        assertThatThrownBy(() -> mockBankClient.confirmUserKey("mb_rawkey"))
+        assertThatThrownBy(() -> mockBankClient.confirmUserKey("mb_rawkey", "op"))
                 .isInstanceOf(Exception.class);
 
         mockServer.verify();

@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.user.dto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import org.teamsai.saibackend.domain.user.entity.User;
 
 @Getter
 @Builder
@@ -15,7 +16,7 @@ public class UserLoginDTO {
     private String name;
 
     public static UserLoginDTO of(
-            UserDTO user,
+            User user,
             String accessToken,
             String refreshToken
     ){

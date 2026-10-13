@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
-import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateDTO;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.dto.response.MatchingReviewProcessResponse;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.service.MatchingReviewValidator;
+import org.teamsai.saibackend.domain.matching.support.MatchingReviewValidator;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateInvalidationReason;
 import org.teamsai.saibackend.domain.matching.type.MatchingReviewResult;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
@@ -15,7 +15,6 @@ import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.service.LoanPaymentService;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
-import org.teamsai.saibackend.domain.transaction.service.BankTransactionQueryService;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -24,7 +23,6 @@ import org.teamsai.saibackend.global.exception.DomainException;
 @RequiredArgsConstructor
 public class BankTransactionMatchingReviewService {
 
-    private final BankTransactionQueryService bankTransactionQueryService;
     private final BankTransactionMatchCandidateService candidateService;
     private final SettlementPaymentService settlementPaymentService;
     private final LoanPaymentService loanPaymentService;
@@ -45,7 +43,7 @@ public class BankTransactionMatchingReviewService {
                         bankTransactionId
                 );
 
-        BankTransactionMatchCandidateDTO candidate =
+        BankTransactionMatchCandidate candidate =
                 candidateService.findByIdAndBankTransactionId(
                         matchCandidateId,
                         bankTransactionId
@@ -109,20 +107,20 @@ public class BankTransactionMatchingReviewService {
             Long bankTransactionId
     ) {
         BankTransactionDetailResponse transaction =
-                bankTransactionQueryService.getTransactionDetailForUpdate(
+                bankTransactionService.getOwnedTransactionDetailForUpdate(
                         userId,
                         linkedAccountId,
                         bankTransactionId
                 );
 
-        matchingReviewValidator.validate(transaction);
+        matchingReviewValidator.validateReviewable(transaction);
 
         return transaction;
     }
 
     private void applyPayment(
             BankTransactionDetailResponse transaction,
-            BankTransactionMatchCandidateDTO candidate
+            BankTransactionMatchCandidate candidate
     ) {
         if (candidate.getTargetType() == MatchingTargetType.SETTLEMENT) {
             settlementPaymentService.applyManuallyMatchedPayment(

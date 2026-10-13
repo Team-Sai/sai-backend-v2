@@ -6,7 +6,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.service.PortOneIdentityService;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -103,7 +103,7 @@ class PortOneIdentityServiceTest {
 
         httpServer.start();
 
-        PortOneIdentityResponse result =
+        PortOneIdentityDTO result =
                 portOneIdentityService
                         .getIdentityVerification(
                                 VERIFICATION_ID

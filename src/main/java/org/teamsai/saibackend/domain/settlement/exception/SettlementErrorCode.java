@@ -18,6 +18,11 @@ public enum SettlementErrorCode implements BaseErrorCode<DomainException> {
             "존재하지 않는 정산입니다."
     ),
 
+    RECURRING_SETTLEMENT_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "존재하지 않는 정기정산입니다."
+    ),
+
     SETTLEMENT_ACCESS_DENIED(
             HttpStatus.FORBIDDEN,
             "해당 정산에 대한 접근 권한이 없습니다."
@@ -85,6 +90,20 @@ public enum SettlementErrorCode implements BaseErrorCode<DomainException> {
     INVALID_SETTLEMENT_PARTICIPANT(
             HttpStatus.BAD_REQUEST,
             "정산 참여자 정보가 올바르지 않습니다."
+    ),
+    INVALID_OWNER_AMOUNT(
+            HttpStatus.BAD_REQUEST,
+            "생성자 부담 금액을 확인해 주세요."
+    ),
+
+    INVALID_PARTICIPANT_AMOUNT(
+            HttpStatus.BAD_REQUEST,
+            "참여자 부담 금액을 확인해 주세요."
+    ),
+
+    SETTLEMENT_AMOUNT_MISMATCH(
+            HttpStatus.BAD_REQUEST,
+            "생성자와 참여자 부담 금액의 합이 총 정산 금액과 일치하지 않습니다."
     ),
 
     DUPLICATE_SETTLEMENT_PARTICIPANT(

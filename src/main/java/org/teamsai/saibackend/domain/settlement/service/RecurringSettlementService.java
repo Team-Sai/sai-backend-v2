@@ -3,16 +3,20 @@ package org.teamsai.saibackend.domain.settlement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.settlement.dto.RecurringSettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateRecurringSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateRecurringSettlementResponse;
-import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.RecurringSettlementManagementMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
+import org.teamsai.saibackend.domain.settlement.assembler.SettlementAssembler;
+import org.teamsai.saibackend.domain.settlement.dto.request.RecurringSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.RecurringSettlementCreateResponse;
+import org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.repository.RecurringSettlementRepository;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.RecurringSettlementValidator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
+import org.teamsai.saibackend.domain.user.entity.User;
+import org.teamsai.saibackend.domain.user.service.UserService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,91 +24,82 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class RecurringSettlementService {
-    private final RecurringSettlementManagementMapper recurringSettlementManagementMapper;
+    private final RecurringSettlementRepository recurringSettlementRepository;
 
-    private final SettlementMapper settlementMapper;
+    private final SettlementRepository settlementRepository;
 
     private final RecurringSettlementValidator recurringSettlementValidator;
 
     private final SettlementAmountCalculator settlementAmountCalculator;
 
-    private final SettlementParticipantRegistrationService participantRegistrationService;
+    private final SettlementParticipantService settlementParticipantService;
 
     private final SettlementAccountService settlementAccountService;
 
+    private final UserService userService;
+
     @Transactional
-    public CreateRecurringSettlementResponse create(
-            Long ownerId, CreateRecurringSettlementRequest request
+    public RecurringSettlementCreateResponse create(
+            Long ownerId, RecurringSettlementCreateRequest request
     ){
         recurringSettlementValidator.validateCreateRequest(request);
 
-        BigDecimal perPersonAmount =
-                settlementAmountCalculator.calculateEqualAmount(
-                        request.getTotalAmount(),
-                        request.getParticipants().size()
-                );
+        User owner = userService.getUser(ownerId);
+        BigDecimal perPersonAmount = null;
+        if (request.getSplitType() == SplitType.EQUAL){
+           perPersonAmount =
+                    settlementAmountCalculator.calculateEqualAmount(
+                            request.getTotalAmount(),
+                            request.getParticipants().size()
+                    );
+        }
 
         LocalDateTime createdAt = LocalDateTime.now();
 
-        RecurringSettlementDTO recurringSettlement =
-                RecurringSettlementDTO.builder()
-                        .ownerId(ownerId)
+        RecurringSettlement recurringSettlement =
+                RecurringSettlement.builder()
+                        .owner(owner)
                         .settlementCategory(request.getSettlementCategory())
                         .title(request.getTitle())
-                        .splitType(SplitType.EQUAL)
+                        .splitType(request.getSplitType())
                         .totalAmount(request.getTotalAmount())
                         .cycleRule(request.getCycleRule())
                         .startDate(request.getStartDate())
                         .endDate(request.getEndDate())
                         .createdAt(createdAt)
                         .build();
-        int recurringInserted = recurringSettlementManagementMapper.insert(
-                recurringSettlement
-        );
+        RecurringSettlement savedRecurringSettlement =
+                recurringSettlementRepository.save(recurringSettlement);
 
-        if(recurringInserted != 1){
-            throw SettlementErrorCode.SETTLEMENT_CREATE_FAILED.toException();
-        }
-
-        SettlementDTO firstSettlement =
-                SettlementDTO.builder()
-                        .recurringSettlementId(recurringSettlement.getRecurringSettlementId())
-                        .ownerId(ownerId)
+        Settlement firstSettlement =
+                Settlement.builder()
+                        .recurringSettlement(savedRecurringSettlement)
+                        .owner(owner)
                         .settlementType(SettlementType.RECURRING)
                         .settlementStatus(SettlementStatus.IN_PROGRESS)
                         .settlementCategory(request.getSettlementCategory())
                         .title(request.getTitle())
-                        .splitType(SplitType.EQUAL)
+                        .splitType(request.getSplitType())
                         .totalAmount(request.getTotalAmount())
                         .dueDate(null)
                         .cycleDate(request.getStartDate())
                         .createdAt(createdAt)
                         .build();
 
-        int settlementInserted =
-                settlementMapper.insertSettlement(firstSettlement);
+        Settlement savedFirstSettlement =
+                settlementRepository.save(firstSettlement);
 
-        if(settlementInserted != 1){
-            throw SettlementErrorCode.SETTLEMENT_CREATE_FAILED.toException();
-        }
-
-        participantRegistrationService.registerParticipants(
-                ownerId,firstSettlement.getSettlementId(),request.getParticipants(),perPersonAmount
+        settlementParticipantService.registerParticipants(
+                ownerId,
+                savedFirstSettlement.getSettlementId(),
+                request.getParticipants(),
+                request.getSplitType(),
+                perPersonAmount
         );
 
         settlementAccountService.selectAccount(
-                ownerId, firstSettlement.getSettlementId(), request.getLinkedAccountId());
+                ownerId, savedFirstSettlement.getSettlementId(), request.getLinkedAccountId());
 
-        return CreateRecurringSettlementResponse.builder()
-                .recurringSettlementId(recurringSettlement.getRecurringSettlementId())
-                .firstSettlementId(firstSettlement.getSettlementId())
-                .settlementType(firstSettlement.getSettlementType())
-                .title(firstSettlement.getTitle())
-                .cycleRule(recurringSettlement.getCycleRule())
-                .startDate(recurringSettlement.getStartDate())
-                .endDate(recurringSettlement.getEndDate())
-                .createdAt(createdAt)
-                .build();
-
+        return SettlementAssembler.toCreateRecurringSettlementResponse(savedRecurringSettlement, savedFirstSettlement);
     }
 }

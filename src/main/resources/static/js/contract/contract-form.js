@@ -378,7 +378,7 @@
 
     try {
       const response = await authFetch(
-          `/api/contracts/${contractId}/listdetails`,
+          `/api/contracts/${contractId}`,
           {
             method: "GET",
             headers: {

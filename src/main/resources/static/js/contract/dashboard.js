@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function load() {
-        const url = `/api/dashboard?keyword=${encodeURIComponent(search.value)}&roleFilter=ALL&statusFilter=${status.value}&sortType=${sort.value}&page=${currentPage}`;
+        const url = `/api/contracts/dashboard?keyword=${encodeURIComponent(search.value)}&roleFilter=ALL&statusFilter=${status.value}&sortType=${sort.value}&page=${currentPage}`;
         const response = await authFetch(url);
         if (!response.ok) throw new Error('차용증 조회에 실패했습니다.');
         const data = await response.json();

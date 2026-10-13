@@ -11,7 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
 import org.teamsai.saibackend.domain.settlement.dto.response.*;
 import org.teamsai.saibackend.domain.settlement.service.*;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
@@ -27,10 +27,9 @@ import java.util.List;
 public class SettlementController {
 
     private final SharedSettlementService sharedSettlementService;
-    private final SettlementPaymentStatusService settlementPaymentStatusService;
     private final SettlementCloseService settlementCloseService;
     private final SettlementQueryService settlementQueryService;
-    private final SettlementSummaryService settlementSummaryService;
+    private final SettlementSummaryQueryService settlementSummaryQueryService;
 
     @GetMapping("/settlements")
     public String settlementListPage() {
@@ -73,16 +72,16 @@ public class SettlementController {
     })
     @ResponseBody
     @PostMapping("/api/settlements/shared")
-    public ResponseEntity<CreateSharedSettlementResponse>
+    public ResponseEntity<SharedSettlementCreateResponse>
     createSharedSettlement(
             @AuthenticationPrincipal
             CustomUserDetails userDetails,
 
             @Valid
             @RequestBody
-            CreateSharedSettlementRequest request
+            SharedSettlementCreateRequest request
     ) {
-        CreateSharedSettlementResponse response =
+        SharedSettlementCreateResponse response =
                 sharedSettlementService.create(
                         userDetails.getUserId(),
                         request
@@ -125,7 +124,7 @@ public class SettlementController {
             @PathVariable Long settlementId
     ){
         SettlementPaymentStatusResponse response =
-                settlementPaymentStatusService.getPaymentStatus(
+                settlementQueryService.getPaymentStatus(
                         settlementId,
                         userDetails.getUserId()
                 );
@@ -253,7 +252,7 @@ public class SettlementController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ){
         SettlementSummaryResponse response =
-                settlementSummaryService.getSummary(
+                settlementSummaryQueryService.getSummary(
                         userDetails.getUserId()
                 );
 

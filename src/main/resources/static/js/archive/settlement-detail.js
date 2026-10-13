@@ -103,7 +103,6 @@
 
     function renderPreview(preview) {
         setText("settlementDisplayId", preview.settlementDisplayId);
-        setText("documentVersion", preview.documentVersion);
 
         setText("settlementId-cell", preview.settlementId);
         setText("title", preview.title);

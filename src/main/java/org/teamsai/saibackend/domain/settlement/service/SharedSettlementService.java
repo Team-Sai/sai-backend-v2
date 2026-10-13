@@ -3,14 +3,17 @@ package org.teamsai.saibackend.domain.settlement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateSharedSettlementResponse;
-import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.SharedSettlementCreateResponse;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
+import org.teamsai.saibackend.domain.user.entity.User;
+import org.teamsai.saibackend.domain.user.service.UserService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,29 +22,34 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class SharedSettlementService {
 
-    private final SettlementMapper settlementMapper;
     private final SettlementAccountService settlementAccountService;
     private final SettlementValidator settlementValidator;
-    private final SettlementParticipantRegistrationService participantRegistrationService;
+    private final SettlementParticipantService settlementParticipantService;
     private final SettlementAmountCalculator settlementAmountCalculator;
-
+    private final SettlementRepository settlementRepository;
+    private final UserService userService;
     @Transactional
-    public CreateSharedSettlementResponse create(
+    public SharedSettlementCreateResponse create(
             Long ownerId,
-            CreateSharedSettlementRequest request
+            SharedSettlementCreateRequest request
     ) {
        settlementValidator.validateCreateRequest(request);
-        BigDecimal perPersonAmount =
-                settlementAmountCalculator.calculateEqualAmount(
-                        request.getTotalAmount(),
-                        request.getParticipants().size()
-                );
+
+       User owner = userService.getUser(ownerId);
+       BigDecimal perPersonAmount = null;
+       if(request.getSplitType() == SplitType.EQUAL){
+           perPersonAmount =
+                   settlementAmountCalculator.calculateEqualAmount(
+                           request.getTotalAmount(),
+                           request.getParticipants().size()
+                   );
+       }
 
         LocalDateTime createdAt = LocalDateTime.now();
 
-        SettlementDTO settlement =
-                SettlementDTO.builder()
-                        .ownerId(ownerId)
+        Settlement settlement =
+                Settlement.builder()
+                        .owner(owner)
                         .settlementType(SettlementType.SHARED)
                         .settlementStatus(
                                 SettlementStatus.IN_PROGRESS
@@ -50,40 +58,30 @@ public class SharedSettlementService {
                                 request.getSettlementCategory()
                         )
                         .title(request.getTitle())
-                        .splitType(SplitType.EQUAL)
+                        .splitType(request.getSplitType())
 
                         .totalAmount(request.getTotalAmount())
                         .dueDate(request.getDueDate())
                         .createdAt(createdAt)
                         .build();
 
-        int insertedCount =
-                settlementMapper.insertSettlement(settlement);
+        Settlement savedSettlement =
+                settlementRepository.save(settlement);
 
-        if (insertedCount != 1) {
-            throw SettlementErrorCode
-                    .SETTLEMENT_CREATE_FAILED
-                    .toException();
-        }
-        participantRegistrationService.registerParticipants(
+        settlementParticipantService.registerParticipants(
                 ownerId,
-                settlement.getSettlementId(),
+                savedSettlement.getSettlementId(),
                 request.getParticipants(),
+                request.getSplitType(),
                 perPersonAmount
         );
 
         settlementAccountService.selectAccount(
                 ownerId,
-                settlement.getSettlementId(),
+                savedSettlement.getSettlementId(),
                 request.getLinkedAccountId()
         );
 
-        return CreateSharedSettlementResponse.builder()
-                .settlementId(settlement.getSettlementId())
-                .settlementType(settlement.getSettlementType())
-                .settlementStatus(settlement.getSettlementStatus())
-                .title(settlement.getTitle())
-                .createdAt(settlement.getCreatedAt())
-                .build();
+        return SharedSettlementCreateResponse.from(savedSettlement);
     }
 }

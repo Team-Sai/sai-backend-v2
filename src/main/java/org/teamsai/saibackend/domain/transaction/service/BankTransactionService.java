@@ -1,57 +1,88 @@
 package org.teamsai.saibackend.domain.transaction.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
+import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
+import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionDetailResponse;
+import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorCode;
-import org.teamsai.saibackend.domain.transaction.mapper.BankTransactionMapper;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQueryRepository;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
+import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class BankTransactionService {
 
-    private final BankTransactionMapper bankTransactionMapper;
+    private final BankTransactionRepository bankTransactionRepository;
+    private final BankTransactionQueryRepository bankTransactionQueryRepository;
+    private final LinkedBankAccountService linkedBankAccountService;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Transactional
-    public Long saveIfNotExists(BankTransactionDTO bankTransaction) {
+    public Long saveIfNotExists(BankTransaction bankTransaction) {
         validateNewBankTransaction(bankTransaction);
 
-        bankTransactionMapper.insertOrGetId(bankTransaction);
+        bankTransactionRepository.insertIfAbsent(
+                bankTransaction.getLinkedAccountId(),
+                bankTransaction.getExternalTransactionId(),
+                bankTransaction.getAmount(),
+                bankTransaction.getTransactionType().name(),
+                bankTransaction.getTransactionAt(),
+                bankTransaction.getCounterpartyName(),
+                bankTransaction.getMemo(),
+                bankTransaction.getSyncedAt()
+        );
 
-        Long bankTransactionId = bankTransaction.getBankTransactionId();
-        if (bankTransactionId == null) {
-            throw BankTransactionErrorCode
-                    .BANK_TRANSACTION_CREATE_FAILED
-                    .toException();
-        }
-
-        return bankTransactionId;
+        return bankTransactionRepository.findIdByExternalKeyForUpdate(
+                        bankTransaction.getLinkedAccountId(),
+                        bankTransaction.getExternalTransactionId()
+                )
+                .orElseThrow(
+                        BankTransactionErrorCode.BANK_TRANSACTION_CREATE_FAILED::toException
+                );
     }
 
-    public List<BankTransactionDTO> findPendingDeposits() {
-        return bankTransactionMapper.findPendingDeposits();
+    public Optional<BankTransaction> findById(Long bankTransactionId) {
+        return bankTransactionRepository.findById(bankTransactionId);
     }
 
-    public List<BankTransactionDTO> findPendingDepositsByLinkedAccountId(
+    public List<BankTransaction> findPendingDeposits() {
+        return bankTransactionRepository.findPendingDeposits(
+                BankTransactionProcessingStatus.PENDING,
+                BankTransactionType.DEPOSIT
+        );
+    }
+
+    public List<BankTransaction> findPendingDepositsByLinkedAccountId(
             Long linkedAccountId
     ) {
-        return bankTransactionMapper.findPendingDepositsByLinkedAccountId(
-                linkedAccountId
+        return bankTransactionRepository.findPendingDepositsByLinkedAccountId(
+                linkedAccountId,
+                BankTransactionProcessingStatus.PENDING,
+                BankTransactionType.DEPOSIT
         );
     }
 
     @Transactional
-    public BankTransactionDTO findByIdAndLinkedAccountIdForUpdate(
+    public BankTransaction findByIdAndLinkedAccountIdForUpdate(
             Long bankTransactionId,
             Long linkedAccountId
     ) {
-        return bankTransactionMapper
-                .findByIdAndLinkedAccountIdForUpdate(
+        BankTransaction bankTransaction = bankTransactionRepository
+                .findLockedByBankTransactionIdAndLinkedAccountId(
                         bankTransactionId,
                         linkedAccountId
                 )
@@ -59,6 +90,8 @@ public class BankTransactionService {
                         BankTransactionErrorCode
                                 .BANK_TRANSACTION_NOT_FOUND::toException
                 );
+        entityManager.refresh(bankTransaction, LockModeType.PESSIMISTIC_WRITE);
+        return bankTransaction;
     }
 
     @Transactional
@@ -69,33 +102,95 @@ public class BankTransactionService {
     ) {
         validateStatusTransition(currentStatus, nextStatus);
 
-        int updatedCount = bankTransactionMapper.updateStatus(
-                bankTransactionId,
-                currentStatus,
-                nextStatus
-        );
+        BankTransaction bankTransaction =
+                bankTransactionRepository.findLockedByBankTransactionId(
+                                bankTransactionId
+                        )
+                        .orElseThrow(
+                                BankTransactionErrorCode
+                                        .BANK_TRANSACTION_STATUS_UPDATE_FAILED
+                                        ::toException
+                        );
 
-        if (updatedCount != 1) {
+        entityManager.refresh(bankTransaction, LockModeType.PESSIMISTIC_WRITE);
+
+        if (bankTransaction.getProcessingStatus() != currentStatus) {
             throw BankTransactionErrorCode
                     .BANK_TRANSACTION_STATUS_UPDATE_FAILED
                     .toException();
         }
+
+        bankTransaction.changeProcessingStatus(nextStatus);
+
+        bankTransactionRepository.flush();
     }
 
+    public List<BankTransaction> findRetryCandidates(
+            Long linkedAccountId
+    ) {
+        return bankTransactionQueryRepository.findRetryCandidates(linkedAccountId);
+    }
+
+    @Transactional
+    public int resetToPendingForRetry(
+            Long bankTransactionId,
+            BankTransactionProcessingStatus currentStatus
+    ) {
+        Optional<BankTransaction> transactionOptional =
+                bankTransactionRepository.findLockedByBankTransactionId(
+                        bankTransactionId
+                );
+
+        if (transactionOptional.isEmpty()) {
+            return 0;
+        }
+
+        BankTransaction bankTransaction = transactionOptional.get();
+
+        entityManager.refresh(bankTransaction, LockModeType.PESSIMISTIC_WRITE);
+
+        if (bankTransaction.getProcessingStatus() != currentStatus) {
+            return 0;
+        }
+
+        bankTransaction.resetToPendingForRetry();
+        bankTransactionRepository.flush();
+
+        return 1;
+    }
+
+    @Transactional
+    public BankTransactionDetailResponse getOwnedTransactionDetailForUpdate(
+            Long userId,
+            Long linkedAccountId,
+            Long bankTransactionId
+    ) {
+        LinkedBankAccount account = linkedBankAccountService.getLinkedAccount(linkedAccountId);
+
+        if (!account.getUserId().equals(userId)) {
+            throw AccountErrorCode.ACCOUNT_ACCESS_DENIED.toException();
+        }
+
+        BankTransaction transaction =
+                findByIdAndLinkedAccountIdForUpdate(bankTransactionId, linkedAccountId);
+
+        return BankTransactionDetailResponse.from(transaction);
+    }
     private void validateNewBankTransaction(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         if (bankTransaction == null
                 || hasInvalidRequiredField(bankTransaction)
                 || hasInvalidAmount(bankTransaction)
                 || hasInvalidInitialStatus(bankTransaction)) {
-            throw BankTransactionErrorCode.INVALID_BANK_TRANSACTION
+            throw BankTransactionErrorCode
+                    .INVALID_BANK_TRANSACTION
                     .toException();
         }
     }
 
     private boolean hasInvalidRequiredField(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         return bankTransaction.getLinkedAccountId() == null
                 || isBlank(bankTransaction.getExternalTransactionId())
@@ -104,13 +199,15 @@ public class BankTransactionService {
                 || bankTransaction.getSyncedAt() == null;
     }
 
-    private boolean hasInvalidAmount(BankTransactionDTO bankTransaction) {
+    private boolean hasInvalidAmount(
+            BankTransaction bankTransaction
+    ) {
         return bankTransaction.getAmount() == null
                 || bankTransaction.getAmount().signum() <= 0;
     }
 
     private boolean hasInvalidInitialStatus(
-            BankTransactionDTO bankTransaction
+            BankTransaction bankTransaction
     ) {
         return bankTransaction.getProcessingStatus() != null
                 && bankTransaction.getProcessingStatus()
@@ -138,12 +235,9 @@ public class BankTransactionService {
 
         if (currentStatus == BankTransactionProcessingStatus.NEEDS_CHECK) {
             return nextStatus == BankTransactionProcessingStatus.APPLIED
-                    || nextStatus
-                    == BankTransactionProcessingStatus.UNMATCHED
-                    || nextStatus
-                    == BankTransactionProcessingStatus.FAILED
-                    || nextStatus
-                    == BankTransactionProcessingStatus.PENDING;
+                    || nextStatus == BankTransactionProcessingStatus.UNMATCHED
+                    || nextStatus == BankTransactionProcessingStatus.FAILED
+                    || nextStatus == BankTransactionProcessingStatus.PENDING;
         }
 
         if (currentStatus == BankTransactionProcessingStatus.UNMATCHED
@@ -158,12 +252,9 @@ public class BankTransactionService {
             BankTransactionProcessingStatus processingStatus
     ) {
         return processingStatus == BankTransactionProcessingStatus.APPLIED
-                || processingStatus
-                == BankTransactionProcessingStatus.UNMATCHED
-                || processingStatus
-                == BankTransactionProcessingStatus.NEEDS_CHECK
-                || processingStatus
-                == BankTransactionProcessingStatus.FAILED;
+                || processingStatus == BankTransactionProcessingStatus.UNMATCHED
+                || processingStatus == BankTransactionProcessingStatus.NEEDS_CHECK
+                || processingStatus == BankTransactionProcessingStatus.FAILED;
     }
 
     private boolean isBlank(String value) {

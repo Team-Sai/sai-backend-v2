@@ -3,7 +3,7 @@ package org.teamsai.saibackend.domain.settlement;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.service.SettlementAmountCalculator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;

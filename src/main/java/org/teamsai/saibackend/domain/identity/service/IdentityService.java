@@ -1,26 +1,27 @@
 package org.teamsai.saibackend.domain.identity.service;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import org.teamsai.saibackend.domain.identity.dto.IdentityDTO;
+import org.teamsai.saibackend.domain.identity.dto.IdentityStateDTO;
 import org.teamsai.saibackend.domain.identity.dto.request.IdentityPrepareRequest;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityCompleteResponse;
 import org.teamsai.saibackend.domain.identity.dto.response.IdentityPrepareResponse;
-import org.teamsai.saibackend.domain.identity.dto.response.PortOneIdentityResponse;
+import org.teamsai.saibackend.domain.identity.dto.PortOneIdentityDTO;
+import org.teamsai.saibackend.domain.identity.entity.Identity;
 import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
-import org.teamsai.saibackend.domain.identity.mapper.IdentityMapper;
+import org.teamsai.saibackend.domain.identity.repository.IdentityRepository;
+import org.teamsai.saibackend.domain.identity.support.IdentityFailureReasonFormatter;
+import org.teamsai.saibackend.domain.identity.support.IdentityValidator;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
-import org.teamsai.saibackend.domain.user.dto.UserDTO;
-import org.teamsai.saibackend.domain.user.exception.UserErrorCode;
-import org.teamsai.saibackend.domain.user.mapper.UserMapper;
+import org.teamsai.saibackend.domain.user.entity.User;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -36,24 +37,25 @@ public class IdentityService {
     private static final String IDENTITY_VERIFICATION_ID_PREFIX =
             "identity-verification-";
 
-    private static final int FAILURE_REASON_MAX_LENGTH =
-            255;
-
-    private final IdentityMapper identityMapper;
-    private final UserMapper userMapper;
+    private final IdentityRepository identityRepository;
+    private final UserService userService;
 
     private final PortOneIdentityService portOneIdentityService;
     private final IdentityValidator identityValidator;
+    private final IdentityStatusService identityStatusService;
+    private final IdentityFailureReasonFormatter failureReasonFormatter;
 
     private final String storeId;
     private final String channelKey;
     private final long validMinutes;
 
     public IdentityService(
-            IdentityMapper identityMapper,
-            UserMapper userMapper,
+            IdentityRepository identityRepository,
+            UserService userService,
             PortOneIdentityService portOneIdentityService,
             IdentityValidator identityValidator,
+            IdentityStatusService identityStatusService,
+            IdentityFailureReasonFormatter failureReasonFormatter,
 
             @Value("${portone.identity.store-id}")
             String storeId,
@@ -64,10 +66,12 @@ public class IdentityService {
             @Value("${portone.identity.valid-minutes:10}")
             long validMinutes
     ) {
-        this.identityMapper = identityMapper;
-        this.userMapper = userMapper;
+        this.identityRepository = identityRepository;
+        this.userService = userService;
         this.portOneIdentityService = portOneIdentityService;
         this.identityValidator = identityValidator;
+        this.identityStatusService = identityStatusService;
+        this.failureReasonFormatter = failureReasonFormatter;
 
         this.storeId = storeId;
         this.channelKey = channelKey;
@@ -79,8 +83,8 @@ public class IdentityService {
             Long userId,
             IdentityPrepareRequest request
     ) {
-        validateUserId(userId);
-        validatePrepareRequest(request);
+        identityValidator.validateUserId(userId);
+        identityValidator.validatePrepareRequest(request);
 
         String identityVerificationId =
                 generateIdentityVerificationId();
@@ -88,22 +92,16 @@ public class IdentityService {
         LocalDateTime requestedAt =
                 LocalDateTime.now();
 
-        IdentityDTO identity = IdentityDTO.builder()
+        Identity identity = Identity.builder()
                 .identityVerificationId(identityVerificationId)
-                .userId(userId)
+                .user(userService.getUserReference(userId))
+
                 .purpose(request.purpose())
                 .status(IdentityStatus.REQUESTED)
                 .requestedAt(requestedAt)
                 .build();
 
-        int insertedCount =
-                identityMapper.insert(identity);
-
-        if (insertedCount != 1) {
-            throw IdentityErrorCode
-                    .IDENTITY_VERIFICATION_CREATE_FAILED
-                    .toException();
-        }
+        identityRepository.save(identity);
 
         return new IdentityPrepareResponse(
                 identityVerificationId,
@@ -112,17 +110,20 @@ public class IdentityService {
         );
     }
 
+    // 외부 API 호출은 트랜잭션 밖에서 수행한다.
+    // 상태 갱신은 IdentityStatusService에서 커밋한 뒤 결과 또는 예외를 반환한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public IdentityCompleteResponse complete(
             Long userId,
             String identityVerificationId
     ) {
-        validateUserId(userId);
-        validateIdentityVerificationId(identityVerificationId);
+        identityValidator.validateUserId(userId);
+        identityValidator.validateIdentityVerificationId(identityVerificationId);
 
-        IdentityDTO identity =
+        Identity identity =
                 findIdentity(identityVerificationId);
 
-        validateOwner(identity, userId);
+        identityValidator.validateOwner(identity, userId);
 
         if (identity.getStatus() == IdentityStatus.VERIFIED) {
             return toCompleteResponse(identity);
@@ -140,7 +141,7 @@ public class IdentityService {
                     .toException();
         }
 
-        PortOneIdentityResponse portOneResponse =
+        PortOneIdentityDTO portOneResponse =
                 portOneIdentityService.getIdentityVerification(
                         identityVerificationId
                 );
@@ -155,7 +156,7 @@ public class IdentityService {
         )) {
             processFailure(
                     identityVerificationId,
-                    createFailureReason(portOneResponse)
+                    failureReasonFormatter.createFailureReason(portOneResponse)
             );
 
             throw IdentityErrorCode
@@ -171,13 +172,8 @@ public class IdentityService {
                     .toException();
         }
 
-        UserDTO user =
-                userMapper.findById(userId)
-                        .orElseThrow(
-                                UserErrorCode
-                                        .USER_NOT_FOUND
-                                        ::toException
-                        );
+        User user =
+                userService.getUser(userId);
 
         try {
             identityValidator.validateSameUser(
@@ -206,7 +202,7 @@ public class IdentityService {
                 verifiedAt.plusMinutes(validMinutes);
 
         int updatedCount =
-                identityMapper.updateVerified(
+                identityStatusService.updateVerified(
                         identityVerificationId,
                         verifiedAt,
                         expiresAt
@@ -233,78 +229,68 @@ public class IdentityService {
             String identityVerificationId,
             IdentityPurpose purpose
     ) {
-        validateUserId(userId);
-        validateIdentityVerificationId(identityVerificationId);
+        identityValidator.validateUserId(userId);
+        identityValidator.validateIdentityVerificationId(identityVerificationId);
+        identityValidator.validatePurpose(purpose);
 
-        if (purpose == null) {
-            throw IdentityErrorCode
-                    .INVALID_IDENTITY_PURPOSE
-                    .toException();
-        }
+        try {
+            int updatedCount =
+                    identityRepository.consume(
+                            identityVerificationId,
+                            userId,
+                            purpose
+                    );
 
-        int updatedCount =
-                identityMapper.consume(
-                        identityVerificationId,
-                        userId,
-                        purpose
-                );
-
-        if (updatedCount != 1) {
+            if (updatedCount != 1) {
+                throw IdentityErrorCode
+                        .IDENTITY_VERIFICATION_CONSUME_FAILED
+                        .toException();
+            }
+        } catch (CannotAcquireLockException exception) {
             throw IdentityErrorCode
                     .IDENTITY_VERIFICATION_CONSUME_FAILED
                     .toException();
         }
     }
 
-    private IdentityDTO findIdentity(
+    private Identity findIdentity(
             String identityVerificationId
     ) {
-        IdentityDTO identity =
-                identityMapper.findByIdentityVerificationId(
-                        identityVerificationId
-                );
-
-        if (identity == null) {
-            throw IdentityErrorCode
-                    .IDENTITY_VERIFICATION_NOT_FOUND
-                    .toException();
-        }
+        Identity identity =
+                identityRepository
+                        .findByIdentityVerificationId(
+                                identityVerificationId
+                        )
+                        .orElseThrow(
+                                IdentityErrorCode
+                                        .IDENTITY_VERIFICATION_NOT_FOUND
+                                        ::toException
+                        );
 
         return identity;
     }
 
-    private void validateOwner(
-            IdentityDTO identity,
-            Long userId
-    ) {
-        if (!Objects.equals(
-                identity.getUserId(),
-                userId
-        )) {
-            throw IdentityErrorCode
-                    .IDENTITY_VERIFICATION_FORBIDDEN
-                    .toException();
-        }
-    }
 
     private void processFailure(
             String identityVerificationId,
             String failureReason
     ) {
         int updatedCount =
-                identityMapper.updateFailed(
+                identityStatusService.updateFailed(
                         identityVerificationId,
-                        truncateFailureReason(failureReason)
+                        failureReasonFormatter.truncateFailureReason(failureReason)
                 );
 
         if (updatedCount == 1) {
             return;
         }
 
-        IdentityDTO latestIdentity =
-                findIdentity(identityVerificationId);
+        IdentityStateDTO latestIdentity =
+                findLatestIdentityState(
+                        identityVerificationId
+                );
 
-        if (latestIdentity.getStatus()
+        if (latestIdentity.status()
                 == IdentityStatus.FAILED) {
             return;
         }
@@ -318,15 +304,29 @@ public class IdentityService {
             Long userId,
             String identityVerificationId
     ) {
-        IdentityDTO latestIdentity =
-                findIdentity(identityVerificationId);
+        IdentityStateDTO latestIdentity =
+                findLatestIdentityState(
+                        identityVerificationId
+                );
 
-        validateOwner(latestIdentity, userId);
+        if (!Objects.equals(
+                latestIdentity.userId(),
+                userId
+        )) {
+            throw IdentityErrorCode
+                    .IDENTITY_VERIFICATION_FORBIDDEN
+                    .toException();
+        }
 
-        if (latestIdentity.getStatus()
+        if (latestIdentity.status()
                 == IdentityStatus.VERIFIED) {
 
-            return toCompleteResponse(latestIdentity);
+            return new IdentityCompleteResponse(
+                    latestIdentity.identityVerificationId(),
+                    latestIdentity.status(),
+                    latestIdentity.verifiedAt(),
+                    latestIdentity.expiresAt()
+            );
         }
 
         throw IdentityErrorCode
@@ -334,8 +334,22 @@ public class IdentityService {
                 .toException();
     }
 
+    private IdentityStateDTO findLatestIdentityState(
+            String identityVerificationId
+    ) {
+        return identityRepository
+                .findStateByIdentityVerificationId(
+                        identityVerificationId
+                )
+                .orElseThrow(
+                        IdentityErrorCode
+                                .IDENTITY_VERIFICATION_NOT_FOUND
+                                ::toException
+                );
+    }
+
     private IdentityCompleteResponse toCompleteResponse(
-            IdentityDTO identity
+            Identity identity
     ) {
         return new IdentityCompleteResponse(
                 identity.getIdentityVerificationId(),
@@ -345,113 +359,10 @@ public class IdentityService {
         );
     }
 
-    private String createFailureReason(
-            PortOneIdentityResponse response
-    ) {
-        PortOneIdentityResponse.Failure failure =
-                response.failure();
-
-        if (failure == null) {
-            return PORTONE_STATUS_FAILED;
-        }
-
-        List<String> reasonParts =
-                new ArrayList<>();
-
-        addFailureReason(
-                reasonParts,
-                failure.reason()
-        );
-
-        addFailureReason(
-                reasonParts,
-                failure.pgCode()
-        );
-
-        addFailureReason(
-                reasonParts,
-                failure.pgMessage()
-        );
-
-        if (reasonParts.isEmpty()) {
-            return PORTONE_STATUS_FAILED;
-        }
-
-        return String.join(
-                " | ",
-                reasonParts
-        );
-    }
-
-    private void addFailureReason(
-            List<String> reasonParts,
-            String value
-    ) {
-        if (StringUtils.hasText(value)) {
-            reasonParts.add(value.trim());
-        }
-    }
-
-    private String truncateFailureReason(
-            String failureReason
-    ) {
-        if (!StringUtils.hasText(failureReason)) {
-            return PORTONE_STATUS_FAILED;
-        }
-
-        String normalizedReason =
-                failureReason.trim();
-
-        if (normalizedReason.length()
-                <= FAILURE_REASON_MAX_LENGTH) {
-
-            return normalizedReason;
-        }
-
-        return normalizedReason.substring(
-                0,
-                FAILURE_REASON_MAX_LENGTH
-        );
-    }
-
     private String generateIdentityVerificationId() {
         return IDENTITY_VERIFICATION_ID_PREFIX
                 + UUID.randomUUID()
                 .toString()
                 .replace("-", "");
-    }
-
-    private void validateUserId(
-            Long userId
-    ) {
-        if (userId == null) {
-            throw IdentityErrorCode
-                    .UNAUTHENTICATED_USER
-                    .toException();
-        }
-    }
-
-    private void validatePrepareRequest(
-            IdentityPrepareRequest request
-    ) {
-        if (request == null
-                || request.purpose() == null) {
-
-            throw IdentityErrorCode
-                    .INVALID_IDENTITY_PURPOSE
-                    .toException();
-        }
-    }
-
-    private void validateIdentityVerificationId(
-            String identityVerificationId
-    ) {
-        if (!StringUtils.hasText(
-                identityVerificationId
-        )) {
-            throw IdentityErrorCode
-                    .INVALID_IDENTITY_VERIFICATION_ID
-                    .toException();
-        }
     }
 }

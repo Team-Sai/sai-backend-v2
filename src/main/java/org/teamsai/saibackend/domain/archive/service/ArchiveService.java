@@ -3,19 +3,18 @@ package org.teamsai.saibackend.domain.archive.service;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.teamsai.saibackend.domain.archive.dto.ArchiveStatus;
-import org.teamsai.saibackend.domain.archive.dto.FileDTO;
-import org.teamsai.saibackend.domain.archive.mapper.ArchiveMapper;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
+import org.teamsai.saibackend.domain.archive.type.ArchiveStatus;
+import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
+import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
+import org.teamsai.saibackend.global.storage.S3FileStorage;
 
 import javax.imageio.ImageIO;
 
@@ -25,12 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDateTime;
+import java.nio.file.*;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -41,24 +35,26 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class ArchiveService {
 
-    private final ArchiveMapper archiveMapper;
-    private final TemplateEngine templateEngine;
-    private final HtmlToPdfRenderer htmlToPdfRenderer;
+    private final ArchiveRepository archiveRepository;
 
     @Getter
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    public List<FileDTO> findFilesByReference(String domainType, Long referenceId) {
-        return archiveMapper.findFilesByReference(domainType, referenceId);
+    // file.storage=s3 일 때만 들어온다. 없으면(null) 기존처럼 로컬 폴더를 쓴다.
+    @Autowired(required = false)
+    private S3FileStorage s3FileStorage;
+
+    public List<ArchiveFile> findFilesByReference(ArchiveStatus domainType, Long referenceId) {
+        return archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(domainType, referenceId);
     }
 
-    public List<FileDTO> findAllFilesByUserId(Long userId) {
-        return archiveMapper.findAllFilesByUserId(userId);
+    public List<ArchiveFile> findAllFilesByUserId(Long userId) {
+        return archiveRepository.findAllByUserId(userId);
     }
 
     @Transactional
-    public FileDTO saveFile(String domainType, Long referenceId, MultipartFile file) {
+    public ArchiveFile saveFile(String domainType, Long referenceId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 존재하지 않습니다.");
         }
@@ -73,13 +69,9 @@ public class ArchiveService {
     }
 
     @Transactional
-    public FileDTO saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
+    public ArchiveFile saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
                              InputStream content, long fileSize) {
         try {
-            Path dirPath = Paths.get(uploadDir);
-            if (!Files.exists(dirPath)) {
-                Files.createDirectories(dirPath);
-            }
 
             String ext = "";
             if (originalFilename != null && originalFilename.contains(".")) {
@@ -88,25 +80,32 @@ public class ArchiveService {
 
             String savedFilename = domainType + "_" + referenceId + "_" + UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
 
-            Path savePath = dirPath.resolve(savedFilename);
-            Files.copy(content, savePath, StandardCopyOption.REPLACE_EXISTING);
+            if (s3FileStorage != null) {
+                s3FileStorage.save(savedFilename, content, fileSize, contentType);
+            } else {
+                Path dirPath = Paths.get(uploadDir);
+                if (!Files.exists(dirPath)) {
+                    Files.createDirectories(dirPath);
+                }
+                Path savePath = dirPath.resolve(savedFilename);
+                Files.copy(content, savePath, StandardCopyOption.REPLACE_EXISTING);
+            }
 
-            FileDTO fileDTO = FileDTO.builder()
-                    .domainType(ArchiveStatus.valueOf(domainType))
-                    .referenceId(referenceId)
-                    .originalFilename(originalFilename)
-                    .savedFilename(savedFilename)
-                    .fileSize(fileSize)
-                    .fileType(contentType)
-                    .createdAt(LocalDateTime.now())
-                    .build();
+            ArchiveFile file = ArchiveFile.builder()
+                        .domainType(ArchiveStatus.valueOf(domainType))
+                        .referenceId(referenceId)
+                        .originalFilename(originalFilename)
+                        .savedFilename(savedFilename)
+                        .fileSize(fileSize)
+                        .fileType(contentType)
+                        .build();
 
-            archiveMapper.insertFile(fileDTO);
+            archiveRepository.save(file);
 
-            log.info("[File Saved] Domain: {}, RefId: {}, Original: {} -> Saved: {}",
+            log.info("[ArchiveFile Saved] Domain: {}, RefId: {}, Original: {} -> Saved: {}",
                     domainType, referenceId, originalFilename, savedFilename);
 
-            return fileDTO;
+            return file;
 
         } catch (IOException e) {
             log.error("파일 저장 중 오류 발생", e);
@@ -114,36 +113,17 @@ public class ArchiveService {
         }
     }
 
-    public byte[] renderContractPdf(LoanContractResponse contract) {
-        String pdfCss;
-        try (InputStream cssStream = getClass().getResourceAsStream("/static/css/archive/contract-pdf.css")) {
-            pdfCss = StreamUtils.copyToString(cssStream, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException("PDF 스타일시트 로딩 중 오류가 발생했습니다.", e);
-        }
-
-        Context context = new Context();
-        context.setVariable("contract", contract);
-        context.setVariable("repaymentTypeLabel", contract.getRepaymentType().getDescription());
-        context.setVariable("pdfCss", pdfCss);
-        context.setVariable("creditorSignatureDataUri", loadSignatureDataUri(contract.getCreditorSignature()));
-        context.setVariable("debtorSignatureDataUri", loadSignatureDataUri(contract.getDebtorSignature()));
-
-        String html = templateEngine.process("archive/contract-pdf", context);
-
-        return htmlToPdfRenderer.render(html, "contractId: " + contract.getContractId());
-    }
-
     private static final int SEAL_RED_RGB = 0xC0272D;
 
-    private String loadSignatureDataUri(String savedFilename) {
+    public String loadSignatureDataUri(String savedFilename) {
         if (savedFilename == null || savedFilename.isBlank()) {
             return null;
         }
 
         try {
-            Path filePath = Paths.get(uploadDir).resolve(savedFilename).normalize();
-            byte[] bytes = Files.readAllBytes(filePath);
+            byte[] bytes = (s3FileStorage != null)
+                    ? s3FileStorage.read(savedFilename)
+                    : Files.readAllBytes(Paths.get(uploadDir).resolve(savedFilename).normalize());
 
             BufferedImage original = ImageIO.read(new ByteArrayInputStream(bytes));
             if (original == null) {
@@ -187,13 +167,21 @@ public class ArchiveService {
         return 255 - brightness;
     }
 
-    public FileDTO getFileById(Long fileId) {
-        return archiveMapper.findFileById(fileId)
+    public ArchiveFile getFileById(Long fileId) {
+        return archiveRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 파일입니다. fileId=" + fileId));
     }
 
 
     public Resource loadFileAsResource(String savedFilename) {
+        if (s3FileStorage != null) {
+            try {
+                return new InputStreamResource(s3FileStorage.openStream(savedFilename));
+            } catch (IOException e) {
+                log.error("S3에서 파일을 찾을 수 없거나 읽을 수 없습니다: {}", savedFilename, e);
+                throw new RuntimeException("파일을 찾을 수 없거나 읽을 수 없습니다.", e);
+            }
+        }
         try {
             Path filePath = Paths.get(uploadDir).resolve(savedFilename).normalize();
             Resource resource = new UrlResource(filePath.toUri());

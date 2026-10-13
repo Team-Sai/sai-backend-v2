@@ -8,7 +8,7 @@ import org.springframework.batch.core.listener.JobExecutionListener;
 import org.springframework.batch.core.step.StepExecution;
 import org.springframework.stereotype.Component;
 import org.teamsai.saibackend.domain.batch.common.notification.JobDisplayNames;
-import org.teamsai.saibackend.domain.batch.common.notification.SlackNotifier;
+import org.teamsai.saibackend.global.notification.SlackNotifier;
 
 import java.time.Duration;
 

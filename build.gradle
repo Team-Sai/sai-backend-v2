@@ -21,6 +21,8 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    // actuator (쿠버네티스 상태 검사)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     // swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
     // thymeleaf
@@ -34,11 +36,7 @@ dependencies {
     // Spring Boot Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    //Spring Batch
-    implementation 'org.springframework.boot:spring-boot-starter-batch'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    //Spring Batch Test
-    testImplementation 'org.springframework.batch:spring-batch-test'
+
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
@@ -54,21 +52,40 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
-
-    implementation 'com.openhtmltopdf:openhtmltopdf-core:1.0.10'
-    implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
 
     // Spring Batch 의존성 추가
     implementation 'org.springframework.boot:spring-boot-starter-batch'
     implementation'org.springframework.boot:spring-boot-starter-data-jpa'
     //Spring Batch Test
     testImplementation 'org.springframework.batch:spring-batch-test'
+    // ShedLock (여러 Pod 중 하나만 배치 실행)
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.10.1'
+    // AWS S3 (업로드 파일 저장)
+    implementation platform('software.amazon.awssdk:bom:2.55.11')
+    implementation 'software.amazon.awssdk:s3'
+    // AWS IAM 인증 토큰 (ElastiCache Redis IAM 인증)
+    implementation 'software.amazon.awssdk:auth'
+    implementation 'software.amazon.awssdk:http-auth-aws'
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
+tasks.named('test', Test) {
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs database and service integration tests.'
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+    shouldRunAfter tasks.named('test')
 }

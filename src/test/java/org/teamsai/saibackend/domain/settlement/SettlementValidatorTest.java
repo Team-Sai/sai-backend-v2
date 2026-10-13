@@ -5,16 +5,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementParticipantMapper;
-import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipantRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementParticipantValidator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
+import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
+import org.teamsai.saibackend.domain.settlement.type.SplitType;
+import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -38,7 +44,12 @@ class SettlementValidatorTest {
     private LinkedBankAccountService linkedBankAccountService;
 
     @Mock
-    private SettlementParticipantMapper settlementParticipantMapper;
+    private SettlementParticipantRepository settlementParticipantRepository;
+
+
+    @Spy
+    private SettlementParticipantValidator participantValidator =
+            new SettlementParticipantValidator();
 
     @InjectMocks
     private SettlementValidator settlementValidator;
@@ -48,7 +59,7 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자는 OWNER 검증을 통과한다")
     void validateOwnerSuccess() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         settlementValidator.validateOwner(
@@ -62,7 +73,7 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자가 아니면 OWNER 검증에 실패한다")
     void validateOwnerFailsWhenUserIsNotOwner() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         assertSettlementExceptionThrownBy(
@@ -127,7 +138,7 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자는 정산 조회 권한 검증을 통과한다")
     void validateAccessibleUserSuccessForOwner() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         settlementValidator.validateAccessibleUser(
@@ -136,11 +147,12 @@ class SettlementValidatorTest {
         );
 
         verify(
-                settlementParticipantMapper,
+                settlementParticipantRepository,
                 never()
         ).existsActiveParticipant(
                 SETTLEMENT_ID,
-                OWNER_ID
+                OWNER_ID,
+                SettlementParticipantStatus.ACTIVE
         );
     }
 
@@ -149,14 +161,15 @@ class SettlementValidatorTest {
     @DisplayName("ACTIVE 참여자는 정산 조회 권한 검증을 통과한다")
     void validateAccessibleUserSuccessForMember() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         given(
-                settlementParticipantMapper
+                settlementParticipantRepository
                         .existsActiveParticipant(
                                 SETTLEMENT_ID,
-                                MEMBER_ID
+                                MEMBER_ID,
+                                SettlementParticipantStatus.ACTIVE
                         )
         ).willReturn(true);
 
@@ -165,10 +178,11 @@ class SettlementValidatorTest {
                 MEMBER_ID
         );
 
-        verify(settlementParticipantMapper)
+        verify(settlementParticipantRepository)
                 .existsActiveParticipant(
                         SETTLEMENT_ID,
-                        MEMBER_ID
+                        MEMBER_ID,
+                        SettlementParticipantStatus.ACTIVE
                 );
     }
 
@@ -177,14 +191,15 @@ class SettlementValidatorTest {
     @DisplayName("정산 생성자도 ACTIVE 참여자도 아니면 조회할 수 없다")
     void validateAccessibleUserFailsWhenUserHasNoAccess() {
 
-        SettlementDTO settlement =
+        Settlement settlement =
                 settlement();
 
         given(
-                settlementParticipantMapper
+                settlementParticipantRepository
                         .existsActiveParticipant(
                                 SETTLEMENT_ID,
-                                OTHER_USER_ID
+                                OTHER_USER_ID,
+                                SettlementParticipantStatus.ACTIVE
                         )
         ).willReturn(false);
 
@@ -198,10 +213,11 @@ class SettlementValidatorTest {
                 SettlementErrorCode.SETTLEMENT_ACCESS_DENIED
         );
 
-        verify(settlementParticipantMapper)
+        verify(settlementParticipantRepository)
                 .existsActiveParticipant(
                         SETTLEMENT_ID,
-                        OTHER_USER_ID
+                        OTHER_USER_ID,
+                        SettlementParticipantStatus.ACTIVE
                 );
     }
 
@@ -210,7 +226,7 @@ class SettlementValidatorTest {
     @DisplayName("정상적인 공동정산 생성 요청은 검증을 통과한다")
     void validateCreateRequestSuccess() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(
                         List.of(
                                 participant("SAI_USER_A"),
@@ -220,6 +236,116 @@ class SettlementValidatorTest {
 
         settlementValidator.validateCreateRequest(
                 request
+        );
+    }
+
+    @Test
+    @DisplayName("CUSTOM 정산 금액 합이 총액과 일치하면 검증을 통과한다")
+    void validateCustomCreateRequestSuccess() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("20000"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("30000")
+                                        ),
+                                        participant(
+                                                "SAI_USER_B",
+                                                new BigDecimal("50000")
+                                        )
+                                )
+                        )
+                        .build();
+
+        settlementValidator.validateCreateRequest(request);
+    }
+
+    @Test
+    @DisplayName("CUSTOM 정산 금액 합이 총액과 다르면 검증에 실패한다")
+    void validateCustomCreateRequestFailsWhenAmountSumDoesNotMatch() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("20000"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("30000")
+                                        ),
+                                        participant(
+                                                "SAI_USER_B",
+                                                new BigDecimal("40000")
+                                        )
+                                )
+                        )
+                        .build();
+
+        assertSettlementExceptionThrownBy(
+                () ->
+                        settlementValidator.validateCreateRequest(
+                                request
+                        ),
+                SettlementErrorCode.SETTLEMENT_AMOUNT_MISMATCH
+        );
+    }
+    @Test
+    @DisplayName("CUSTOM 정산 참여자 금액이 0원이면 검증에 실패한다")
+    void validateCustomCreateRequestFailsWhenParticipantAmountIsZero() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("100000"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                BigDecimal.ZERO
+                                        )
+                                )
+                        )
+                        .build();
+
+        assertSettlementExceptionThrownBy(
+                () ->
+                        settlementValidator.validateCreateRequest(
+                                request
+                        ),
+                SettlementErrorCode.INVALID_PARTICIPANT_AMOUNT
+        );
+    }
+
+    @Test
+    @DisplayName("CUSTOM 정산 생성자 금액이 음수이면 검증에 실패한다")
+    void validateCustomCreateRequestFailsWhenOwnerAmountIsNegative() {
+
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("-1"))
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("100001")
+                                        )
+                                )
+                        )
+                        .build();
+
+        assertSettlementExceptionThrownBy(
+                () -> settlementValidator.validateCreateRequest(request),
+                SettlementErrorCode.INVALID_OWNER_AMOUNT
         );
     }
 
@@ -241,7 +367,7 @@ class SettlementValidatorTest {
     @DisplayName("참여자가 없으면 공동정산 생성 요청 검증에 실패한다")
     void validateCreateRequestFailsWhenParticipantsAreEmpty() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(List.of());
 
         assertSettlementExceptionThrownBy(
@@ -256,39 +382,31 @@ class SettlementValidatorTest {
     @Test
     @DisplayName("참여자 목록에 null이 포함되면 검증에 실패한다")
     void validateCreateRequestFailsWhenParticipantIsNull() {
+        SharedSettlementCreateRequest request = request(
+                Arrays.asList(
+                        participant("SAI_USER_A"),
+                        null
+                )
+        );
 
-        CreateSharedSettlementRequest request =
-                request(
-                        Arrays.asList(
-                                participant("SAI_USER_A"),
-                                null
-                        )
-                );
-
-        assertThatThrownBy(
-                () ->
-                        settlementValidator
-                                .validateCreateRequest(request)
-        ).isInstanceOf(DomainException.class);
+        assertSettlementExceptionThrownBy(
+                () -> settlementValidator.validateCreateRequest(request),
+                SettlementErrorCode.INVALID_SETTLEMENT_PARTICIPANT
+        );
     }
 
 
     @Test
     @DisplayName("참여자 userToken이 비어 있으면 검증에 실패한다")
     void validateCreateRequestFailsWhenUserTokenIsBlank() {
+        SharedSettlementCreateRequest request = request(
+                List.of(participant(" "))
+        );
 
-        CreateSharedSettlementRequest request =
-                request(
-                        List.of(
-                                participant(" ")
-                        )
-                );
-
-        assertThatThrownBy(
-                () ->
-                        settlementValidator
-                                .validateCreateRequest(request)
-        ).isInstanceOf(DomainException.class);
+        assertSettlementExceptionThrownBy(
+                () -> settlementValidator.validateCreateRequest(request),
+                SettlementErrorCode.INVALID_SETTLEMENT_PARTICIPANT
+        );
     }
 
 
@@ -296,7 +414,7 @@ class SettlementValidatorTest {
     @DisplayName("동일한 userToken의 참여자가 중복되면 검증에 실패한다")
     void validateCreateRequestFailsWhenParticipantIsDuplicated() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 request(
                         List.of(
                                 participant("SAI_USER_A"),
@@ -304,39 +422,52 @@ class SettlementValidatorTest {
                         )
                 );
 
-        assertThatThrownBy(
-                () ->
-                        settlementValidator
-                                .validateCreateRequest(request)
-        ).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> settlementValidator.validateCreateRequest(request))
+                .isInstanceOf(DomainException.class)
+                .extracting("errorCode")
+                .isEqualTo(SettlementErrorCode.DUPLICATE_SETTLEMENT_PARTICIPANT);
     }
 
 
-    private SettlementDTO settlement() {
+    private Settlement settlement() {
 
-        return SettlementDTO.builder()
+        return Settlement.builder()
                 .settlementId(SETTLEMENT_ID)
-                .ownerId(OWNER_ID)
+                .owner(
+                        User.builder().userId(OWNER_ID).build()
+                )
                 .build();
     }
 
 
-    private CreateSharedSettlementRequest request(
-            List<CreateSettlementParticipantRequest> participants
+    private SharedSettlementCreateRequest request(
+            List<SettlementParticipantCreateRequest> participants
     ) {
 
-        return CreateSharedSettlementRequest.builder()
+        return SharedSettlementCreateRequest.builder()
+                .splitType(SplitType.EQUAL)
                 .participants(participants)
                 .build();
     }
 
 
-    private CreateSettlementParticipantRequest participant(
+    private SettlementParticipantCreateRequest participant(
             String userToken
     ) {
 
-        return CreateSettlementParticipantRequest.builder()
+        return SettlementParticipantCreateRequest.builder()
                 .userToken(userToken)
+                .build();
+    }
+
+    private SettlementParticipantCreateRequest participant(
+            String userToken,
+            BigDecimal amount
+    ) {
+
+        return SettlementParticipantCreateRequest.builder()
+                .userToken(userToken)
+                .amount(amount)
                 .build();
     }
 

@@ -4,14 +4,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.teamsai.saibackend.domain.matching.model.EvaluatedMatchingCandidate;
+import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateQueryRepository;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateDTO;
+import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.dto.BankTransactionMatchCandidateQueryDTO;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
-import org.teamsai.saibackend.domain.matching.mapper.BankTransactionMatchCandidateMapper;
-import org.teamsai.saibackend.domain.matching.service.EvaluatedMatchingCandidate;
-import org.teamsai.saibackend.domain.matching.service.MatchingCandidate;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateRepository;
+import org.teamsai.saibackend.domain.matching.repository.BankTransactionMatchCandidateValidationQueryRepository;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
 import org.teamsai.saibackend.domain.matching.type.MatchingCandidateInvalidationReason;
@@ -34,19 +37,27 @@ import static org.mockito.Mockito.when;
 class BankTransactionMatchCandidateServiceTest {
 
     @Mock
-    private BankTransactionMatchCandidateMapper candidateMapper;
+    private BankTransactionMatchCandidateRepository candidateRepository;
+
+    @Mock
+    private BankTransactionMatchCandidateQueryRepository candidateQueryRepository;
+
+    @Mock
+    private BankTransactionMatchCandidateValidationQueryRepository candidateValidationQueryRepository;
 
     private BankTransactionMatchCandidateService candidateService;
 
     @BeforeEach
     void setUp() {
         candidateService = new BankTransactionMatchCandidateService(
-                candidateMapper
+                candidateRepository,
+                candidateQueryRepository,
+                candidateValidationQueryRepository
         );
     }
 
     @Test
-    void savesEvaluatedCandidatesAsDtos() {
+    void savesEvaluatedCandidatesAsEntities() {
         Long bankTransactionId = 100L;
         EvaluatedMatchingCandidate settlementCandidate =
                 evaluatedCandidate(
@@ -63,30 +74,27 @@ class BankTransactionMatchCandidateServiceTest {
                         MatchingAmountType.EXACT
                 );
 
-        when(candidateMapper.insertAll(org.mockito.ArgumentMatchers.anyList()))
-                .thenReturn(2);
-
         candidateService.saveAll(
                 bankTransactionId,
                 List.of(settlementCandidate, loanCandidate)
         );
 
-        ArgumentCaptor<List<BankTransactionMatchCandidateDTO>> captor =
+        ArgumentCaptor<List<BankTransactionMatchCandidate>> captor =
                 ArgumentCaptor.forClass(List.class);
-        verify(candidateMapper).insertAll(captor.capture());
+        verify(candidateRepository).saveAllAndFlush(captor.capture());
 
-        List<BankTransactionMatchCandidateDTO> savedCandidates =
+        List<BankTransactionMatchCandidate> savedCandidates =
                 captor.getValue();
 
         assertThat(savedCandidates).hasSize(2);
         assertThat(savedCandidates)
                 .extracting(
-                        BankTransactionMatchCandidateDTO::getBankTransactionId,
-                        BankTransactionMatchCandidateDTO::getTargetType,
-                        BankTransactionMatchCandidateDTO::getTargetId,
-                        BankTransactionMatchCandidateDTO::getExpectedRemainingAmount,
-                        BankTransactionMatchCandidateDTO::getAmountMatchType,
-                        BankTransactionMatchCandidateDTO::getCandidateStatus
+                        BankTransactionMatchCandidate::getBankTransactionId,
+                        BankTransactionMatchCandidate::getTargetType,
+                        BankTransactionMatchCandidate::getTargetId,
+                        BankTransactionMatchCandidate::getExpectedRemainingAmount,
+                        BankTransactionMatchCandidate::getAmountMatchType,
+                        BankTransactionMatchCandidate::getCandidateStatus
                 )
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(
@@ -112,7 +120,7 @@ class BankTransactionMatchCandidateServiceTest {
                     assertThat(candidate.getInvalidationReason()).isNull();
                 });
         assertThat(savedCandidates)
-                .extracting(BankTransactionMatchCandidateDTO::getCreatedAt)
+                .extracting(BankTransactionMatchCandidate::getCreatedAt)
                 .doesNotContainNull()
                 .allMatch(createdAt -> createdAt.equals(
                         savedCandidates.get(0).getCreatedAt()
@@ -120,16 +128,16 @@ class BankTransactionMatchCandidateServiceTest {
     }
 
     @Test
-    void doesNotCallMapperWhenCandidatesAreEmpty() {
+    void doesNotCallRepositoryWhenCandidatesAreEmpty() {
         candidateService.saveAll(100L, List.of());
 
-        verify(candidateMapper, never()).insertAll(
+        verify(candidateRepository, never()).saveAllAndFlush(
                 org.mockito.ArgumentMatchers.anyList()
         );
     }
 
     @Test
-    void failsWhenInsertedCountDoesNotMatchCandidateCount() {
+    void failsWhenPersistenceFails() {
         EvaluatedMatchingCandidate candidate = evaluatedCandidate(
                 MatchingTargetType.SETTLEMENT,
                 10L,
@@ -137,8 +145,8 @@ class BankTransactionMatchCandidateServiceTest {
                 MatchingAmountType.EXACT
         );
 
-        when(candidateMapper.insertAll(org.mockito.ArgumentMatchers.anyList()))
-                .thenReturn(0);
+        when(candidateRepository.saveAllAndFlush(org.mockito.ArgumentMatchers.anyList()))
+                .thenThrow(new DataIntegrityViolationException("duplicate candidate"));
 
         assertThatThrownBy(() -> candidateService.saveAll(
                 100L,
@@ -169,12 +177,12 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void returnsCandidatesForBankTransaction() {
-        BankTransactionMatchCandidateDTO candidate = dto(1L, 100L);
+        BankTransactionMatchCandidate candidate = dto(1L, 100L);
 
-        when(candidateMapper.findAllByBankTransactionId(100L))
+        when(candidateRepository.findAllByBankTransactionIdOrderByMatchCandidateIdAsc(100L))
                 .thenReturn(List.of(candidate));
 
-        List<BankTransactionMatchCandidateDTO> result =
+        List<BankTransactionMatchCandidate> result =
                 candidateService.findAllByBankTransactionId(100L);
 
         assertThat(result).containsExactly(candidate);
@@ -196,7 +204,7 @@ class BankTransactionMatchCandidateServiceTest {
                         .createdAt(LocalDateTime.now())
                         .build();
 
-        when(candidateMapper.findAllForReviewByBankTransactionId(100L))
+        when(candidateQueryRepository.findAllForReviewByBankTransactionId(100L))
                 .thenReturn(List.of(candidate));
 
         List<BankTransactionMatchCandidateQueryDTO> result =
@@ -216,7 +224,7 @@ class BankTransactionMatchCandidateServiceTest {
                         .aggregateId(20L)
                         .build();
 
-        when(candidateMapper.findAllForReviewByBankTransactionIds(
+        when(candidateQueryRepository.findAllForReviewByBankTransactionIds(
                 List.of(100L, 101L),
                 MatchingTargetType.SETTLEMENT,
                 20L
@@ -246,7 +254,7 @@ class BankTransactionMatchCandidateServiceTest {
                         .isEqualTo(MatchingErrorCode.INVALID_MATCHING_REQUEST)
         );
 
-        verify(candidateMapper, never())
+        verify(candidateQueryRepository, never())
                 .findAllForReviewByBankTransactionIds(
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(),
@@ -256,12 +264,12 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void returnsCandidateBelongingToBankTransaction() {
-        BankTransactionMatchCandidateDTO candidate = dto(1L, 100L);
+        BankTransactionMatchCandidate candidate = dto(1L, 100L);
 
-        when(candidateMapper.findByIdAndBankTransactionId(1L, 100L))
+        when(candidateValidationQueryRepository.findByIdAndBankTransactionId(1L, 100L))
                 .thenReturn(Optional.of(candidate));
 
-        BankTransactionMatchCandidateDTO result =
+        BankTransactionMatchCandidate result =
                 candidateService.findByIdAndBankTransactionId(1L, 100L);
 
         assertThat(result).isSameAs(candidate);
@@ -269,7 +277,7 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void failsWhenCandidateDoesNotBelongToBankTransaction() {
-        when(candidateMapper.findByIdAndBankTransactionId(1L, 100L))
+        when(candidateValidationQueryRepository.findByIdAndBankTransactionId(1L, 100L))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
@@ -285,72 +293,47 @@ class BankTransactionMatchCandidateServiceTest {
 
     @Test
     void invalidatesAvailableCandidate() {
-        when(candidateMapper.invalidate(
-                org.mockito.ArgumentMatchers.eq(1L),
-                org.mockito.ArgumentMatchers.eq(100L),
-                org.mockito.ArgumentMatchers.eq(
-                        MatchingCandidateInvalidationReason
-                                .TARGET_NOT_AVAILABLE
-                ),
-                org.mockito.ArgumentMatchers.any(LocalDateTime.class)
-        )).thenReturn(1);
+        BankTransactionMatchCandidate candidate = dto(1L, 100L);
+        when(candidateRepository.findAvailableForUpdate(
+                1L, 100L, MatchingCandidateStatus.AVAILABLE
+        )).thenReturn(Optional.of(candidate));
 
         candidateService.invalidateCandidate(
-                1L,
-                100L,
-                MatchingCandidateInvalidationReason.TARGET_NOT_AVAILABLE
+                1L, 100L, MatchingCandidateInvalidationReason.TARGET_NOT_AVAILABLE
         );
 
-        verify(candidateMapper).invalidate(
-                org.mockito.ArgumentMatchers.eq(1L),
-                org.mockito.ArgumentMatchers.eq(100L),
-                org.mockito.ArgumentMatchers.eq(
-                        MatchingCandidateInvalidationReason
-                                .TARGET_NOT_AVAILABLE
-                ),
-                org.mockito.ArgumentMatchers.any(LocalDateTime.class)
-        );
+        // UPDATE 호출 횟수 대신 실제 Entity의 상태 변경을 검증한다.
+        assertThat(candidate.getCandidateStatus()).isEqualTo(MatchingCandidateStatus.INVALIDATED);
+        assertThat(candidate.getInvalidationReason())
+                .isEqualTo(MatchingCandidateInvalidationReason.TARGET_NOT_AVAILABLE);
+        assertThat(candidate.getInvalidatedAt()).isNotNull();
     }
 
     @Test
     void failsWhenCandidateCannotBeInvalidated() {
-        when(candidateMapper.invalidate(
-                org.mockito.ArgumentMatchers.eq(1L),
-                org.mockito.ArgumentMatchers.eq(100L),
-                org.mockito.ArgumentMatchers.eq(
-                        MatchingCandidateInvalidationReason.TARGET_NOT_FOUND
-                ),
-                org.mockito.ArgumentMatchers.any(LocalDateTime.class)
-        )).thenReturn(0);
+        when(candidateRepository.findAvailableForUpdate(
+                1L, 100L, MatchingCandidateStatus.AVAILABLE
+        )).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> candidateService.invalidateCandidate(
-                1L,
-                100L,
-                MatchingCandidateInvalidationReason.TARGET_NOT_FOUND
+                1L, 100L, MatchingCandidateInvalidationReason.TARGET_NOT_FOUND
         )).isInstanceOfSatisfying(
                 DomainException.class,
                 exception -> assertThat(exception.getErrorCode())
-                        .isEqualTo(
-                                MatchingErrorCode
-                                        .MATCHING_CANDIDATE_INVALIDATION_FAILED
-                        )
+                        .isEqualTo(MatchingErrorCode.MATCHING_CANDIDATE_INVALIDATION_FAILED)
         );
     }
 
     @Test
     void failsWhenInvalidationReasonIsNull() {
         assertThatThrownBy(() -> candidateService.invalidateCandidate(
-                1L,
-                100L,
-                null
+                1L, 100L, null
         )).isInstanceOfSatisfying(
                 DomainException.class,
                 exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(MatchingErrorCode.INVALID_MATCHING_REQUEST)
         );
-
-        verify(candidateMapper, never()).invalidate(
-                org.mockito.ArgumentMatchers.any(),
+        verify(candidateRepository, never()).findAvailableForUpdate(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any()
@@ -358,9 +341,24 @@ class BankTransactionMatchCandidateServiceTest {
     }
 
     @Test
+    void deletesOnlyRequestedTransactionCandidates() {
+        candidateService.deleteAllByBankTransactionId(100L);
+        verify(candidateRepository).deleteAllByBankTransactionId(100L);
+    }
+
+    @Test
+    void rejectsInvalidTransactionIdBeforeDeleting() {
+        assertThatThrownBy(() -> candidateService.deleteAllByBankTransactionId(0L))
+                .isInstanceOf(DomainException.class);
+        verify(candidateRepository, never()).deleteAllByBankTransactionId(
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
     void returnsAvailableCandidateCount() {
-        when(candidateMapper.countAvailableByBankTransactionId(100L))
-                .thenReturn(2);
+        when(candidateRepository.countByBankTransactionIdAndCandidateStatus(100L, MatchingCandidateStatus.AVAILABLE))
+                .thenReturn(2L);
 
         int result = candidateService.countAvailableCandidates(100L);
 
@@ -384,11 +382,11 @@ class BankTransactionMatchCandidateServiceTest {
         return new EvaluatedMatchingCandidate(candidate, amountMatchType);
     }
 
-    private BankTransactionMatchCandidateDTO dto(
+    private BankTransactionMatchCandidate dto(
             Long matchCandidateId,
             Long bankTransactionId
     ) {
-        return BankTransactionMatchCandidateDTO.builder()
+        return BankTransactionMatchCandidate.builder()
                 .matchCandidateId(matchCandidateId)
                 .bankTransactionId(bankTransactionId)
                 .targetType(MatchingTargetType.SETTLEMENT)

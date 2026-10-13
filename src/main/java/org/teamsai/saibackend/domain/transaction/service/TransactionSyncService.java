@@ -3,14 +3,19 @@ package org.teamsai.saibackend.domain.transaction.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
-import org.teamsai.saibackend.domain.account.dto.LinkedBankAccountDTO;
+import org.springframework.web.client.RestClientResponseException;
+import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.mapper.LinkedBankAccountMapper;
-import org.teamsai.saibackend.domain.transaction.dto.response.BankTransactionResponse;
+import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
+import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
+import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
 import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.util.List;
 
 @Slf4j
@@ -18,7 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TransactionSyncService {
 
-    private final LinkedBankAccountMapper linkedBankAccountMapper;
+    private final LinkedBankAccountService linkedBankAccountService;
     private final MockBankClient mockBankClient;
     private final UserService userService;
     private final BankTransactionPersistenceService bankTransactionPersistenceService;
@@ -29,18 +34,16 @@ public class TransactionSyncService {
     **/
 
     public int syncTransactions(Long userId, Long linkedAccountId) {
-        LinkedBankAccountDTO linkedAccount = linkedBankAccountMapper.findById(linkedAccountId)
-                .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
+        LinkedBankAccount linkedAccount = linkedBankAccountService.getLinkedAccount(linkedAccountId);
 
         validateOwnership(userId, linkedAccount);
 
         String userKey = userService.getUserKeyByUserId(linkedAccount.getUserId());
 
-        Long lastSyncedId = linkedBankAccountMapper.
-                            findLastSyncedTransactionIdById(linkedAccountId);
+        Long lastSyncedId = linkedBankAccountService.getLastSyncedTransactionId(linkedAccountId);
         long afterTransactionId = lastSyncedId == null ? 0L : lastSyncedId;
 
-        List<BankTransactionResponse> transactions = fetchTransactions(
+        List<BankTransactionDTO> transactions = fetchTransactions(
                 linkedAccountId,
                 linkedAccount.getAccountId(),
                 userKey,
@@ -51,7 +54,7 @@ public class TransactionSyncService {
                 saveAndAdvanceCursor(linkedAccountId, transactions);
     }
 
-    private void validateOwnership(Long userId, LinkedBankAccountDTO linkedAccount) {
+    private void validateOwnership(Long userId, LinkedBankAccount linkedAccount) {
         if (!linkedAccount.getUserId().equals(userId)) {
             log.warn(
                     "[TransactionSyncService] 소유자가 아닌 계좌 동기화 시도 - " +
@@ -62,7 +65,7 @@ public class TransactionSyncService {
         }
     }
 
-    private List<BankTransactionResponse> fetchTransactions(
+    private List<BankTransactionDTO> fetchTransactions(
             Long linkedAccountId,
             Long bankAccountId,
             String userKey,
@@ -72,10 +75,37 @@ public class TransactionSyncService {
             return mockBankClient.
                     getTransactions(bankAccountId, userKey, afterTransactionId);
         } catch (RestClientException e) {
+            if (isRetryableBankFailure(e)) {
+                throw new RetryableBankTransactionFetchException(e);
+            }
             log.warn("[TransactionSyncService] 거래내역 조회 실패 - linkedAccountId: {}",
                     linkedAccountId, e);
             throw AccountErrorCode.BANK_SERVER_UNAVAILABLE.toException();
         }
     }
+
+    private boolean isRetryableBankFailure(RestClientException exception) {
+        if (exception instanceof RestClientResponseException responseException) {
+            int status = responseException.getStatusCode().value();
+
+            return status == 502
+                    || status == 503
+                    || status == 504;
+        }
+
+        if (exception instanceof ResourceAccessException) {
+            Throwable cause = exception.getCause();
+
+            while (cause != null) {
+                if (cause instanceof SocketTimeoutException
+                        || cause instanceof ConnectException) {
+                    return true;
+                }
+
+                cause = cause.getCause();
+            }
+        }
+
+        return false;
+    }
 }
- 

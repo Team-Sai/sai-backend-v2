@@ -6,24 +6,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementAccountDTO;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
+import org.teamsai.saibackend.domain.settlement.entity.SettlementAccount;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementAccountMapper;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementAccountRepository;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementAccountStatus;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SettlementAccountService {
-
-    private final SettlementMapper settlementMapper;
-    private final SettlementAccountMapper settlementAccountMapper;
+    private final SettlementRepository settlementRepository;
+    private final SettlementAccountRepository settlementAccountRepository;
     private final LinkedBankAccountService linkedBankAccountService;
     private final SettlementValidator settlementValidator;
 
@@ -40,21 +41,28 @@ public class SettlementAccountService {
                 linkedAccountId
         );
 
-        SettlementDTO settlement = findSettlement(settlementId);
-
-        settlementValidator.validateOwner(settlement,userId);
-
-        settlementValidator.validateLinkedAccountOwner(userId,linkedAccountId);
-
-        Optional<SettlementAccountDTO> currentAccount =
-                settlementAccountMapper.findActiveBySettlementIdForUpdate(
-                        settlementId
+        Settlement settlement = settlementRepository
+                .findByIdForUpdate(settlementId)
+                .orElseThrow(
+                        SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException
                 );
 
-        log.info(
-                "[정산계좌] 기존 ACTIVE 계좌 존재={}",
-                currentAccount.isPresent()
+        settlementValidator.validateOwner(
+                settlement,
+                userId
         );
+
+        settlementValidator.validateLinkedAccountOwner(
+                userId,
+                linkedAccountId
+        );
+
+        Optional<SettlementAccount> currentAccount =
+                settlementAccountRepository
+                        .findBySettlementIdAndStatus(
+                                settlementId,
+                                SettlementAccountStatus.ACTIVE
+                        );
 
         if (currentAccount.isPresent()
                 && Objects.equals(
@@ -75,57 +83,30 @@ public class SettlementAccountService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        currentAccount.ifPresent(
-                account -> replaceCurrentAccount(
-                        account,
+        currentAccount.ifPresent(account -> {
+            account.replace(now);
+            settlementAccountRepository.flush();
+        });
+
+        SettlementAccount newAccount =
+                SettlementAccount.create(
+                        settlement,
+                        linkedAccountId,
                         now
-                )
-        );
-
-        SettlementAccountDTO newAccount =
-                SettlementAccountDTO.builder()
-                        .settlementId(settlementId)
-                        .linkedAccountId(linkedAccountId)
-                        .accountStatus(
-                                SettlementAccountStatus.ACTIVE
-                        )
-                        .selectedAt(now)
-                        .endedAt(null)
-                        .build();
-
-        log.info(
-                "[정산계좌] INSERT 직전 settlementId={}, linkedAccountId={}, status={}",
-                newAccount.getSettlementId(),
-                newAccount.getLinkedAccountId(),
-                newAccount.getAccountStatus()
-        );
-
-        int insertedCount =
-                settlementAccountMapper.insert(
-                        newAccount
                 );
 
-        log.info(
-                "[정산계좌] INSERT 결과 count={}, generatedId={}",
-                insertedCount,
-                newAccount.getSettlementAccountId()
-        );
-
-        if (insertedCount != 1) {
-            throw SettlementErrorCode
-                    .SETTLEMENT_ACCOUNT_CREATE_FAILED
-                    .toException();
-        }
+        SettlementAccount savedAccount =
+                settlementAccountRepository.save(newAccount);
 
         return toResponse(
                 userId,
-                newAccount
+                savedAccount
         );
     }
 
     private SettlementAccountResponse toResponse(
             Long userId,
-            SettlementAccountDTO settlementAccount
+            SettlementAccount settlementAccount
     ) {
         LinkedBankAccountResponse linkedAccount =
                 linkedBankAccountService
@@ -152,27 +133,38 @@ public class SettlementAccountService {
 
 
     @Transactional(readOnly = true)
-    public SettlementAccountResponse findCurrentAccount(Long userId, Long settlementId){
-        SettlementDTO settlement = findSettlement(settlementId);
+    public SettlementAccountResponse findCurrentAccount(
+            Long userId,
+            Long settlementId
+    ) {
+        Settlement settlement = findSettlement(settlementId);
 
-        settlementValidator.validateAccessibleUser(settlement,userId);
+        settlementValidator.validateAccessibleUser(
+                settlement,
+                userId
+        );
 
-        SettlementAccountDTO account = settlementAccountMapper.findActiveBySettlementId(settlementId)
-                .orElseThrow(SettlementErrorCode.SETTLEMENT_ACCOUNT_NOT_FOUND::toException);
+        SettlementAccount account =
+                settlementAccountRepository
+                        .findBySettlementIdAndStatus(
+                                settlementId,
+                                SettlementAccountStatus.ACTIVE
+                        )
+                        .orElseThrow(
+                                SettlementErrorCode
+                                        .SETTLEMENT_ACCOUNT_NOT_FOUND
+                                        ::toException
+                        );
 
-        return toResponse(settlement.getOwnerId(), account);
+        return toResponse(
+                settlement.getOwner().getUserId(),
+                account
+        );
     }
 
 
-    private SettlementDTO findSettlement(Long settlementId){
-        return settlementMapper.findById(settlementId).orElseThrow(SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException);
+    private Settlement findSettlement(Long settlementId){
+        return settlementRepository.findById(settlementId).orElseThrow(SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException);
     }
 
-    private void replaceCurrentAccount(SettlementAccountDTO account, LocalDateTime endedAt){
-        int updatedCount = settlementAccountMapper.updateStatus(account.getSettlementAccountId(), SettlementAccountStatus.REPLACED,endedAt);
-
-        if(updatedCount != 1){
-            throw SettlementErrorCode.SETTLEMENT_ACCOUNT_UPDATE_FAILED.toException();
-        }
-    }
 }

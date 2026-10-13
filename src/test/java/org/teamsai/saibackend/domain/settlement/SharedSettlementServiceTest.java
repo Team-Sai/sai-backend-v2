@@ -7,20 +7,20 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.settlement.dto.SettlementDTO;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSettlementParticipantRequest;
-import org.teamsai.saibackend.domain.settlement.dto.request.CreateSharedSettlementRequest;
-import org.teamsai.saibackend.domain.settlement.dto.response.CreateSharedSettlementResponse;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementParticipantCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SharedSettlementCreateRequest;
+import org.teamsai.saibackend.domain.settlement.dto.response.SharedSettlementCreateResponse;
+import org.teamsai.saibackend.domain.settlement.entity.Settlement;
 import org.teamsai.saibackend.domain.settlement.exception.SettlementErrorCode;
-import org.teamsai.saibackend.domain.settlement.mapper.SettlementMapper;
-import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementAmountCalculator;
-import org.teamsai.saibackend.domain.settlement.service.SettlementParticipantRegistrationService;
-import org.teamsai.saibackend.domain.settlement.service.SettlementValidator;
-import org.teamsai.saibackend.domain.settlement.service.SharedSettlementService;
+import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
+import org.teamsai.saibackend.domain.settlement.service.*;
+import org.teamsai.saibackend.domain.settlement.support.SettlementAmountCalculator;
+import org.teamsai.saibackend.domain.settlement.support.SettlementValidator;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 import org.teamsai.saibackend.domain.settlement.type.SettlementType;
 import org.teamsai.saibackend.domain.settlement.type.SplitType;
+import org.teamsai.saibackend.domain.user.entity.User;
+import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
@@ -31,8 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SharedSettlementService 단위 테스트")
@@ -44,7 +43,10 @@ class SharedSettlementServiceTest {
 
 
     @Mock
-    private SettlementMapper settlementMapper;
+    private SettlementRepository settlementRepository;
+
+    @Mock
+    private UserService userService;
 
     @Mock
     private SettlementAccountService settlementAccountService;
@@ -53,8 +55,7 @@ class SharedSettlementServiceTest {
     private SettlementValidator settlementValidator;
 
     @Mock
-    private SettlementParticipantRegistrationService
-            participantRegistrationService;
+    private SettlementParticipantService participantService;
 
     @Mock
     private SettlementAmountCalculator settlementAmountCalculator;
@@ -69,7 +70,7 @@ class SharedSettlementServiceTest {
     )
     void createSharedSettlementSuccess() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 createRequest(
                         new BigDecimal("450000"),
                         List.of(
@@ -80,6 +81,15 @@ class SharedSettlementServiceTest {
 
         BigDecimal expectedAmount =
                 new BigDecimal("150000");
+
+        User owner =
+                User.builder()
+                        .userId(OWNER_ID)
+                        .build();
+
+        given(
+                userService.getUser(OWNER_ID)
+        ).willReturn(owner);
 
 
         given(
@@ -93,45 +103,53 @@ class SharedSettlementServiceTest {
 
 
         given(
-                settlementMapper.insertSettlement(
-                        any(SettlementDTO.class)
+                settlementRepository.save(
+                        any(Settlement.class)
                 )
         ).willAnswer(invocation -> {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     invocation.getArgument(0);
 
-            settlement.setSettlementId(
-                    SETTLEMENT_ID
-            );
-
-            return 1;
+            return Settlement.builder()
+                    .settlementId(SETTLEMENT_ID)
+                    .owner(settlement.getOwner())
+                    .settlementType(settlement.getSettlementType())
+                    .settlementStatus(settlement.getSettlementStatus())
+                    .settlementCategory(settlement.getSettlementCategory())
+                    .title(settlement.getTitle())
+                    .splitType(settlement.getSplitType())
+                    .totalAmount(settlement.getTotalAmount())
+                    .dueDate(settlement.getDueDate())
+                    .createdAt(settlement.getCreatedAt())
+                    .build();
         });
 
 
-        CreateSharedSettlementResponse response =
+        SharedSettlementCreateResponse response =
                 sharedSettlementService.create(
                         OWNER_ID,
                         request
                 );
 
 
-        ArgumentCaptor<SettlementDTO> settlementCaptor =
+        ArgumentCaptor<Settlement> settlementCaptor =
                 ArgumentCaptor.forClass(
-                        SettlementDTO.class
+                        Settlement.class
                 );
 
-        verify(settlementMapper)
-                .insertSettlement(
+
+        verify(settlementRepository)
+                .save(
                         settlementCaptor.capture()
                 );
 
 
-        SettlementDTO savedSettlement =
+        Settlement savedSettlement =
                 settlementCaptor.getValue();
 
 
-        assertThat(savedSettlement.getOwnerId())
+        assertThat(savedSettlement.getOwner().getUserId())
                 .isEqualTo(OWNER_ID);
 
         assertThat(savedSettlement.getSettlementType())
@@ -162,7 +180,7 @@ class SharedSettlementServiceTest {
                         "450000"
                 );
 
-        assertThat(savedSettlement.getRecurringSettlementId())
+        assertThat(savedSettlement.getRecurringSettlement())
                 .isNull();
 
         assertThat(savedSettlement.getCycleDate())
@@ -182,11 +200,12 @@ class SharedSettlementServiceTest {
                 );
 
 
-        verify(participantRegistrationService)
+        verify(participantService)
                 .registerParticipants(
                         OWNER_ID,
                         SETTLEMENT_ID,
                         request.getParticipants(),
+                        SplitType.EQUAL,
                         expectedAmount
                 );
 
@@ -217,15 +236,119 @@ class SharedSettlementServiceTest {
                         "제주도 여행비 정산"
                 );
     }
+    @Test
+    @DisplayName(
+            "CUSTOM 공동정산 생성 시 균등 금액을 계산하지 않고 CUSTOM 방식으로 참여자를 등록한다"
+    )
+    void createCustomSharedSettlementSuccess() {
 
+        SharedSettlementCreateRequest request =
+                SharedSettlementCreateRequest.builder()
+                        .settlementCategory("여행")
+                        .title("제주도 여행비 정산")
+                        .dueDate(LocalDate.now().plusDays(7))
+                        .splitType(SplitType.CUSTOM)
+                        .totalAmount(new BigDecimal("100000"))
+                        .ownerAmount(new BigDecimal("20000"))
+                        .linkedAccountId(LINKED_ACCOUNT_ID)
+                        .participants(
+                                List.of(
+                                        participant(
+                                                "SAI_USER_A",
+                                                new BigDecimal("30000")
+                                        ),
+                                        participant(
+                                                "SAI_USER_B",
+                                                new BigDecimal("50000")
+                                        )
+                                )
+                        )
+                        .build();
+
+        User owner =
+                User.builder()
+                        .userId(OWNER_ID)
+                        .build();
+
+        given(
+                userService.getUser(OWNER_ID)
+        ).willReturn(owner);
+
+        given(
+                settlementRepository.save(
+                        any(Settlement.class)
+                )
+        ).willAnswer(invocation -> {
+
+            Settlement settlement =
+                    invocation.getArgument(0);
+
+            return Settlement.builder()
+                    .settlementId(SETTLEMENT_ID)
+                    .owner(settlement.getOwner())
+                    .settlementType(settlement.getSettlementType())
+                    .settlementStatus(settlement.getSettlementStatus())
+                    .settlementCategory(settlement.getSettlementCategory())
+                    .title(settlement.getTitle())
+                    .splitType(settlement.getSplitType())
+                    .totalAmount(settlement.getTotalAmount())
+                    .dueDate(settlement.getDueDate())
+                    .createdAt(settlement.getCreatedAt())
+                    .build();
+        });
+
+        sharedSettlementService.create(
+                OWNER_ID,
+                request
+        );
+
+        ArgumentCaptor<Settlement> settlementCaptor =
+                ArgumentCaptor.forClass(
+                        Settlement.class
+                );
+
+        verify(settlementRepository)
+                .save(
+                        settlementCaptor.capture()
+                );
+
+        assertThat(
+                settlementCaptor.getValue()
+                        .getSplitType()
+        ).isEqualTo(SplitType.CUSTOM);
+
+        verify(
+                settlementAmountCalculator,
+                never()
+        ).calculateEqualAmount(
+                any(),
+                any(Integer.class)
+        );
+
+        verify(participantService)
+                .registerParticipants(
+                        OWNER_ID,
+                        SETTLEMENT_ID,
+                        request.getParticipants(),
+                        SplitType.CUSTOM,
+                        null
+                );
+
+        verify(settlementAccountService)
+                .selectAccount(
+                        OWNER_ID,
+                        SETTLEMENT_ID,
+                        LINKED_ACCOUNT_ID
+                );
+    }
 
     @Test
     @DisplayName(
             "공동정산 저장에 실패하면 참여자 등록과 수취 계좌 설정을 하지 않는다"
     )
-    void createSharedSettlementFailsWhenInsertCountIsInvalid() {
+    void createSharedSettlementFailsWhenSaveFails() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 createRequest(
                         new BigDecimal("30000"),
                         List.of(
@@ -237,6 +360,15 @@ class SharedSettlementServiceTest {
 
         BigDecimal expectedAmount =
                 new BigDecimal("15000");
+
+        User owner =
+                User.builder()
+                        .userId(OWNER_ID)
+                        .build();
+
+        given(
+                userService.getUser(OWNER_ID)
+        ).willReturn(owner);
 
 
         given(
@@ -250,20 +382,22 @@ class SharedSettlementServiceTest {
 
 
         given(
-                settlementMapper.insertSettlement(
-                        any(SettlementDTO.class)
+                settlementRepository.save(
+                        any(Settlement.class)
                 )
-        ).willReturn(0);
+        ).willThrow(
+                new RuntimeException("저장 실패")
+        );
 
 
-        assertSettlementExceptionThrownBy(
+        assertThatThrownBy(
                 () ->
                         sharedSettlementService.create(
                                 OWNER_ID,
                                 request
-                        ),
-                SettlementErrorCode
-                        .SETTLEMENT_CREATE_FAILED
+                        )
+        ).isInstanceOf(
+                RuntimeException.class
         );
 
 
@@ -279,7 +413,7 @@ class SharedSettlementServiceTest {
                 );
 
         verifyNoInteractions(
-                participantRegistrationService,
+                participantService,
                 settlementAccountService
         );
     }
@@ -291,7 +425,7 @@ class SharedSettlementServiceTest {
     )
     void failsWhenSettlementAccountSelectionFails() {
 
-        CreateSharedSettlementRequest request =
+        SharedSettlementCreateRequest request =
                 createRequest(
                         new BigDecimal("30000"),
                         List.of(
@@ -303,6 +437,15 @@ class SharedSettlementServiceTest {
 
         BigDecimal expectedAmount =
                 new BigDecimal("15000");
+
+        User owner =
+                User.builder()
+                        .userId(OWNER_ID)
+                        .build();
+
+        given(
+                userService.getUser(OWNER_ID)
+        ).willReturn(owner);
 
 
         given(
@@ -316,19 +459,26 @@ class SharedSettlementServiceTest {
 
 
         given(
-                settlementMapper.insertSettlement(
-                        any(SettlementDTO.class)
+                settlementRepository.save(
+                        any(Settlement.class)
                 )
         ).willAnswer(invocation -> {
 
-            SettlementDTO settlement =
+            Settlement settlement =
                     invocation.getArgument(0);
 
-            settlement.setSettlementId(
-                    SETTLEMENT_ID
-            );
-
-            return 1;
+            return Settlement.builder()
+                    .settlementId(SETTLEMENT_ID)
+                    .owner(settlement.getOwner())
+                    .settlementType(settlement.getSettlementType())
+                    .settlementStatus(settlement.getSettlementStatus())
+                    .settlementCategory(settlement.getSettlementCategory())
+                    .title(settlement.getTitle())
+                    .splitType(settlement.getSplitType())
+                    .totalAmount(settlement.getTotalAmount())
+                    .dueDate(settlement.getDueDate())
+                    .createdAt(settlement.getCreatedAt())
+                    .build();
         });
 
 
@@ -357,11 +507,12 @@ class SharedSettlementServiceTest {
         );
 
 
-        verify(participantRegistrationService)
+        verify(participantService)
                 .registerParticipants(
                         OWNER_ID,
                         SETTLEMENT_ID,
                         request.getParticipants(),
+                        SplitType.EQUAL,
                         expectedAmount
                 );
 
@@ -375,41 +526,29 @@ class SharedSettlementServiceTest {
     }
 
 
-    private CreateSharedSettlementRequest createRequest(
+    private SharedSettlementCreateRequest createRequest(
             BigDecimal totalAmount,
-            List<CreateSettlementParticipantRequest> participants
+            List<SettlementParticipantCreateRequest> participants
     ) {
 
-        return CreateSharedSettlementRequest
+        return SharedSettlementCreateRequest
                 .builder()
-                .settlementCategory(
-                        "여행"
-                )
-                .title(
-                        "제주도 여행비 정산"
-                )
-                .dueDate(
-                        LocalDate.now()
-                                .plusDays(7)
-                )
-                .totalAmount(
-                        totalAmount
-                )
-                .linkedAccountId(
-                        LINKED_ACCOUNT_ID
-                )
-                .participants(
-                        participants
-                )
+                .settlementCategory("여행")
+                .title("제주도 여행비 정산")
+                .dueDate(LocalDate.now().plusDays(7))
+                .splitType(SplitType.EQUAL)
+                .totalAmount(totalAmount)
+                .linkedAccountId(LINKED_ACCOUNT_ID)
+                .participants(participants)
                 .build();
     }
 
 
-    private CreateSettlementParticipantRequest participant(
+    private SettlementParticipantCreateRequest participant(
             String userToken
     ) {
 
-        return CreateSettlementParticipantRequest
+        return SettlementParticipantCreateRequest
                 .builder()
                 .userToken(
                         userToken
@@ -417,22 +556,14 @@ class SharedSettlementServiceTest {
                 .build();
     }
 
-
-    private void assertSettlementExceptionThrownBy(
-            Runnable operation,
-            SettlementErrorCode errorCode
+    private SettlementParticipantCreateRequest participant(
+            String userToken,
+            BigDecimal amount
     ) {
 
-        assertThatThrownBy(
-                operation::run
-        ).isInstanceOfSatisfying(
-                DomainException.class,
-                exception ->
-                        assertThat(
-                                exception.getErrorCode()
-                        ).isEqualTo(
-                                errorCode
-                        )
-        );
+        return SettlementParticipantCreateRequest.builder()
+                .userToken(userToken)
+                .amount(amount)
+                .build();
     }
 }

@@ -10,6 +10,11 @@ import org.teamsai.saibackend.global.exception.DomainException;
 @RequiredArgsConstructor
 public enum BankTransactionErrorCode implements BaseErrorCode<DomainException> {
 
+    INVALID_PAGINATION(
+            HttpStatus.BAD_REQUEST,
+            "조회 페이지가 허용 범위를 초과했습니다."
+    ),
+
     INVALID_DATE_RANGE(
             HttpStatus.BAD_REQUEST,
             "조회 시작일이 종료일보다 늦을 수 없습니다."

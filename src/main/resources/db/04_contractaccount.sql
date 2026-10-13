@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS contract_account (
     linked_account_id BIGINT NOT NULL,
     account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     selected_at DATETIME NOT NULL,
-    ended_at DATETIME NULL,
     contract_id BIGINT NOT NULL,
 
     CONSTRAINT pk_contract_account PRIMARY KEY (contract_account_id),

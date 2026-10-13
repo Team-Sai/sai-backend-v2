@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.teamsai.saibackend.domain.settlement.dto.request.SelectSettlementAccountRequest;
+import org.teamsai.saibackend.domain.settlement.dto.request.SettlementAccountSelectRequest;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementAccountResponse;
 import org.teamsai.saibackend.domain.settlement.service.SettlementAccountService;
 
@@ -76,7 +76,7 @@ public class SettlementAccountController {
 
             @Valid
             @RequestBody
-            SelectSettlementAccountRequest request
+            SettlementAccountSelectRequest request
     ) {
         SettlementAccountResponse response =
                 settlementAccountService
