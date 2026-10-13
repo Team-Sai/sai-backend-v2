@@ -1,7 +1,6 @@
 package org.teamsai.saibackend.domain.batch.settlement.reminder;
 
 import lombok.RequiredArgsConstructor;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.batch.core.job.Job;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,8 +12,7 @@ public class SettlementDueReminderScheduler extends AbstractDailyBatchScheduler 
 
     private final Job settlementDueReminderJob;
 
-    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
-    @SchedulerLock(name = "settlementDueReminder", lockAtLeastFor = "5m", lockAtMostFor = "30m")
+    @Scheduled(cron = "0 0 0 * * *")
     public void runSettlementDueReminder() throws Exception {
         runDaily();
     }
