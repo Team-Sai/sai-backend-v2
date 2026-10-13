@@ -17,7 +17,6 @@ public record SettlementDetailResponse(
         LocalDate startDate,
         LocalDate endDate,
         LocalDateTime createdAt,
-        String role,
-        Long recurringSettlementId
+        String role
 ) {
 }

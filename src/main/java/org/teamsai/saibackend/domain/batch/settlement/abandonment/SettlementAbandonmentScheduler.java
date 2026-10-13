@@ -1,7 +1,6 @@
 package org.teamsai.saibackend.domain.batch.settlement.abandonment;
 
 import lombok.RequiredArgsConstructor;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.batch.core.job.Job;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,8 +12,7 @@ public class SettlementAbandonmentScheduler extends AbstractDailyBatchScheduler 
 
     private final Job settlementAbandonmentJob;
 
-    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
-    @SchedulerLock(name = "settlementAbandonment", lockAtLeastFor = "5m", lockAtMostFor = "30m")
+    @Scheduled(cron = "0 0 0 * * *")
     public void runAbandonmentDetection() throws Exception {
         runDaily();
     }

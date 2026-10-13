@@ -20,7 +20,6 @@ import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
-import org.teamsai.saibackend.domain.settlement.dto.response.SettlementWithPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.math.BigDecimal;
@@ -61,7 +60,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -82,7 +81,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -100,7 +99,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -115,7 +114,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -131,16 +130,14 @@ public class CalendarTest {
         SettlementListResponse settlement = settlement(
                 100L, "회식비 정산", "MEMBER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID))
-                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
-                        settlement,
-                        paymentStatus(
-                                100L,
-                                BigDecimal.valueOf(35_000),
-                                BigDecimal.valueOf(35_000),
-                                obligation(1L, USER_ID, BigDecimal.valueOf(35_000))
-                        )
-                )));
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
+        when(settlementQueryService.getPaymentStatus(100L, USER_ID))
+                .thenReturn(paymentStatus(
+                        100L,
+                        BigDecimal.valueOf(35_000),
+                        BigDecimal.valueOf(35_000),
+                        obligation(1L, USER_ID, BigDecimal.valueOf(35_000))
+                ));
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -161,11 +158,9 @@ public class CalendarTest {
         SettlementListResponse settlement = settlement(
                 101L, "종료된 정산", "OWNER", "CLOSED", TARGET_DATE, LocalDateTime.now()
         );
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID))
-                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
-                        settlement,
-                        paymentStatus(101L, BigDecimal.ZERO, BigDecimal.ZERO)
-                )));
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
+        when(settlementQueryService.getPaymentStatus(101L, USER_ID))
+                .thenReturn(paymentStatus(101L, BigDecimal.ZERO, BigDecimal.ZERO));
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -183,15 +178,13 @@ public class CalendarTest {
         SettlementListResponse settlement = settlement(
                 102L, "회식비 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID))
-                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
-                        settlement,
-                        paymentStatus(
-                                102L,
-                                BigDecimal.valueOf(20_000),
-                                BigDecimal.valueOf(20_000)
-                        )
-                )));
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
+        when(settlementQueryService.getPaymentStatus(102L, USER_ID))
+                .thenReturn(paymentStatus(
+                        102L,
+                        BigDecimal.valueOf(20_000),
+                        BigDecimal.valueOf(20_000)
+                ));
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -215,11 +208,9 @@ public class CalendarTest {
         SettlementListResponse settlement = settlement(
                 103L, "가나다 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID))
-                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
-                        settlement,
-                        paymentStatus(103L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000))
-                )));
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
+        when(settlementQueryService.getPaymentStatus(103L, USER_ID))
+                .thenReturn(paymentStatus(103L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -235,7 +226,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -335,7 +326,7 @@ public class CalendarTest {
     private SettlementListResponse settlement(
             Long id, String title, String role, String status, LocalDate dueDate, LocalDateTime createdAt
     ) {
-        return new SettlementListResponse(id, title, role, "ETC", "ONE_TIME", "EQUAL", status, BigDecimal.ZERO, dueDate, null, null, null, null, createdAt);
+        return new SettlementListResponse(id, title, role, "ETC", "ONE_TIME", "EQUAL", status, BigDecimal.ZERO, dueDate, null, null, null, createdAt);
     }
 
     private ContractDashboardQueryService.IntegrationDashboardData loanData(
@@ -363,7 +354,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -383,7 +374,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -401,7 +392,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, List.of(schedule1, schedule2, schedule3)));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -418,7 +409,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, pastDate);
@@ -435,7 +426,7 @@ public class CalendarTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(USER_ID))
                 .thenReturn(loanData(contract, schedule));
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID)).thenReturn(List.of());
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of());
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, futureDate);
@@ -452,11 +443,9 @@ public class CalendarTest {
         SettlementListResponse settlement = settlement(
                 105L, "여행 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID))
-                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
-                        settlement,
-                        paymentStatus(105L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000))
-                )));
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
+        when(settlementQueryService.getPaymentStatus(105L, USER_ID))
+                .thenReturn(paymentStatus(105L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -477,14 +466,11 @@ public class CalendarTest {
                 106L, "여행 정산", "OWNER", "TRAVEL", "RECURRING", "CUSTOM",
                 "OPEN", BigDecimal.valueOf(100_000), null, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31),
                 TARGET_DATE,
-                null,
                 LocalDateTime.now()
         );
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID))
-                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
-                        settlement,
-                        paymentStatus(106L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000))
-                )));
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
+        when(settlementQueryService.getPaymentStatus(106L, USER_ID))
+                .thenReturn(paymentStatus(106L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);
@@ -505,11 +491,9 @@ public class CalendarTest {
         SettlementListResponse settlement = settlement(
                 107L, "회식비 정산", "OWNER", "OPEN", TARGET_DATE, LocalDateTime.now()
         );
-        when(settlementQueryService.getSettlementListWithPaymentStatus(USER_ID))
-                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
-                        settlement,
-                        paymentStatus(107L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000))
-                )));
+        when(settlementQueryService.getSettlementList(USER_ID)).thenReturn(List.of(settlement));
+        when(settlementQueryService.getPaymentStatus(107L, USER_ID))
+                .thenReturn(paymentStatus(107L, BigDecimal.valueOf(10_000), BigDecimal.valueOf(10_000)));
 
         List<DashboardCalendarItemResponse> result =
                 integrationCalendarQueryService.getCalendarDayDetail(USER_ID, TARGET_DATE);

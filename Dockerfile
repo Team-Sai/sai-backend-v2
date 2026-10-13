@@ -16,8 +16,6 @@ RUN ./gradlew clean bootJar --no-daemon
 
 FROM eclipse-temurin:17-jre
 
-ENV TZ=Asia/Seoul
-
 WORKDIR /app
 
 COPY --from=builder /app/build/libs/*.jar app.jar

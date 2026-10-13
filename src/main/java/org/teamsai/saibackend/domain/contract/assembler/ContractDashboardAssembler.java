@@ -1,6 +1,5 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
-import org.teamsai.saibackend.domain.contract.calculator.RepaymentAmountCalculator;
 import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardRowResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractDashboardSummaryResponse;
@@ -17,9 +16,12 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class ContractDashboardAssembler {
+
+    private record RoleDueSummary(BigDecimal amount, Integer dueMonth) {}
 
     private ContractDashboardAssembler() {
     }
@@ -27,18 +29,10 @@ public final class ContractDashboardAssembler {
     public static ContractDashboardRowResponse toRow(
             LoanContractResponse contract,
             List<RepaymentScheduleWithRemainingProjection> schedules,
-            Long userId,
-            YearMonth targetMonth
+            Long userId
     ) {
-        BigDecimal totalRemaining =
-                RepaymentAmountCalculator.totalRemaining(schedules);
-
-        BigDecimal thisMonthDue =
-                RepaymentAmountCalculator.thisMonthDue(schedules, targetMonth);
-
-        BigDecimal overdueAmount =
-                RepaymentAmountCalculator.previousMonthsUnpaid(
-                        schedules, targetMonth);
+        BigDecimal totalRemaining = calculateTotalRemaining(schedules);
+        BigDecimal thisMonthDue = calculateThisMonthDue(schedules);
 
         ContractRole role = determineRole(contract, userId);
         TransactionCategory category = determineCategory(role);
@@ -47,7 +41,7 @@ public final class ContractDashboardAssembler {
         Optional<RepaymentScheduleWithRemainingProjection> nearestSchedule = findNearestSchedule(schedules);
         LocalDate nearestDueDate = nearestSchedule.map(RepaymentScheduleWithRemainingProjection::getDueDate).orElse(null);
         BigDecimal nextDueAmount = nearestSchedule
-                .map(RepaymentAmountCalculator::remainingAmount)
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
                 .orElse(null);
         return ContractDashboardRowResponse.builder()
                 .contractId(contract.getContractId())
@@ -57,7 +51,6 @@ public final class ContractDashboardAssembler {
                 .principalAmount(contract.getPrincipalAmount())
                 .totalRemainingAmount(totalRemaining)
                 .thisMonthDueAmount(thisMonthDue)
-                .overdueAmount(overdueAmount)
                 .contractStatus(contractStatus)
                 .repaymentStatus(determineRepaymentStatus(contract, schedules))
                 .paymentStatus(paymentStatus)
@@ -69,7 +62,9 @@ public final class ContractDashboardAssembler {
     }
 
     public static ContractDashboardSummaryResponse buildSummary(
-            List<ContractDashboardRowResponse> rows) {
+            List<ContractDashboardRowResponse> rows,
+            Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap
+    ) {
         int totalContractCount = rows.size();
 
         BigDecimal totalLentAmount = rows.stream()
@@ -90,34 +85,17 @@ public final class ContractDashboardAssembler {
                 .min(LocalDate::compareTo)
                 .orElse(null);
 
+        RoleDueSummary allSummary = calculateRoleDueSummary(rows, scheduleMap);
+
         List<ContractDashboardRowResponse> creditorRows = rows.stream()
                 .filter(row -> row.getRole() == ContractRole.CREDITOR)
                 .toList();
         List<ContractDashboardRowResponse> debtorRows = rows.stream()
                 .filter(row -> row.getRole() == ContractRole.DEBTOR)
                 .toList();
-        BigDecimal thisMonthDueAmount = rows.stream()
-                .map(ContractDashboardRowResponse::getThisMonthDueAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal receivableThisMonthAmount = creditorRows.stream()
-                .map(ContractDashboardRowResponse::getThisMonthDueAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal payableThisMonthAmount = debtorRows.stream()
-                .map(ContractDashboardRowResponse::getThisMonthDueAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal receivableOverdueAmount = creditorRows.stream()
-                .map(ContractDashboardRowResponse::getOverdueAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal payableOverdueAmount = debtorRows.stream()
-                .map(ContractDashboardRowResponse::getOverdueAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal payableTotalRequiredAmount =
-                payableThisMonthAmount.add(payableOverdueAmount);
+        RoleDueSummary receivableSummary = calculateRoleDueSummary(creditorRows, scheduleMap);
+        RoleDueSummary payableSummary = calculateRoleDueSummary(debtorRows, scheduleMap);
 
         return ContractDashboardSummaryResponse.builder()
                 .totalContractCount(totalContractCount)
@@ -127,16 +105,42 @@ public final class ContractDashboardAssembler {
                 .payableCount(debtorRows.size())
                 .nearestDueDate(nearestDueDate)
                 .defaultFilter(defaultFilter)
-                .thisMonthDueAmount(thisMonthDueAmount)
-                .dueMonth(null)
-                .receivableThisMonthAmount(receivableThisMonthAmount)
-                .receivableDueMonth(null)
-                .payableThisMonthAmount(payableThisMonthAmount)
-                .payableDueMonth(null)
-                .receivableOverdueAmount(receivableOverdueAmount)
-                .payableOverdueAmount(payableOverdueAmount)
-                .payableTotalRequiredAmount(payableTotalRequiredAmount)
+                .thisMonthDueAmount(allSummary.amount())
+                .dueMonth(allSummary.dueMonth())
+                .receivableThisMonthAmount(receivableSummary.amount())
+                .receivableDueMonth(receivableSummary.dueMonth())
+                .payableThisMonthAmount(payableSummary.amount())
+                .payableDueMonth(payableSummary.dueMonth())
                 .build();
+    }
+
+    private static BigDecimal calculateTotalRemaining(List<RepaymentScheduleWithRemainingProjection> schedules) {
+        return schedules.stream()
+                .filter(s -> s.getStatus().isUnresolved())
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal calculateThisMonthDue(List<RepaymentScheduleWithRemainingProjection> schedules) {
+        YearMonth thisMonth = YearMonth.now();
+        return schedules.stream()
+                .filter(s -> s.getStatus().isUnresolved()
+                        && YearMonth.from(s.getDueDate()).equals(thisMonth))
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal calculateYearMonthDue(List<RepaymentScheduleWithRemainingProjection> schedules, YearMonth targetMonth) {
+        return schedules.stream()
+                .filter(s -> s.getStatus().isUnresolved()
+                        && YearMonth.from(s.getDueDate()).equals(targetMonth))
+                .map(ContractDashboardAssembler::getRemainingPaymentAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal getRemainingPaymentAmount(RepaymentScheduleWithRemainingProjection schedule) {
+        return Optional.ofNullable(schedule.getRemainingPaymentAmount())
+                .orElse(schedule.getTotalPaymentDue());
     }
 
     private static ContractDashboardPaymentStatus determinePaymentStatus(BigDecimal totalRemaining) {
@@ -167,6 +171,36 @@ public final class ContractDashboardAssembler {
         return role == ContractRole.CREDITOR
                 ? TransactionCategory.RECEIVE
                 : TransactionCategory.PAY;
+    }
+
+    private static RoleDueSummary calculateRoleDueSummary(List<ContractDashboardRowResponse> roleRows, Map<Long, List<RepaymentScheduleWithRemainingProjection>> scheduleMap) {
+        BigDecimal thisMonthDue = roleRows.stream()
+                .map(ContractDashboardRowResponse::getThisMonthDueAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        LocalDate nearestDueDate = roleRows.stream()
+                .filter(row -> row.getNearestScheduleDueDate() != null)
+                .map(ContractDashboardRowResponse::getNearestScheduleDueDate)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+
+        if (nearestDueDate == null) {
+            return new RoleDueSummary(thisMonthDue, null);
+        }
+
+        YearMonth targetMonth = YearMonth.from(nearestDueDate);
+        boolean isCurrentMonth = targetMonth.equals(YearMonth.now());
+
+        if (thisMonthDue.compareTo(BigDecimal.ZERO) == 0 && !isCurrentMonth) {
+            BigDecimal yearMonthDue = roleRows.stream()
+                    .map(row -> calculateYearMonthDue(
+                            scheduleMap.getOrDefault(row.getContractId(), List.of()), targetMonth))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            return new RoleDueSummary(yearMonthDue, targetMonth.getMonthValue());
+        }
+
+        return new RoleDueSummary(thisMonthDue, null);
     }
 
     private static Optional<RepaymentScheduleWithRemainingProjection> findNearestSchedule(List<RepaymentScheduleWithRemainingProjection> schedules) {

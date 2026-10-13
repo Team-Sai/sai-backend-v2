@@ -195,8 +195,7 @@ class SettlementArchiveQueryServiceTest {
                 null,
                 null,
                 LocalDateTime.of(2026, 8, 1, 10, 0),
-                "OWNER",
-                null
+                "OWNER"
         );
     }
 
