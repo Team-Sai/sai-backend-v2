@@ -4,6 +4,7 @@ package org.teamsai.saibackend.domain.contract.client;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -149,9 +150,10 @@ public class RagApiClient {
 
         } catch (RestClientResponseException e) {
             log.error(
-                    "RAG 서버 HTTP 오류 - uri={}, status={}",
+                    "RAG 서버 HTTP 오류 - uri={}, status={}, exceptionType={}",
                     uri,
                     e.getStatusCode(),
+                    e.getClass().getName(),
                     e
             );
 
@@ -164,8 +166,9 @@ public class RagApiClient {
         } catch (ResourceAccessException e) {
             if (isTimeout(e)) {
                 log.error(
-                        "RAG 서버 타임아웃 - uri={}",
+                        "RAG 서버 타임아웃 - uri={}, exceptionType={}",
                         uri,
+                        e.getClass().getName(),
                         e
                 );
 
@@ -177,8 +180,9 @@ public class RagApiClient {
             }
 
             log.error(
-                    "RAG 서버 연결 실패 - uri={}",
+                    "RAG 서버 연결 실패 - uri={}, exceptionType={}",
                     uri,
+                    e.getClass().getName(),
                     e
             );
 
@@ -190,10 +194,22 @@ public class RagApiClient {
 
         } catch (RestClientException e) {
             log.error(
-                    "RAG 서버 통신 오류 - uri={}",
+                    "RAG 서버 통신 오류 - uri={}, exceptionType={}, causeType={}",
                     uri,
+                    e.getClass().getName(),
+                    e.getCause() != null
+                            ? e.getCause().getClass().getName()
+                            : "none",
                     e
             );
+
+            if (isTimeout(e)) {
+                throw new ResponseStatusException(
+                        HttpStatus.GATEWAY_TIMEOUT,
+                        "RAG 서버 응답 시간이 초과되었습니다.",
+                        e
+                );
+            }
 
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
@@ -208,7 +224,8 @@ public class RagApiClient {
 
         while (cause != null) {
             if (cause instanceof SocketTimeoutException
-                    || cause instanceof HttpTimeoutException) {
+                    || cause instanceof HttpTimeoutException
+                    || cause instanceof TimeoutException) {
                 return true;
             }
 
