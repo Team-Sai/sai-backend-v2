@@ -57,14 +57,7 @@ public interface BankTransactionMatchCandidateValidationQueryRepository
                         SELECT 1
                         FROM repayment_schedule rs
                         WHERE rs.schedule_id = mc.target_id
-                        AND rs.status IN ('PENDING', 'OVERDUE')
-                        AND NOT EXISTS (
-                            SELECT 1
-                            FROM repayment_schedule earlier
-                            WHERE earlier.contract_id = rs.contract_id
-                                AND earlier.status IN ('PENDING', 'OVERDUE')
-                                AND earlier.sequence < rs.sequence
-                        )
+                        AND rs.status = 'PENDING'
                         AND rs.total_payment_due > COALESCE((
                             SELECT SUM(pr.amount)
                             FROM payment_record pr
