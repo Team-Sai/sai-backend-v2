@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,17 +40,22 @@ public class ContractClauseAgentController {
                     description = "잘못된 요청"
             ),
             @ApiResponse(
-                    responseCode = "500",
-                    description = "AI Agent 호출 실패"
+                    responseCode = "502",
+                    description = "AI 서버 응답 오류"
+            ),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "AI 서버 연결 실패"
+            ),
+            @ApiResponse(
+                    responseCode = "504",
+                    description = "AI 서버 응답 시간 초과"
             )
     })
     @PostMapping("/api/contracts/clause-suggestions")
     public ContractClauseResponse suggestClause(
-            @RequestBody ContractClauseRequest request
+            @Valid @RequestBody ContractClauseRequest request
     ) {
-
-        return contractClauseAgentService.suggestClause(
-                request
-        );
+        return contractClauseAgentService.suggestClause(request);
     }
 }
