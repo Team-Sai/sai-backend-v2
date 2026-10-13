@@ -41,7 +41,11 @@ public class SettlementAccountService {
                 linkedAccountId
         );
 
-        Settlement settlement = findSettlement(settlementId);
+        Settlement settlement = settlementRepository
+                .findByIdForUpdate(settlementId)
+                .orElseThrow(
+                        SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException
+                );
 
         settlementValidator.validateOwner(
                 settlement,
@@ -53,15 +57,9 @@ public class SettlementAccountService {
                 linkedAccountId
         );
 
-        Settlement lockedSettlement = settlementRepository
-                .findByIdForUpdate(settlementId)
-                .orElseThrow(
-                        SettlementErrorCode.SETTLEMENT_NOT_FOUND::toException
-                );
-
         Optional<SettlementAccount> currentAccount =
                 settlementAccountRepository
-                        .findBySettlementIdAndStatusForUpdate(
+                        .findBySettlementIdAndStatus(
                                 settlementId,
                                 SettlementAccountStatus.ACTIVE
                         );
@@ -85,13 +83,14 @@ public class SettlementAccountService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        currentAccount.ifPresent(
-                account -> account.replace(now)
-        );
+        currentAccount.ifPresent(account -> {
+            account.replace(now);
+            settlementAccountRepository.flush();
+        });
 
         SettlementAccount newAccount =
                 SettlementAccount.create(
-                        lockedSettlement,
+                        settlement,
                         linkedAccountId,
                         now
                 );
