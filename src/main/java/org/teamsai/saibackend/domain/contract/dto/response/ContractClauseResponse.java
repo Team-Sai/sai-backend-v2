@@ -1,3 +1,4 @@
+
 package org.teamsai.saibackend.domain.contract.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -29,6 +30,31 @@ public class ContractClauseResponse {
 
     private List<Reference> references;
 
+    private List<UnresolvedDecision> unresolvedDecisions;
+
+    // 기존 생성자 호출과의 호환성 유지
+    public ContractClauseResponse(
+            String message,
+            List<Issue> issues,
+            String title,
+            String summary,
+            String suggestedClause,
+            List<String> warnings,
+            Validation validation,
+            List<Reference> references
+    ) {
+        this(
+                message,
+                issues,
+                title,
+                summary,
+                suggestedClause,
+                warnings,
+                validation,
+                references,
+                null
+        );
+    }
 
     @Getter
     @NoArgsConstructor
@@ -40,7 +66,6 @@ public class ContractClauseResponse {
 
         private String reason;
     }
-
 
     @Getter
     @NoArgsConstructor
@@ -55,7 +80,6 @@ public class ContractClauseResponse {
         private List<ValidationCheck> checks;
     }
 
-
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
@@ -68,7 +92,6 @@ public class ContractClauseResponse {
 
         private String message;
     }
-
 
     @Getter
     @NoArgsConstructor
@@ -96,5 +119,16 @@ public class ContractClauseResponse {
         private Double finalScore;
 
         private String matchedIssue;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class UnresolvedDecision {
+
+        private String name;
+
+        private String reason;
     }
 }
