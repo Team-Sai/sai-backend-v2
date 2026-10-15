@@ -2,8 +2,6 @@ import http from 'k6/http';
 import { check, group, sleep } from 'k6';
 import exec from 'k6/execution';
 
-// 시드 데이터(k6-loadtest/seed/02_seed.sql)가 들어간 DB 기준의 다중 사용자 시나리오
-// 실행 예) docker compose -f k6-loadtest/docker-compose.loadtest.yml run --rm k6 run -e PROFILE=load /scripts/realistic-load.js
 
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:8080';
 const PROFILE = __ENV.PROFILE || 'load';
