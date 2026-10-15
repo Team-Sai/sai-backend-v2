@@ -3,7 +3,6 @@ package org.teamsai.saibackend.domain.integration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.BeforeEach;
-import org.teamsai.saibackend.domain.integration.reader.DashboardPreparationAttentionReader;
 import org.teamsai.saibackend.domain.integration.reader.IntegrationDashboardDataReader;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +24,7 @@ import org.teamsai.saibackend.domain.payment.type.PaymentStatus;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementWithPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.service.SettlementQueryService;
 
 import java.math.BigDecimal;
@@ -48,22 +48,13 @@ class IntegrationDashboardQueryServiceTest {
     @Mock
     private SettlementQueryService settlementQueryService;
 
-    @Mock
-    private DashboardPreparationAttentionReader
-            preparationAttentionReader;
-
     private IntegrationDashboardQueryService integrationDashboardQueryService;
 
     @BeforeEach
     void setUp() {
-        integrationDashboardQueryService =
-                new IntegrationDashboardQueryService(
-                        new IntegrationDashboardDataReader(
-                                contractDashboardQueryService,
-                                settlementQueryService
-                        ),
-                        preparationAttentionReader
-                );
+        integrationDashboardQueryService = new IntegrationDashboardQueryService(
+                new IntegrationDashboardDataReader(contractDashboardQueryService, settlementQueryService)
+        );
     }
 
     @Test
@@ -154,19 +145,15 @@ class IntegrationDashboardQueryServiceTest {
                 .status(ContractStatus.COMPLETED)
                 .build();
 
-        RepaymentScheduleWithRemainingProjection paidSchedule =
-                schedule(
-                        100L,
-                        requestedMonth.atDay(1),
-                        RepaymentScheduleStatus.PAID
-                );
+        RepaymentScheduleWithRemainingProjection paidSchedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(paidSchedule.getScheduleId()).thenReturn(100L);
+        lenient().when(paidSchedule.getDueDate()).thenReturn(requestedMonth.atDay(1));
+        lenient().when(paidSchedule.getStatus()).thenReturn(RepaymentScheduleStatus.PAID);
 
-        RepaymentScheduleWithRemainingProjection pendingSchedule =
-                schedule(
-                        101L,
-                        upcomingDueDate,
-                        RepaymentScheduleStatus.PENDING
-                );
+        RepaymentScheduleWithRemainingProjection pendingSchedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(pendingSchedule.getScheduleId()).thenReturn(101L);
+        lenient().when(pendingSchedule.getDueDate()).thenReturn(upcomingDueDate);
+        lenient().when(pendingSchedule.getStatus()).thenReturn(RepaymentScheduleStatus.PENDING);
 
         when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(
@@ -269,8 +256,11 @@ class IntegrationDashboardQueryServiceTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), null, List.of()));
-        when(settlementQueryService.getSettlementList(userId)).thenReturn(List.of(settlement));
-        when(settlementQueryService.getPaymentStatus(30L, userId)).thenReturn(paymentStatus);
+        when(settlementQueryService.getSettlementListWithPaymentStatus(userId))
+                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
+                        settlement,
+                        paymentStatus
+                )));
 
         IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.from(dueDate)
@@ -322,8 +312,11 @@ class IntegrationDashboardQueryServiceTest {
 
         when(contractDashboardQueryService.getIntegrationDashboardData(userId))
                 .thenReturn(loanData(emptyContractDashboard(), null, List.of()));
-        when(settlementQueryService.getSettlementList(userId)).thenReturn(List.of(settlement));
-        when(settlementQueryService.getPaymentStatus(31L, userId)).thenReturn(paymentStatus);
+        when(settlementQueryService.getSettlementListWithPaymentStatus(userId))
+                .thenReturn(List.of(new SettlementWithPaymentStatusResponse(
+                        settlement,
+                        paymentStatus
+                )));
 
         IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.from(dueDate)
@@ -369,15 +362,18 @@ class IntegrationDashboardQueryServiceTest {
                                 .build())
                         .contracts(loans)
                         .build(), null, List.of()));
-        when(settlementQueryService.getSettlementList(userId)).thenReturn(settlements);
-        settlements.forEach(settlement -> when(settlementQueryService.getPaymentStatus(
-                settlement.settlementId(), userId
-        )).thenReturn(paymentStatus(
-                settlement.settlementId(),
-                BigDecimal.valueOf(10_000),
-                BigDecimal.valueOf(10_000),
-                obligation(settlement.settlementId(), 2L, BigDecimal.valueOf(10_000))
-        )));
+        when(settlementQueryService.getSettlementListWithPaymentStatus(userId))
+                .thenReturn(settlements.stream()
+                        .map(settlement -> new SettlementWithPaymentStatusResponse(
+                                settlement,
+                                paymentStatus(
+                                        settlement.settlementId(),
+                                        BigDecimal.valueOf(10_000),
+                                        BigDecimal.valueOf(10_000),
+                                        obligation(settlement.settlementId(), 2L, BigDecimal.valueOf(10_000))
+                                )
+                        ))
+                        .toList());
 
         IntegrationDashboardResponse response = integrationDashboardQueryService.getDashboard(
                 userId, YearMonth.of(2026, 8)
@@ -437,27 +433,10 @@ class IntegrationDashboardQueryServiceTest {
             LocalDate dueDate,
             RepaymentScheduleStatus status
     ) {
-        RepaymentScheduleWithRemainingProjection schedule =
-                mock(RepaymentScheduleWithRemainingProjection.class);
-
-        lenient().when(schedule.getScheduleId())
-                .thenReturn(scheduleId);
-        lenient().when(schedule.getDueDate())
-                .thenReturn(dueDate);
-        lenient().when(schedule.getStatus())
-                .thenReturn(status);
-
-        BigDecimal totalAmount = BigDecimal.valueOf(10_000);
-
-        lenient().when(schedule.getTotalPaymentDue())
-                .thenReturn(totalAmount);
-        lenient().when(schedule.getRemainingPaymentAmount())
-                .thenReturn(
-                        status == RepaymentScheduleStatus.PAID
-                                ? BigDecimal.ZERO
-                                : totalAmount
-                );
-
+        RepaymentScheduleWithRemainingProjection schedule = mock(RepaymentScheduleWithRemainingProjection.class);
+        lenient().when(schedule.getScheduleId()).thenReturn(scheduleId);
+        lenient().when(schedule.getDueDate()).thenReturn(dueDate);
+        lenient().when(schedule.getStatus()).thenReturn(status);
         return schedule;
     }
 

@@ -14,6 +14,11 @@ spring:
 
     retry:
       max-attempts: 0
+ai:
+  rag:
+    base-url: ${AI_RAG_BASE_URL:http://localhost:8001}
+    connect-timeout: ${AI_RAG_CONNECT_TIMEOUT:PT5S}
+    read-timeout: ${AI_RAG_READ_TIMEOUT:PT60S}
 
 sai:
   repayment:

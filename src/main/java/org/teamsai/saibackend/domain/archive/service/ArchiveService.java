@@ -3,7 +3,9 @@ package org.teamsai.saibackend.domain.archive.service;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.teamsai.saibackend.domain.archive.type.ArchiveStatus;
 import org.teamsai.saibackend.domain.archive.entity.ArchiveFile;
 import org.teamsai.saibackend.domain.archive.repository.ArchiveRepository;
+import org.teamsai.saibackend.global.storage.S3FileStorage;
 
 import javax.imageio.ImageIO;
 
@@ -37,6 +40,10 @@ public class ArchiveService {
     @Getter
     @Value("${file.upload-dir}")
     private String uploadDir;
+
+    // file.storage=s3 일 때만 들어온다. 없으면(null) 기존처럼 로컬 폴더를 쓴다.
+    @Autowired(required = false)
+    private S3FileStorage s3FileStorage;
 
     public List<ArchiveFile> findFilesByReference(ArchiveStatus domainType, Long referenceId) {
         return archiveRepository.findByDomainTypeAndReferenceIdOrderByCreatedAtDesc(domainType, referenceId);
@@ -65,10 +72,6 @@ public class ArchiveService {
     public ArchiveFile saveFile(String domainType, Long referenceId, String originalFilename, String contentType,
                              InputStream content, long fileSize) {
         try {
-            Path dirPath = Paths.get(uploadDir);
-            if (!Files.exists(dirPath)) {
-                Files.createDirectories(dirPath);
-            }
 
             String ext = "";
             if (originalFilename != null && originalFilename.contains(".")) {
@@ -77,8 +80,16 @@ public class ArchiveService {
 
             String savedFilename = domainType + "_" + referenceId + "_" + UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
 
-            Path savePath = dirPath.resolve(savedFilename);
-            Files.copy(content, savePath, StandardCopyOption.REPLACE_EXISTING);
+            if (s3FileStorage != null) {
+                s3FileStorage.save(savedFilename, content, fileSize, contentType);
+            } else {
+                Path dirPath = Paths.get(uploadDir);
+                if (!Files.exists(dirPath)) {
+                    Files.createDirectories(dirPath);
+                }
+                Path savePath = dirPath.resolve(savedFilename);
+                Files.copy(content, savePath, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             ArchiveFile file = ArchiveFile.builder()
                         .domainType(ArchiveStatus.valueOf(domainType))
@@ -110,8 +121,9 @@ public class ArchiveService {
         }
 
         try {
-            Path filePath = Paths.get(uploadDir).resolve(savedFilename).normalize();
-            byte[] bytes = Files.readAllBytes(filePath);
+            byte[] bytes = (s3FileStorage != null)
+                    ? s3FileStorage.read(savedFilename)
+                    : Files.readAllBytes(Paths.get(uploadDir).resolve(savedFilename).normalize());
 
             BufferedImage original = ImageIO.read(new ByteArrayInputStream(bytes));
             if (original == null) {
@@ -162,6 +174,14 @@ public class ArchiveService {
 
 
     public Resource loadFileAsResource(String savedFilename) {
+        if (s3FileStorage != null) {
+            try {
+                return new InputStreamResource(s3FileStorage.openStream(savedFilename));
+            } catch (IOException e) {
+                log.error("S3에서 파일을 찾을 수 없거나 읽을 수 없습니다: {}", savedFilename, e);
+                throw new RuntimeException("파일을 찾을 수 없거나 읽을 수 없습니다.", e);
+            }
+        }
         try {
             Path filePath = Paths.get(uploadDir).resolve(savedFilename).normalize();
             Resource resource = new UrlResource(filePath.toUri());

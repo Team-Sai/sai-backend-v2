@@ -104,14 +104,7 @@ public class BankTransactionMatchCandidateQueryRepository {
                 )
                 OR (
                     mc.target_type = 'LOAN'
-                    AND schedule.status IN ('PENDING', 'OVERDUE')
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM repayment_schedule earlier
-                        WHERE earlier.contract_id = schedule.contract_id
-                            AND earlier.status IN ('PENDING', 'OVERDUE')
-                            AND earlier.sequence < schedule.sequence
-                    )
+                    AND schedule.status = 'PENDING'
                     AND schedule.total_payment_due > COALESCE((
                         SELECT SUM(pr.amount)
                         FROM payment_record pr

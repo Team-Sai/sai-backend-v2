@@ -85,13 +85,13 @@ public class MatchingCandidateRepository {
                 AND lc.status = 'COMPLETED'
                 AND lc.created_at <= :transactionAt
                 AND rs.created_at <= :transactionAt
-                AND rs.status IN ('PENDING', 'OVERDUE')
+                AND rs.status = 'PENDING'
                 %s
                 AND NOT EXISTS (
                     SELECT 1
                     FROM repayment_schedule earlier
                     WHERE earlier.contract_id = rs.contract_id
-                        AND earlier.status IN ('PENDING', 'OVERDUE')
+                        AND earlier.status = 'PENDING'
                         AND earlier.sequence < rs.sequence
                 )
             GROUP BY
