@@ -10,10 +10,22 @@ services:
       - influxdb-data:/var/lib/influxdb
     networks: [k6net]
 
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports:
+      - "127.0.0.1:9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [k6net]
+
   grafana:
     image: grafana/grafana:10.4.3
     depends_on:
       - influxdb
+      - prometheus
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -48,6 +60,13 @@ services:
         sed "s/\$${DS_DUMMY}/InfluxDB/g" /tmp/k6-raw.json \
           > /var/lib/grafana/dashboards/k6.json
 
+        echo "download jvm (micrometer) dashboard json..."
+        curl -fsSL "https://grafana.com/api/dashboards/4701/revisions/10/download" \
+          -o /tmp/jvm-raw.json || exit 1
+
+        sed "s/\$${DS_PROMETHEUS}/Prometheus/g" /tmp/jvm-raw.json \
+          > /var/lib/grafana/dashboards/jvm-micrometer.json
+
         echo "done"
 
   k6:
@@ -70,3 +89,4 @@ networks:
 volumes:
   influxdb-data:
   grafana-data:
+  prometheus-data:
