@@ -46,6 +46,10 @@ dependencies {
     implementation "org.springframework.boot:spring-boot-starter-security"
     implementation "org.springframework.security:spring-security-test"
 
+    // Actuator / Prometheus
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
     // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
