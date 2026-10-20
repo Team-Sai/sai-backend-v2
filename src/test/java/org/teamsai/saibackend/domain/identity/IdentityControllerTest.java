@@ -23,8 +23,6 @@ import org.teamsai.saibackend.domain.identity.exception.IdentityErrorCode;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
 import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.identity.type.IdentityStatus;
-import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.config.SecurityConfig;
 import org.teamsai.saibackend.global.jwt.JwtAuthenticationEntryPoint;
 import org.teamsai.saibackend.global.jwt.JwtAuthenticationFilter;
@@ -50,7 +48,6 @@ class IdentityControllerTest {
     private MockMvc mvc;
     @MockitoBean IdentityService service;
     @MockitoBean JwtTokenProvider tokens;
-    @MockitoBean UserService users;
     private static final String ID = "identity-verification-controller-test";
 
     @BeforeEach
@@ -123,6 +120,5 @@ class IdentityControllerTest {
 
     private void authenticate() {
         when(tokens.getUserIdIfValid("test-token")).thenReturn(Optional.of(42L));
-        when(users.findUserById(42L)).thenReturn(Optional.of(User.builder().userId(42L).build()));
     }
 }
