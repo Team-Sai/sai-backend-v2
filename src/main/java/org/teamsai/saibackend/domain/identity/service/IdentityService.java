@@ -238,7 +238,8 @@ public class IdentityService {
                     identityRepository.consume(
                             identityVerificationId,
                             userId,
-                            purpose
+                            purpose,
+                            LocalDateTime.now()
                     );
 
             if (updatedCount != 1) {
