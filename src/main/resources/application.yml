@@ -36,7 +36,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,prometheus
+        include: health
   metrics:
     tags:
       application: sai-backend
