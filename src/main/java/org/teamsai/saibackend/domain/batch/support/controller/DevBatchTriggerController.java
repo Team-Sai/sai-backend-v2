@@ -15,6 +15,8 @@ import org.teamsai.saibackend.domain.settlement.service.SettlementCloseService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 @RestController
@@ -77,7 +79,7 @@ public class DevBatchTriggerController {
                 .toJobParameters();
 
         log.info("[dev-trigger] {} 수동 실행 - baseDate={}", jobName, date);
-        JobExecution execution = jobOperator.start(job, params);
+        JobExecution execution = startOutsideRequestThread(job, params);
 
         long readCount = execution.getStepExecutions().stream()
                 .mapToLong(s -> s.getReadCount()).sum();
@@ -92,5 +94,23 @@ public class DevBatchTriggerController {
                 "readCount", readCount,
                 "writeCount", writeCount
         ));
+    }
+
+
+    private JobExecution startOutsideRequestThread(Job job, JobParameters params) throws Exception {
+        try {
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    return jobOperator.start(job, params);
+                } catch (Exception e) {
+                    throw new CompletionException(e);
+                }
+            }).join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof Exception cause) {
+                throw cause;
+            }
+            throw e;
+        }
     }
 }
