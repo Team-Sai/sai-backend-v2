@@ -7,6 +7,7 @@ import org.teamsai.saibackend.domain.settlement.dto.response.SettlementListRespo
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentObligationResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.dto.response.SettlementSummaryResponse;
+import org.teamsai.saibackend.domain.settlement.dto.response.SettlementWithPaymentStatusResponse;
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.math.BigDecimal;
@@ -20,8 +21,8 @@ public class SettlementSummaryQueryService {
 
     @Transactional(readOnly = true)
     public SettlementSummaryResponse getSummary(Long userId) {
-        List<SettlementListResponse> settlements =
-                settlementQueryService.getSettlementList(userId);
+        List<SettlementWithPaymentStatusResponse> settlements =
+                settlementQueryService.getSettlementListWithPaymentStatus(userId);
 
         BigDecimal receivableAmount = BigDecimal.ZERO;
         BigDecimal payableAmount = BigDecimal.ZERO;
@@ -29,16 +30,13 @@ public class SettlementSummaryQueryService {
         long receivableCount = 0;
         long payableCount = 0;
 
-        for (SettlementListResponse settlement : settlements) {
+        for (SettlementWithPaymentStatusResponse item : settlements) {
+            SettlementListResponse settlement = item.settlement();
             if (!isInProgress(settlement)) {
                 continue;
             }
 
-            SettlementPaymentStatusResponse paymentStatus =
-                    settlementQueryService.getPaymentStatus(
-                            settlement.settlementId(),
-                            userId
-                    );
+            SettlementPaymentStatusResponse paymentStatus = item.paymentStatus();
 
             BigDecimal receivableRemainingAmount =
                     getReceivableRemainingAmount(settlement, paymentStatus);

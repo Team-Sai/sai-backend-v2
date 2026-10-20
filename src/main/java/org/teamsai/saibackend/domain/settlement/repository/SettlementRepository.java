@@ -12,8 +12,11 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus
 import org.teamsai.saibackend.domain.settlement.type.SettlementStatus;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface SettlementRepository extends JpaRepository<Settlement,Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -87,24 +90,51 @@ public interface SettlementRepository extends JpaRepository<Settlement,Long> {
             @Param("closedStatus") SettlementStatus closedStatus
     );
 
+
+    default List<Settlement> findAllAccessibleByUserId(
+            Long userId,
+            SettlementParticipantStatus participantStatus
+    ) {
+        Set<Long> settlementIds = new HashSet<>(findIdsByOwnerUserId(userId));
+        settlementIds.addAll(findIdsByParticipantUserId(userId, participantStatus));
+
+        if (settlementIds.isEmpty()) {
+            return List.of();
+        }
+
+        return findAllWithOwnerByIdIn(settlementIds);
+    }
+
+    @Query("""
+        SELECT s.settlementId
+        FROM Settlement s
+        WHERE s.owner.userId = :userId
+        """)
+    List<Long> findIdsByOwnerUserId(
+            @Param("userId") Long userId
+    );
+
+    @Query("""
+        SELECT sp.settlement.settlementId
+        FROM SettlementParticipant sp
+        WHERE sp.user.userId = :userId
+          AND sp.participantStatus = :participantStatus
+        """)
+    List<Long> findIdsByParticipantUserId(
+            @Param("userId") Long userId,
+            @Param("participantStatus") SettlementParticipantStatus participantStatus
+    );
+
     @Query("""
         SELECT s
         FROM Settlement s
         JOIN FETCH s.owner
         LEFT JOIN FETCH s.recurringSettlement
-        WHERE s.owner.userId = :userId
-           OR EXISTS (
-                SELECT sp.participantId
-                FROM SettlementParticipant sp
-                WHERE sp.settlement = s
-                  AND sp.user.userId = :userId
-                  AND sp.participantStatus = :participantStatus
-           )
+        WHERE s.settlementId IN :settlementIds
         ORDER BY s.settlementId DESC
         """)
-    List<Settlement> findAllAccessibleByUserId(
-            @Param("userId") Long userId,
-            @Param("participantStatus") SettlementParticipantStatus participantStatus
+    List<Settlement> findAllWithOwnerByIdIn(
+            @Param("settlementIds") Collection<Long> settlementIds
     );
 
     @Query("""
