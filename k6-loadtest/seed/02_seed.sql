@@ -147,7 +147,7 @@ FROM (
 -- 납부 완료 회차 -> 채권자 계좌 입금 거래 + 상환 기록
 INSERT INTO bank_transaction
     (linked_account_id, external_transaction_id, amount, transaction_type, processing_status,
-     transaction_at, counterparty_name, memo, synced_at)
+     transaction_at, counterparty_name, memo, synced_at, retry_count)
 SELECT cu.linked_account_id,
        CONCAT('LT-L-', rs.schedule_id),
        rs.total_payment_due,
@@ -156,7 +156,7 @@ SELECT cu.linked_account_id,
        rs.paid_at,
        du.name,
        '차용금 상환',
-       rs.paid_at + INTERVAL 5 MINUTE
+       rs.paid_at + INTERVAL 5 MINUTE, 0
 FROM repayment_schedule rs
 JOIN loan_contract lc ON lc.contract_id = rs.contract_id
 JOIN tmp_lt_user cu ON cu.user_id = lc.creditor_id
@@ -287,7 +287,7 @@ FROM (
 -- 납부분 -> 정산 소유자 계좌 입금 거래 + 납부 기록 (PARTIALLY_PAID 는 절반만 납부)
 INSERT INTO bank_transaction
     (linked_account_id, external_transaction_id, amount, transaction_type, processing_status,
-     transaction_at, counterparty_name, memo, synced_at)
+     transaction_at, counterparty_name, memo, synced_at, retry_count)
 SELECT t.owner_account_id,
        CONCAT('LT-S-', po.payment_obligation_id),
        IF(po.payment_status = 'PAID', po.expected_amount, po.expected_amount / 2),
@@ -296,7 +296,7 @@ SELECT t.owner_account_id,
        t.created_at + INTERVAL 2 DAY,
        mu.name,
        '정산 입금',
-       t.created_at + INTERVAL 2 DAY + INTERVAL 5 MINUTE
+       t.created_at + INTERVAL 2 DAY + INTERVAL 5 MINUTE, 0
 FROM payment_obligation po
 JOIN settlement_participant p ON p.participant_id = po.participant_id
 JOIN tmp_lt_settlement t ON t.settlement_id = p.settlement_id
