@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.batch.support.controller;
 
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.job.Job;
@@ -17,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Slf4j
 @RestController
@@ -28,6 +31,7 @@ public class DevBatchTriggerController {
     private final JobOperator jobOperator;
     private final Map<String, Job> jobs; // Spring이 등록된 모든 Job 빈을 이름→빈으로 자동 주입
     private final SettlementCloseService settlementCloseService;
+    private final ExecutorService batchTriggerExecutor = Executors.newSingleThreadExecutor();
 
     private static final Map<String, String> DISPLAY_NAMES = Map.of(
             "repaymentScheduleOverdueJob", "상환 연체 처리",
@@ -96,7 +100,7 @@ public class DevBatchTriggerController {
         ));
     }
 
-
+    // 요청 스레드에 묶인 OSIV 영속성 컨텍스트가 job 동안 누적되지 않도록 별도 스레드에서 실행
     private JobExecution startOutsideRequestThread(Job job, JobParameters params) throws Exception {
         try {
             return CompletableFuture.supplyAsync(() -> {
@@ -105,12 +109,17 @@ public class DevBatchTriggerController {
                 } catch (Exception e) {
                     throw new CompletionException(e);
                 }
-            }).join();
+            }, batchTriggerExecutor).join();
         } catch (CompletionException e) {
             if (e.getCause() instanceof Exception cause) {
                 throw cause;
             }
             throw e;
         }
+    }
+
+    @PreDestroy
+    void shutdownExecutor() {
+        batchTriggerExecutor.shutdown();
     }
 }
