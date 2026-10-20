@@ -64,18 +64,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                 n.created_at AS createdAt
             FROM notification n
             LEFT JOIN settlement s
-                ON (
-                    n.notification_type = 'SETTLEMENT_PARTICIPANT_ADDED'
-                    AND s.settlement_id = n.reference_id
-                )
-                OR (
-                    n.notification_type IN (
-                        'SETTLEMENT_DUE_REMINDER_D3',
-                        'SETTLEMENT_DUE_REMINDER_D1',
-                        'SETTLEMENT_DUE_REMINDER_DDAY'
-                    )
-                    AND s.settlement_id = n.secondary_reference_id
-                )
+                ON s.settlement_id = CASE
+                    WHEN n.notification_type = 'SETTLEMENT_PARTICIPANT_ADDED'
+                    THEN n.reference_id
+                    ELSE n.secondary_reference_id
+                END
             WHERE n.user_id = :userId
               AND n.notification_type IN (
                   'SETTLEMENT_PARTICIPANT_ADDED',
