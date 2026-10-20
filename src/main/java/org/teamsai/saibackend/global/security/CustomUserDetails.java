@@ -11,14 +11,14 @@ import java.util.Collections;
 @Getter
 public class CustomUserDetails implements UserDetails {
 
-    private final String userToken;
-    private final String userKey;
     private final Long userId;
 
+    public CustomUserDetails(Long userId) {
+        this.userId = userId;
+    }
+
     public CustomUserDetails(User user) {
-        this.userToken = user.getUserToken();
-        this.userKey = user.getUserKey();
-        this.userId = user.getUserId();
+        this(user.getUserId());
     }
 
     @Override

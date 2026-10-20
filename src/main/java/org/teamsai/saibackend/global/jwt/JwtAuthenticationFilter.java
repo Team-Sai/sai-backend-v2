@@ -13,8 +13,6 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.teamsai.saibackend.domain.user.entity.User;
-import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
 import java.io.IOException;
@@ -27,7 +25,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserService userService;
 
     @Override
     protected void doFilterInternal(
@@ -59,16 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         Long userId = userIdOptional.get();
 
-        Optional<User> userOptional =
-                userService.findUserById(userId);
-
-        if (userOptional.isEmpty()) {
-            return;
-        }
-
-        CustomUserDetails userDetails = new CustomUserDetails(
-                userOptional.get()
-        );
+        CustomUserDetails userDetails = new CustomUserDetails(userId);
 
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(

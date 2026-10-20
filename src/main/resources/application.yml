@@ -31,3 +31,12 @@ sai:
       chunk-size: 200
       max-chunks: 10
       cron: "0 30 3 * * *"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  metrics:
+    tags:
+      application: sai-backend

@@ -1098,9 +1098,10 @@ class IdentityServiceTest {
         void consumeSuccess() {
             given(
                     identityRepository.consume(
-                            VERIFICATION_ID,
-                            USER_ID,
-                            IdentityPurpose.LOAN_CONTRACT
+                            eq(VERIFICATION_ID),
+                            eq(USER_ID),
+                            eq(IdentityPurpose.LOAN_CONTRACT),
+                            any(LocalDateTime.class)
                     )
             ).willReturn(1);
 
@@ -1112,9 +1113,10 @@ class IdentityServiceTest {
 
             verify(identityRepository)
                     .consume(
-                            VERIFICATION_ID,
-                            USER_ID,
-                            IdentityPurpose.LOAN_CONTRACT
+                            eq(VERIFICATION_ID),
+                            eq(USER_ID),
+                            eq(IdentityPurpose.LOAN_CONTRACT),
+                            any(LocalDateTime.class)
                     );
         }
 
@@ -1123,9 +1125,10 @@ class IdentityServiceTest {
         void consumeFailsWhenVerificationIsUnavailable() {
             given(
                     identityRepository.consume(
-                            VERIFICATION_ID,
-                            USER_ID,
-                            IdentityPurpose.LOAN_CONTRACT
+                            eq(VERIFICATION_ID),
+                            eq(USER_ID),
+                            eq(IdentityPurpose.LOAN_CONTRACT),
+                            any(LocalDateTime.class)
                     )
             ).willReturn(0);
 
@@ -1144,9 +1147,10 @@ class IdentityServiceTest {
         void consumeFailsWhenLockCannotBeAcquired() {
             given(
                     identityRepository.consume(
-                            VERIFICATION_ID,
-                            USER_ID,
-                            IdentityPurpose.LOAN_CONTRACT
+                            eq(VERIFICATION_ID),
+                            eq(USER_ID),
+                            eq(IdentityPurpose.LOAN_CONTRACT),
+                            any(LocalDateTime.class)
                     )
             ).willThrow(
                     new CannotAcquireLockException(
