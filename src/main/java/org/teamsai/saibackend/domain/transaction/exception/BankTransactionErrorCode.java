@@ -48,6 +48,11 @@ public enum BankTransactionErrorCode implements BaseErrorCode<DomainException> {
     TRANSACTION_SYNC_BUSY(
             HttpStatus.SERVICE_UNAVAILABLE,
             "거래 동기화 요청이 많습니다. 잠시 후 다시 시도해주세요."
+    ),
+
+    TRANSACTION_SYNC_TIMEOUT(
+            HttpStatus.GATEWAY_TIMEOUT,
+            "거래 동기화가 지연되고 있습니다. 잠시 후 다시 시도해주세요."
     );
 
     private final HttpStatus httpStatus;

@@ -18,14 +18,16 @@ import org.teamsai.saibackend.domain.transaction.exception.BankTransactionErrorC
 import org.teamsai.saibackend.domain.transaction.service.TransactionSyncMatchService;
 import org.teamsai.saibackend.global.security.CustomUserDetails;
 
+import java.time.Duration;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.concurrent.TimeoutException;
 
 @Tag(name = "거래 동기화 API", description = "사이은행 거래내역 동기화 및 자동매칭 실행")
 @RestController
@@ -34,6 +36,8 @@ public class TransactionSyncController {
 
     private static final int SYNC_THREADS = 10;
     private static final int SYNC_QUEUE_CAPACITY = 50;
+    private static final Duration SYNC_TIMEOUT = Duration.ofSeconds(15);
+    private static final Duration SYNC_ALL_TIMEOUT = Duration.ofSeconds(60);
 
     private final TransactionSyncMatchService transactionSyncMatchService;
     private final ExecutorService transactionSyncExecutor = new ThreadPoolExecutor(
@@ -60,7 +64,7 @@ public class TransactionSyncController {
                         linkedAccountId,
                         targetType,
                         aggregateId
-                ))
+                ), SYNC_TIMEOUT)
         );
     }
 
@@ -72,28 +76,35 @@ public class TransactionSyncController {
     ){
         Long userId = userDetails.getUserId();
         return ResponseEntity.ok(
-                runOutsideRequestThread(() -> transactionSyncMatchService.syncAll(userId))
+                runOutsideRequestThread(() -> transactionSyncMatchService.syncAll(userId), SYNC_ALL_TIMEOUT)
         );
     }
 
     // 요청 스레드의 OSIV가 은행 응답을 기다리는 동안 DB 커넥션을 쥐고 있지 않도록 별도 스레드에서 실행
-    private <T> T runOutsideRequestThread(Supplier<T> task) {
-        CompletableFuture<T> future;
+    private <T> T runOutsideRequestThread(Callable<T> task, Duration timeout) {
+        Future<T> future;
         try {
-            future = CompletableFuture.supplyAsync(task, transactionSyncExecutor);
+            future = transactionSyncExecutor.submit(task);
         } catch (RejectedExecutionException e) {
             throw BankTransactionErrorCode.TRANSACTION_SYNC_BUSY.toException();
         }
         try {
-            return future.join();
-        } catch (CompletionException e) {
+            return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw BankTransactionErrorCode.TRANSACTION_SYNC_TIMEOUT.toException();
+        } catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw BankTransactionErrorCode.TRANSACTION_SYNC_BUSY.toException();
+        } catch (ExecutionException e) {
             if (e.getCause() instanceof RuntimeException cause) {
                 throw cause;
             }
             if (e.getCause() instanceof Error error) {
                 throw error;
             }
-            throw e;
+            throw new IllegalStateException(e.getCause());
         }
     }
 
