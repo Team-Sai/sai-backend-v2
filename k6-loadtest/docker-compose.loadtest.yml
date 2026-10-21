@@ -69,6 +69,18 @@ services:
 
         echo "done"
 
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    ports:
+      - "127.0.0.1:8474:8474"
+      - "127.0.0.1:18081:18081"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./toxiproxy/toxiproxy.json:/config/toxiproxy.json:ro
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    networks: [k6net]
+
   k6:
     image: grafana/k6:0.49.0
     depends_on:

@@ -43,6 +43,11 @@ public enum BankTransactionErrorCode implements BaseErrorCode<DomainException> {
     BANK_TRANSACTION_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "은행 거래를 찾을 수 없습니다."
+    ),
+
+    TRANSACTION_SYNC_BUSY(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "거래 동기화 요청이 많습니다. 잠시 후 다시 시도해주세요."
     );
 
     private final HttpStatus httpStatus;
