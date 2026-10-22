@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.global.config;
 
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -45,6 +46,13 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(authorize ->
                         authorize
+
+
+                                // SSE(스트리밍) 응답은 처음 요청에서 이미 인증·인가를 마친 뒤
+                                // 같은 요청을 ASYNC로 다시 디스패치한다.
+                                // JWT 필터는 ASYNC 디스패치에서 다시 돌지 않으므로 여기서 허용한다.
+                                .dispatcherTypeMatchers(DispatcherType.ASYNC)
+                                .permitAll()
 
                                 .requestMatchers(
                                         "/api/auth/signup",

@@ -1,0 +1,8 @@
+{
+  "principalAmount": 1000000,
+  "interestRate": 5,
+  "startDate": "2026-11-01",
+  "maturityDate": "2027-01-31",
+  "repaymentType": "BULLET",
+  "message": "이자를 연 25%로 해줘"
+}
