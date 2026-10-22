@@ -87,9 +87,10 @@ public class RagApiClient {
     public ContractClauseResponse suggestClause(
             RagClauseSuggestionRequest request
     ) {
+        // 요청 원문에는 금액·이름 같은 개인 정보가 있을 수 있어 길이만 남긴다.
         log.info(
-                "RAG 특약 Agent 요청 - message={}",
-                request.getMessage()
+                "RAG 특약 Agent 요청 - messageLength={}",
+                request.getMessage() != null ? request.getMessage().length() : 0
         );
 
         ContractClauseResponse response =
@@ -138,9 +139,10 @@ public class RagApiClient {
     ) {
         String uri = "/rag/contracts/clause-suggestions/stream";
 
+        // 요청 원문에는 금액·이름 같은 개인 정보가 있을 수 있어 길이만 남긴다.
         log.info(
-                "RAG 특약 Agent 스트리밍 요청 - message={}",
-                request.getMessage()
+                "RAG 특약 Agent 스트리밍 요청 - messageLength={}",
+                request.getMessage() != null ? request.getMessage().length() : 0
         );
 
         try {
