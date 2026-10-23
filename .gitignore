@@ -48,3 +48,4 @@ npm-debug.log*
 
 ### k6 loadtest ###
 k6-loadtest/reports/
+k6-loadtest/prometheus/targets.json

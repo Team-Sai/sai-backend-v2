@@ -1,0 +1,7 @@
+services:
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-academy},loadtest
+      MANAGEMENT_SERVER_PORT: "8082"
+    ports:
+      - "8082:8082"

@@ -9,5 +9,7 @@ scrape_configs:
 
   - job_name: sai-backend
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["host.docker.internal:8080"]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets.json
+        refresh_interval: 30s
