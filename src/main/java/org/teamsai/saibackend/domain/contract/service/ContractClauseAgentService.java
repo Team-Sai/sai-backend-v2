@@ -22,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
 import org.teamsai.saibackend.domain.contract.client.RagSseReader;
+import org.teamsai.saibackend.domain.contract.client.RagStreamEventFilter;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
@@ -139,13 +140,15 @@ public class ContractClauseAgentService {
                     new RagSseReader.Listener() {
                         @Override
                         public void onEvent(String event, String data) {
-                            sendToClient(
-                                    emitter,
-                                    closed,
-                                    SseEmitter.event()
-                                            .name(event)
-                                            .data(data)
-                            );
+                            // 정해진 이벤트·필드만 프론트로 보낸다. (debug 같은 내부 정보 차단)
+                            RagStreamEventFilter.filter(event, data)
+                                    .ifPresent(safeData -> sendToClient(
+                                            emitter,
+                                            closed,
+                                            SseEmitter.event()
+                                                    .name(event)
+                                                    .data(safeData)
+                                    ));
                         }
 
                         @Override
