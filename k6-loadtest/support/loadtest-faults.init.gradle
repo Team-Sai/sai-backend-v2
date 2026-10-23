@@ -1,0 +1,8 @@
+// Explicit -I opt-in only. Never use this init script for a release build/bootJar.
+gradle.projectsEvaluated {
+    rootProject.sourceSets.main.java.srcDir(rootProject.file('k6-loadtest/support/java'))
+}
+
+gradle.projectsEvaluated {
+    rootProject.sourceSets.test.java.srcDir(rootProject.file('k6-loadtest/support/test'))
+}

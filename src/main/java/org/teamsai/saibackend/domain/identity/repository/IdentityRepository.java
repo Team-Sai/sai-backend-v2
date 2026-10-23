@@ -61,13 +61,13 @@ public interface IdentityRepository
             update Identity i
             set i.status =
                     org.teamsai.saibackend.domain.identity.type.IdentityStatus.USED,
-                i.usedAt = CURRENT_TIMESTAMP
+                i.usedAt = :now
             where i.identityVerificationId = :identityVerificationId
               and i.user.userId = :userId
               and i.purpose = :purpose
               and i.status =
                     org.teamsai.saibackend.domain.identity.type.IdentityStatus.VERIFIED
-              and i.expiresAt > CURRENT_TIMESTAMP
+              and i.expiresAt > :now
               and i.usedAt is null
             """)
     int consume(
@@ -76,7 +76,9 @@ public interface IdentityRepository
             @Param("userId")
             Long userId,
             @Param("purpose")
-            IdentityPurpose purpose
+            IdentityPurpose purpose,
+            @Param("now")
+            LocalDateTime now
     );
 
     @Query("""
