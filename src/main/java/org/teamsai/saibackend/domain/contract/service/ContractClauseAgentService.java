@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.contract.service;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -141,14 +142,29 @@ public class ContractClauseAgentService {
                         @Override
                         public void onEvent(String event, String data) {
                             // 정해진 이벤트·필드만 프론트로 보낸다. (debug 같은 내부 정보 차단)
-                            RagStreamEventFilter.filter(event, data)
-                                    .ifPresent(safeData -> sendToClient(
-                                            emitter,
-                                            closed,
-                                            SseEmitter.event()
-                                                    .name(event)
-                                                    .data(safeData)
-                                    ));
+                            Optional<String> safeData = RagStreamEventFilter.filter(event, data);
+
+                            if (safeData.isEmpty()) {
+                                // 내용에는 사용자 정보가 있을 수 있어 이벤트 이름만 남긴다.
+                                log.warn("AI 스트리밍 이벤트 제외 - event={}", event);
+
+                                if (RagStreamEventFilter.isTerminal(event)) {
+                                    // final/error가 사라지면 화면이 "검토 중"에서 멈춘다.
+                                    // 정상 종료로 처리하지 않고 오류(502)로 알린다.
+                                    throw new IllegalStateException(
+                                            "AI 스트리밍 종료 이벤트 형식 오류 - event=" + event
+                                    );
+                                }
+                                return;
+                            }
+
+                            sendToClient(
+                                    emitter,
+                                    closed,
+                                    SseEmitter.event()
+                                            .name(event)
+                                            .data(safeData.get())
+                            );
                         }
 
                         @Override

@@ -44,4 +44,63 @@ class RagStreamEventFilterTest {
         assertTrue(RagStreamEventFilter.filter("progress", "not-json").isEmpty());
         assertTrue(RagStreamEventFilter.filter("progress", "[1,2]").isEmpty());
     }
+
+    @Test
+    @DisplayName("draft·final은 references·validation 같은 중첩 객체 안의 모르는 필드도 뺀다")
+    void nestedUnknownFieldsAreDropped() {
+        String data = """
+                {
+                  "suggestedClause": "제1조",
+                  "validation": {
+                    "status": "PASS",
+                    "isSafeToSuggest": true,
+                    "checks": [{"type": "AMBIGUITY", "status": "PASS", "message": "ok", "llmReason": "내부 판단"}],
+                    "internalScore": 0.42
+                  },
+                  "references": [{"lawName": "민법", "articleNumber": "제468조", "searchQuery": "내부 검색 질의"}],
+                  "clauseRevised": true
+                }
+                """;
+
+        String result = RagStreamEventFilter.filter("final", data).orElseThrow();
+
+        assertTrue(result.contains("\"lawName\":\"민법\""));
+        assertTrue(result.contains("\"isSafeToSuggest\":true"));
+        assertTrue(result.contains("\"clauseRevised\":true"));
+        assertFalse(result.contains("llmReason"));
+        assertFalse(result.contains("internalScore"));
+        assertFalse(result.contains("searchQuery"));
+    }
+
+    @Test
+    @DisplayName("AI가 보내지 않은 필드는 null로 만들어 보내지 않는다")
+    void absentFieldsStayAbsent() {
+        String result = RagStreamEventFilter.filter(
+                "draft",
+                "{\"title\":\"중도상환\",\"suggestedClause\":\"제1조\"}"
+        ).orElseThrow();
+
+        assertFalse(result.contains("references"));
+        assertFalse(result.contains("null"));
+    }
+
+    @Test
+    @DisplayName("clauseRevised가 true/false가 아니면 빼고 보낸다")
+    void nonBooleanClauseRevisedIsDropped() {
+        String result = RagStreamEventFilter.filter(
+                "final",
+                "{\"suggestedClause\":\"제1조\",\"clauseRevised\":\"yes\"}"
+        ).orElseThrow();
+
+        assertFalse(result.contains("clauseRevised"));
+    }
+
+    @Test
+    @DisplayName("final·error만 스트림을 끝내는 이벤트로 본다")
+    void terminalEvents() {
+        assertTrue(RagStreamEventFilter.isTerminal("final"));
+        assertTrue(RagStreamEventFilter.isTerminal("error"));
+        assertFalse(RagStreamEventFilter.isTerminal("draft"));
+        assertFalse(RagStreamEventFilter.isTerminal("delta"));
+    }
 }
