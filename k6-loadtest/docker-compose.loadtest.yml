@@ -18,7 +18,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/targets.json:/etc/prometheus/targets.json:ro
+      - ./prometheus/targets:/etc/prometheus/targets:ro
       - prometheus-data:/prometheus
     networks: [k6net]
 

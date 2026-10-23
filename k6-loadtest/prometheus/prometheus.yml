@@ -11,5 +11,5 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     file_sd_configs:
       - files:
-          - /etc/prometheus/targets.json
+          - /etc/prometheus/targets/*.json
         refresh_interval: 30s

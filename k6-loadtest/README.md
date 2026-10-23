@@ -29,11 +29,11 @@ curl http://YOUR_SAIWONJANG_SERVER_LAN_IP:8082/actuator/prometheus
 예시 파일을 복사하고 VM의 사설 IP로 바꿉니다. 이 주소는 사이원장 VM에 접속할 때 사용하는 주소이며, 앞서 확인한 `192.168.0.205` 같은 형태입니다.
 
 ```powershell
-Copy-Item .\prometheus\targets.json.example .\prometheus\targets.json
-notepad .\prometheus\targets.json
+Copy-Item .\prometheus\targets.json.example .\prometheus\targets\sai-backend.json
+notepad .\prometheus\targets\sai-backend.json
 ```
 
-`targets.json`은 Git에서 제외되어 VM 사설 IP가 저장소에 올라가지 않습니다. Prometheus는 이 파일을 서비스 검색 설정으로 읽습니다.
+Prometheus는 `prometheus/targets` 디렉터리의 JSON 파일을 읽습니다. 디렉터리는 저장소에 포함되어 있으므로, 타깃 파일을 만들기 전에 Prometheus를 시작해도 마운트 오류가 나지 않습니다. `sai-backend.json`은 Git에서 제외되어 VM 사설 IP가 저장소에 올라가지 않습니다.
 
 `k6-loadtest` 디렉터리에서 로컬 모니터링 도구를 실행합니다.
 
