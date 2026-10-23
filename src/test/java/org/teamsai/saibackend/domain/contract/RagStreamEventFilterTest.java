@@ -103,4 +103,20 @@ class RagStreamEventFilterTest {
         assertFalse(RagStreamEventFilter.isTerminal("draft"));
         assertFalse(RagStreamEventFilter.isTerminal("delta"));
     }
+
+    @Test
+    @DisplayName("references 이벤트는 근거 법령 목록만, DTO에 없는 내부 필드는 빼고 보낸다")
+    void referencesEventKeepsOnlyKnownReferenceFields() {
+        String result = RagStreamEventFilter.filter(
+                "references",
+                "{\"references\":[{\"lawName\":\"민법\",\"articleNumber\":\"제468조\",\"searchQuery\":\"내부\"}],"
+                        + "\"debug\":{\"plans\":[]}}"
+        ).orElseThrow();
+
+        assertTrue(result.contains("\"lawName\":\"민법\""));
+        assertTrue(result.contains("\"articleNumber\":\"제468조\""));
+        assertFalse(result.contains("searchQuery"));
+        assertFalse(result.contains("debug"));
+        assertFalse(RagStreamEventFilter.isTerminal("references"));
+    }
 }

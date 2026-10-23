@@ -34,11 +34,12 @@ public final class RagStreamEventFilter {
     private static final Set<String> TERMINAL_EVENTS = Set.of("final", "error");
 
     /** DTO를 거쳐 중첩 필드까지 거르는 이벤트 */
-    private static final Set<String> DTO_EVENTS = Set.of("draft", "final");
+    private static final Set<String> DTO_EVENTS = Set.of("references", "draft", "final");
 
     /** 이벤트별로 프론트에 보낼 수 있는 최상위 필드 */
     private static final Map<String, List<String>> ALLOWED_FIELDS = Map.of(
             "progress", List.of("step"),
+            "references", List.of("references"),   // 생성 전에 먼저 보내는 근거 법령
             "delta", List.of("text"),
             "draft", List.of(
                     "title",
