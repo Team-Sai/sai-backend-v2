@@ -1,8 +1,11 @@
 
 package org.teamsai.saibackend.domain.contract.client;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 
@@ -10,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -83,9 +87,10 @@ public class RagApiClient {
     public ContractClauseResponse suggestClause(
             RagClauseSuggestionRequest request
     ) {
+        // 요청 원문에는 금액·이름 같은 개인 정보가 있을 수 있어 길이만 남긴다.
         log.info(
-                "RAG 특약 Agent 요청 - message={}",
-                request.getMessage()
+                "RAG 특약 Agent 요청 - messageLength={}",
+                request.getMessage() != null ? request.getMessage().length() : 0
         );
 
         ContractClauseResponse response =
@@ -122,6 +127,89 @@ public class RagApiClient {
         }
 
         return response;
+    }
+
+    /**
+     * AI 특약 생성 스트리밍(SSE)을 받아 이벤트마다 listener에 넘긴다.
+     * AI가 보내는 progress / draft / final / error 이벤트와 keep-alive 주석을 그대로 전달한다.
+     */
+    public void streamClause(
+            RagClauseSuggestionRequest request,
+            RagSseReader.Listener listener
+    ) {
+        String uri = "/rag/contracts/clause-suggestions/stream";
+
+        // 요청 원문에는 금액·이름 같은 개인 정보가 있을 수 있어 길이만 남긴다.
+        log.info(
+                "RAG 특약 Agent 스트리밍 요청 - messageLength={}",
+                request.getMessage() != null ? request.getMessage().length() : 0
+        );
+
+        try {
+            restClient.post()
+                    .uri(uri)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.TEXT_EVENT_STREAM)
+                    .body(request)
+                    .exchange((clientRequest, clientResponse) -> {
+                        if (!clientResponse.getStatusCode().is2xxSuccessful()) {
+                            log.error(
+                                    "RAG 서버 HTTP 오류 - uri={}, status={}",
+                                    uri,
+                                    clientResponse.getStatusCode()
+                            );
+
+                            throw new ResponseStatusException(
+                                    HttpStatus.BAD_GATEWAY,
+                                    "RAG 서버에서 요청을 정상적으로 처리하지 못했습니다."
+                            );
+                        }
+
+                        try (BufferedReader reader = new BufferedReader(
+                                new InputStreamReader(
+                                        clientResponse.getBody(),
+                                        StandardCharsets.UTF_8
+                                )
+                        )) {
+                            RagSseReader.read(reader, listener);
+                        }
+
+                        return null;
+                    });
+
+        } catch (ResponseStatusException e) {
+            throw e;
+
+        } catch (RestClientException e) {
+            log.error(
+                    "RAG 서버 스트리밍 오류 - uri={}, exceptionType={}",
+                    uri,
+                    e.getClass().getName(),
+                    e
+            );
+
+            if (isTimeout(e)) {
+                throw new ResponseStatusException(
+                        HttpStatus.GATEWAY_TIMEOUT,
+                        "RAG 서버 응답 시간이 초과되었습니다.",
+                        e
+                );
+            }
+
+            if (e instanceof ResourceAccessException) {
+                throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "RAG 서버에 연결할 수 없습니다.",
+                        e
+                );
+            }
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "RAG 서버 통신 중 오류가 발생했습니다.",
+                    e
+            );
+        }
     }
 
     private <T> T executeRequest(
