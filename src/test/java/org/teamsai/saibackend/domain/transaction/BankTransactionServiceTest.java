@@ -1,8 +1,5 @@
 package org.teamsai.saibackend.domain.transaction;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,7 +22,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -40,16 +36,8 @@ class BankTransactionServiceTest {
     @Mock
     private LinkedBankAccountService linkedBankAccountService;
 
-    @Mock
-    private EntityManager entityManager;
-
     @InjectMocks
     private BankTransactionService bankTransactionService;
-
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(bankTransactionService, "entityManager", entityManager);
-    }
 
     @Test
     @DisplayName("본인 계좌의 거래를 잠금 조회해 상세 응답을 반환한다")
@@ -65,7 +53,6 @@ class BankTransactionServiceTest {
         assertThat(result.linkedAccountId()).isEqualTo(1L);
         assertThat(result.amount()).isEqualByComparingTo("1");
         assertThat(result.processingStatus()).isEqualTo(BankTransactionProcessingStatus.NEEDS_CHECK);
-        verify(entityManager).refresh(transaction, LockModeType.PESSIMISTIC_WRITE);
     }
 
     @Test
@@ -182,15 +169,11 @@ class BankTransactionServiceTest {
     }
 
     @Test
-    @DisplayName("매칭용 잠금 조회는 DB에서 갱신한 최신 상태를 반환한다")
-    void refreshesTransactionBeforeMatching() {
-        BankTransaction transaction = transaction(BankTransactionProcessingStatus.PENDING);
+    @DisplayName("매칭용 잠금 조회 결과를 반환한다")
+    void returnsLockedTransactionForMatching() {
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.APPLIED);
         given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(101L, 1L))
                 .willReturn(Optional.of(transaction));
-        doAnswer(invocation -> {
-            transaction.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
-            return null;
-        }).when(entityManager).refresh(transaction, LockModeType.PESSIMISTIC_WRITE);
 
         BankTransaction result =
                 bankTransactionService.findByIdAndLinkedAccountIdForUpdate(101L, 1L);
@@ -199,15 +182,11 @@ class BankTransactionServiceTest {
     }
 
     @Test
-    @DisplayName("상태 변경 전에 최신 상태를 읽어 이미 처리된 거래의 변경을 거부한다")
-    void checksRefreshedStatusBeforeUpdating() {
-        BankTransaction transaction = transaction(BankTransactionProcessingStatus.PENDING);
+    @DisplayName("잠금 조회에서 현재 상태가 다르면 상태 변경을 거부한다")
+    void rejectsStatusUpdateWhenLockedStateDoesNotMatch() {
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.APPLIED);
         given(bankTransactionRepository.findLockedByBankTransactionId(1L))
                 .willReturn(Optional.of(transaction));
-        doAnswer(invocation -> {
-            transaction.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
-            return null;
-        }).when(entityManager).refresh(transaction, LockModeType.PESSIMISTIC_WRITE);
 
         assertThatThrownBy(() -> bankTransactionService.updateStatus(
                 1L, BankTransactionProcessingStatus.PENDING, BankTransactionProcessingStatus.FAILED
@@ -221,39 +200,33 @@ class BankTransactionServiceTest {
     }
 
     @Test
-    @DisplayName("재시도 전에 최신 상태를 읽어 이미 처리된 거래의 초기화를 건너뛴다")
-    void skipsRetryWhenRefreshedStatusDoesNotMatch() {
+    @DisplayName("재시도 상태가 조회 시점과 다르면 초기화를 건너뛴다")
+    void skipsRetryWhenExpectedStatusDoesNotMatch() {
         BankTransaction transaction = transaction(BankTransactionProcessingStatus.UNMATCHED);
-        given(bankTransactionRepository.findLockedByBankTransactionId(1L))
+        ReflectionTestUtils.setField(transaction, "retryCount", 3);
+        given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(1L, 1L))
                 .willReturn(Optional.of(transaction));
-        doAnswer(invocation -> {
-            transaction.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
-            return null;
-        }).when(entityManager).refresh(transaction, LockModeType.PESSIMISTIC_WRITE);
 
         int result = bankTransactionService.resetToPendingForRetry(
-                1L, BankTransactionProcessingStatus.UNMATCHED
+                1L, 1L, BankTransactionProcessingStatus.UNMATCHED, 2
         );
 
         assertThat(result).isZero();
-        assertThat(transaction.getProcessingStatus()).isEqualTo(BankTransactionProcessingStatus.APPLIED);
-        assertThat(transaction.getRetryCount()).isZero();
+        assertThat(transaction.getProcessingStatus()).isEqualTo(BankTransactionProcessingStatus.UNMATCHED);
+        assertThat(transaction.getRetryCount()).isEqualTo(3);
         verify(bankTransactionRepository, never()).flush();
     }
 
     @Test
-    @DisplayName("재시도 횟수도 최신 값에서 증가시킨다")
-    void incrementsRefreshedRetryCount() {
+    @DisplayName("예상한 재시도 횟수와 일치하면 횟수를 증가시키고 PENDING으로 초기화한다")
+    void incrementsRetryCountWhenExpectedCountMatches() {
         BankTransaction transaction = transaction(BankTransactionProcessingStatus.UNMATCHED);
-        given(bankTransactionRepository.findLockedByBankTransactionId(1L))
+        ReflectionTestUtils.setField(transaction, "retryCount", 3);
+        given(bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(1L, 1L))
                 .willReturn(Optional.of(transaction));
-        doAnswer(invocation -> {
-            org.springframework.test.util.ReflectionTestUtils.setField(transaction, "retryCount", 3);
-            return null;
-        }).when(entityManager).refresh(transaction, LockModeType.PESSIMISTIC_WRITE);
 
         int result = bankTransactionService.resetToPendingForRetry(
-                1L, BankTransactionProcessingStatus.UNMATCHED
+                1L, 1L, BankTransactionProcessingStatus.UNMATCHED, 3
         );
 
         assertThat(result).isEqualTo(1);

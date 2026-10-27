@@ -12,10 +12,10 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.global.notification.SlackNotifier;
-import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionRetryService;
+import org.teamsai.saibackend.domain.matching.service.RetryPrepareService;
 import org.teamsai.saibackend.domain.matching.type.RetryPolicy;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
@@ -34,7 +34,7 @@ class BankTransactionRetryServiceTest {
     @Mock
     private BankTransactionService bankTransactionService;
     @Mock
-    private BankTransactionMatchCandidateService candidateService;
+    private RetryPrepareService retryPrepareService;
     @Mock
     private BankMatchingService bankMatchingService;
     @Mock
@@ -73,8 +73,7 @@ class BankTransactionRetryServiceTest {
 
             service.retryForAccount(userId, linkedAccountId);
 
-            verifyNoInteractions(candidateService, bankMatchingService, slackNotifier);
-            verify(bankTransactionService, never()).resetToPendingForRetry(any(), any());
+            verifyNoInteractions(retryPrepareService, bankMatchingService, slackNotifier);
         }
     }
 
@@ -88,6 +87,18 @@ class BankTransactionRetryServiceTest {
             List<BankTransaction> candidates = List.of(tx1, tx2);
 
             when(bankTransactionService.findRetryCandidates(linkedAccountId)).thenReturn(candidates);
+            when(retryPrepareService.prepare(
+                    linkedAccountId,
+                    100L,
+                    BankTransactionProcessingStatus.UNMATCHED,
+                    1
+            )).thenReturn(true);
+            when(retryPrepareService.prepare(
+                    linkedAccountId,
+                    200L,
+                    BankTransactionProcessingStatus.UNMATCHED,
+                    2
+            )).thenReturn(true);
 
             AutoMatchingExecutionResult result = mock(AutoMatchingExecutionResult.class);
             when(result.appliedCount()).thenReturn(1);
@@ -101,10 +112,12 @@ class BankTransactionRetryServiceTest {
 
             service.retryForAccount(userId, linkedAccountId);
 
-            verify(candidateService).deleteAllByBankTransactionId(100L);
-            verify(candidateService).deleteAllByBankTransactionId(200L);
-            verify(bankTransactionService).resetToPendingForRetry(100L, BankTransactionProcessingStatus.UNMATCHED);
-            verify(bankTransactionService).resetToPendingForRetry(200L, BankTransactionProcessingStatus.UNMATCHED);
+            verify(retryPrepareService).prepare(
+                    linkedAccountId, 100L, BankTransactionProcessingStatus.UNMATCHED, 1
+            );
+            verify(retryPrepareService).prepare(
+                    linkedAccountId, 200L, BankTransactionProcessingStatus.UNMATCHED, 2
+            );
             verify(bankMatchingService).execute(userId, linkedAccountId, true);
             verifyNoInteractions(slackNotifier);
         }
@@ -117,6 +130,9 @@ class BankTransactionRetryServiceTest {
         void 재조회_결과가_APPLIED면_알림을_보내지_않는다() {
             BankTransaction original = tx(100L, BankTransactionProcessingStatus.UNMATCHED, 3);
             when(bankTransactionService.findRetryCandidates(linkedAccountId)).thenReturn(List.of(original));
+            when(retryPrepareService.prepare(
+                    linkedAccountId, 100L, BankTransactionProcessingStatus.UNMATCHED, 3
+            )).thenReturn(true);
 
             AutoMatchingExecutionResult result = mock(AutoMatchingExecutionResult.class);
             when(bankMatchingService.execute(userId, linkedAccountId, true)).thenReturn(result);
@@ -133,6 +149,9 @@ class BankTransactionRetryServiceTest {
         void 재조회_결과가_없으면_알림을_보내지_않는다() {
             BankTransaction original = tx(100L, BankTransactionProcessingStatus.UNMATCHED, 3);
             when(bankTransactionService.findRetryCandidates(linkedAccountId)).thenReturn(List.of(original));
+            when(retryPrepareService.prepare(
+                    linkedAccountId, 100L, BankTransactionProcessingStatus.UNMATCHED, 3
+            )).thenReturn(true);
 
             AutoMatchingExecutionResult result = mock(AutoMatchingExecutionResult.class);
             when(bankMatchingService.execute(userId, linkedAccountId, true)).thenReturn(result);
@@ -148,6 +167,9 @@ class BankTransactionRetryServiceTest {
         void 재시도횟수가_최대치_이상이고_APPLIED가_아니면_알림을_보낸다() {
             BankTransaction original = tx(100L, BankTransactionProcessingStatus.UNMATCHED, 5);
             when(bankTransactionService.findRetryCandidates(linkedAccountId)).thenReturn(List.of(original));
+            when(retryPrepareService.prepare(
+                    linkedAccountId, 100L, BankTransactionProcessingStatus.UNMATCHED, 5
+            )).thenReturn(true);
 
             AutoMatchingExecutionResult result = mock(AutoMatchingExecutionResult.class);
             when(bankMatchingService.execute(userId, linkedAccountId, true)).thenReturn(result);
@@ -169,6 +191,9 @@ class BankTransactionRetryServiceTest {
         void 재시도횟수가_최대치_미만이면_알림을_보내지_않는다() {
             BankTransaction original = tx(100L, BankTransactionProcessingStatus.UNMATCHED, 2);
             when(bankTransactionService.findRetryCandidates(linkedAccountId)).thenReturn(List.of(original));
+            when(retryPrepareService.prepare(
+                    linkedAccountId, 100L, BankTransactionProcessingStatus.UNMATCHED, 2
+            )).thenReturn(true);
 
             AutoMatchingExecutionResult result = mock(AutoMatchingExecutionResult.class);
             when(bankMatchingService.execute(userId, linkedAccountId, true)).thenReturn(result);
@@ -191,6 +216,12 @@ class BankTransactionRetryServiceTest {
             BankTransaction tx1 = tx(100L, BankTransactionProcessingStatus.UNMATCHED, 5);
             BankTransaction tx2 = tx(200L, BankTransactionProcessingStatus.UNMATCHED, 1);
             when(bankTransactionService.findRetryCandidates(linkedAccountId)).thenReturn(List.of(tx1, tx2));
+            when(retryPrepareService.prepare(
+                    linkedAccountId, 100L, BankTransactionProcessingStatus.UNMATCHED, 5
+            )).thenReturn(true);
+            when(retryPrepareService.prepare(
+                    linkedAccountId, 200L, BankTransactionProcessingStatus.UNMATCHED, 1
+            )).thenReturn(true);
 
             AutoMatchingExecutionResult result = mock(AutoMatchingExecutionResult.class);
             when(bankMatchingService.execute(userId, linkedAccountId, true)).thenReturn(result);

@@ -1,8 +1,5 @@
 package org.teamsai.saibackend.domain.transaction.service;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,8 +25,6 @@ public class BankTransactionService {
     private final BankTransactionRepository bankTransactionRepository;
     private final BankTransactionQueryRepository bankTransactionQueryRepository;
     private final LinkedBankAccountService linkedBankAccountService;
-    @PersistenceContext
-    private EntityManager entityManager;
 
     @Transactional
     public Long saveIfNotExists(BankTransaction bankTransaction) {
@@ -90,7 +85,6 @@ public class BankTransactionService {
                         BankTransactionErrorCode
                                 .BANK_TRANSACTION_NOT_FOUND::toException
                 );
-        entityManager.refresh(bankTransaction, LockModeType.PESSIMISTIC_WRITE);
         return bankTransaction;
     }
 
@@ -112,8 +106,6 @@ public class BankTransactionService {
                                         ::toException
                         );
 
-        entityManager.refresh(bankTransaction, LockModeType.PESSIMISTIC_WRITE);
-
         if (bankTransaction.getProcessingStatus() != currentStatus) {
             throw BankTransactionErrorCode
                     .BANK_TRANSACTION_STATUS_UPDATE_FAILED
@@ -134,11 +126,14 @@ public class BankTransactionService {
     @Transactional
     public int resetToPendingForRetry(
             Long bankTransactionId,
-            BankTransactionProcessingStatus currentStatus
+            Long linkedAccountId,
+            BankTransactionProcessingStatus currentStatus,
+            int expectedRetryCount
     ) {
         Optional<BankTransaction> transactionOptional =
-                bankTransactionRepository.findLockedByBankTransactionId(
-                        bankTransactionId
+                bankTransactionRepository.findLockedByBankTransactionIdAndLinkedAccountId(
+                        bankTransactionId,
+                        linkedAccountId
                 );
 
         if (transactionOptional.isEmpty()) {
@@ -147,9 +142,8 @@ public class BankTransactionService {
 
         BankTransaction bankTransaction = transactionOptional.get();
 
-        entityManager.refresh(bankTransaction, LockModeType.PESSIMISTIC_WRITE);
-
-        if (bankTransaction.getProcessingStatus() != currentStatus) {
+        if (bankTransaction.getProcessingStatus() != currentStatus
+                || bankTransaction.getRetryCount() != expectedRetryCount) {
             return 0;
         }
 

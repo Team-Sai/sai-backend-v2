@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.dto.RepaymentScheduleDTO;
 import org.teamsai.saibackend.domain.contract.exception.RepaymentScheduleErrorCode;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleService;
+import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
@@ -23,7 +24,7 @@ public class LoanPaymentService {
     private final RepaymentScheduleService repaymentScheduleService;
     private final PaymentRecordService paymentRecordService;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void applyAutoMatchedPayment(Long targetId, Long bankTransactionId, BigDecimal amount) {
         applyPayment(
                 targetId,
@@ -57,7 +58,7 @@ public class LoanPaymentService {
             boolean limitToRemainingAmount
     ) {
 
-        RepaymentScheduleDTO schedule = repaymentScheduleService.getScheduleByScheduleId(targetId);
+        RepaymentScheduleDTO schedule = repaymentScheduleService.getScheduleForUpdate(targetId);
 
         if (!schedule.getStatus().isUnresolved()) {
             log.warn("[LoanPaymentService] 처리 불가능한 스케줄 상태 - scheduleId: {}, status: {}", targetId, schedule.getStatus());
@@ -113,5 +114,31 @@ public class LoanPaymentService {
             repaymentScheduleService.markAsPaid(targetId, LocalDateTime.now());
             log.info("[LoanPaymentService] 상환 상태 완료(PAID) 처리 - scheduleId: {}", targetId);
         }
+    }
+
+    @Transactional
+    public boolean isPaymentConsistent(Long scheduleId) {
+        RepaymentScheduleDTO schedule = repaymentScheduleService
+                .findScheduleForUpdate(scheduleId)
+                .orElse(null);
+        if (schedule == null) {
+            return false;
+        }
+
+        BigDecimal paidAmount = paymentRecordService.sumConfirmedAmountByTarget(
+                PaymentTargetType.LOAN,
+                scheduleId
+        );
+
+        if (paidAmount.signum() <= 0
+                || paidAmount.compareTo(schedule.getTotalPaymentDue()) > 0) {
+            return false;
+        }
+
+        if (paidAmount.compareTo(schedule.getTotalPaymentDue()) == 0) {
+            return schedule.getStatus() == RepaymentScheduleStatus.PAID;
+        }
+
+        return schedule.getStatus().isUnresolved();
     }
 }

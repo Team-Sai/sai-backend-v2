@@ -1,14 +1,13 @@
 package org.teamsai.saibackend.domain.matching.service;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.matching.*;
+import org.teamsai.saibackend.domain.matching.exception.AutoMatchingPaymentException;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.model.*;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
-import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.service.LoanPaymentService;
 import org.teamsai.saibackend.domain.payment.service.SettlementPaymentService;
 import org.teamsai.saibackend.global.exception.DomainException;
@@ -20,7 +19,6 @@ import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class AutoMatchingService {
 
     private final AutoMatchingJudge autoMatchingJudge;
@@ -48,7 +46,7 @@ public class AutoMatchingService {
                     excludeAppliedCandidates(candidates, appliedCandidateKeys);
 
             AutoMatchingProcessResult processResult =
-                    processTransactionSafely(transaction, availableCandidates);
+                    processTransaction(transaction, availableCandidates);
 
             transactionResults.add(
                     new AutoMatchingTransactionResult(
@@ -96,54 +94,6 @@ public class AutoMatchingService {
         }
     }
 
-    private AutoMatchingProcessResult processTransactionSafely(
-            MatchingTransaction transaction,
-            List<MatchingCandidate> candidates
-    ) {
-        try {
-            return processTransaction(transaction, candidates);
-        } catch (DomainException exception) {
-            return classifyPaymentException(transaction, exception);
-        }
-    }
-
-    private AutoMatchingProcessResult classifyPaymentException(
-            MatchingTransaction transaction,
-            DomainException exception
-    ) {
-        if (exception.getErrorCode()
-                == PaymentErrorCode.DUPLICATE_PAYMENT_RECORD) {
-            log.warn(
-                    "Auto matching transaction duplicated. " +
-                            "transactionId={}, errorCode={}",
-                    transaction.transactionId(),
-                    exception.getErrorCode()
-            );
-            return AutoMatchingProcessResult.duplicate();
-        }
-
-        if (exception.getHttpStatus().is5xxServerError()) {
-            log.error(
-                    "Auto matching transaction failed. " +
-                            "transactionId={}, errorCode={}",
-                    transaction.transactionId(),
-                    exception.getErrorCode(),
-                    exception
-            );
-            return AutoMatchingProcessResult.failed();
-        }
-
-        log.warn(
-                "Auto matching transaction needs check. " +
-                        "transactionId={}, errorCode={}",
-                transaction.transactionId(),
-                exception.getErrorCode()
-        );
-
-        // 개별 납부 반영 실패가 전체 자동매칭 실행을 중단하지 않도록 한다.
-        return AutoMatchingProcessResult.needsCheck();
-    }
-
     private List<MatchingCandidate> excludeAppliedCandidates(
             List<MatchingCandidate> candidates,
             Set<AppliedCandidateKey> appliedCandidateKeys
@@ -182,18 +132,10 @@ public class AutoMatchingService {
         try {
             return applyPayment(transaction, evaluatedCandidate);
         } catch (DomainException exception) {
-            AutoMatchingProcessResult processResult =
-                    classifyPaymentException(transaction, exception);
-
-            if (processResult.status()
-                    == AutoMatchingProcessStatus.NEEDS_CHECK) {
-                candidateService.saveAll(
-                        transaction.transactionId(),
-                        List.of(evaluatedCandidate)
-                );
-            }
-
-            return processResult;
+            throw new AutoMatchingPaymentException(
+                    evaluatedCandidate,
+                    exception
+            );
         }
     }
 
@@ -286,20 +228,6 @@ public class AutoMatchingService {
         private static AutoMatchingProcessResult unmatched() {
             return new AutoMatchingProcessResult(
                     AutoMatchingProcessStatus.UNMATCHED,
-                    null
-            );
-        }
-
-        private static AutoMatchingProcessResult duplicate() {
-            return new AutoMatchingProcessResult(
-                    AutoMatchingProcessStatus.DUPLICATE,
-                    null
-            );
-        }
-
-        private static AutoMatchingProcessResult failed() {
-            return new AutoMatchingProcessResult(
-                    AutoMatchingProcessStatus.FAILED,
                     null
             );
         }
