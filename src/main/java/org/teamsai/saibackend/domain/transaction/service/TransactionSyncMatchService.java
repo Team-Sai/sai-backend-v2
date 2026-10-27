@@ -3,6 +3,8 @@ package org.teamsai.saibackend.domain.transaction.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
@@ -18,6 +20,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class TransactionSyncMatchService {
 
     private final TransactionSyncService transactionSyncService;

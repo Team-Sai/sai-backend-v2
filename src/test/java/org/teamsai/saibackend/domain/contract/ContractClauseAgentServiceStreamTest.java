@@ -119,4 +119,35 @@ class ContractClauseAgentServiceStreamTest {
         assertNotNull(thrown, "끊긴 뒤 이벤트를 보내면 읽기를 멈추도록 예외가 나야 한다");
         assertEquals("ClientDisconnectedException", thrown.getClass().getSimpleName());
     }
+
+    @Test
+    @DisplayName("final 이벤트가 형식 오류로 걸러지면 정상 종료로 넘기지 않고 오류로 처리한다")
+    void brokenFinalEventIsNotTreatedAsSuccess() throws Exception {
+        ContractClauseAgentService service = new ContractClauseAgentService(ragApiClient);
+        CountDownLatch relayFinished = new CountDownLatch(1);
+        AtomicReference<Throwable> thrownToReader = new AtomicReference<>();
+
+        doAnswer(invocation -> {
+            RagSseReader.Listener listener = invocation.getArgument(1);
+
+            try {
+                listener.onEvent("final", "not-json");
+
+            } catch (Throwable e) {
+                thrownToReader.set(e);
+                throw e;
+
+            } finally {
+                relayFinished.countDown();
+            }
+
+            return null;
+        }).when(ragApiClient).streamClause(any(), any());
+
+        service.streamClause(request("이자 5% 조항"));
+
+        assertTrue(relayFinished.await(5, TimeUnit.SECONDS));
+        assertNotNull(thrownToReader.get(), "final이 사라졌는데 조용히 넘어가면 화면이 검토 중에서 멈춘다");
+        assertEquals(IllegalStateException.class, thrownToReader.get().getClass());
+    }
 }

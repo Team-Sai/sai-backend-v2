@@ -102,6 +102,24 @@ public class RepaymentScheduleService {
                 .orElseThrow(() -> RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND.toException());
     }
 
+    @Transactional
+    public RepaymentScheduleDTO getScheduleForUpdate(Long scheduleId) {
+        RepaymentSchedule schedule =
+                repaymentScheduleRepository.findByIdForUpdate(scheduleId)
+                        .orElseThrow(
+                                RepaymentScheduleErrorCode.SCHEDULE_NOT_FOUND
+                                        ::toException
+                        );
+
+        return RepaymentScheduleDTO.from(schedule);
+    }
+
+    @Transactional
+    public Optional<RepaymentScheduleDTO> findScheduleForUpdate(Long scheduleId) {
+        return repaymentScheduleRepository.findByIdForUpdate(scheduleId)
+                .map(RepaymentScheduleDTO::from);
+    }
+
     public Map<Long, List<RepaymentScheduleWithRemainingProjection>> getSchedulesByContractIds(List<Long> contractIds) {
         if (contractIds == null || contractIds.isEmpty()) {
             return Map.of();

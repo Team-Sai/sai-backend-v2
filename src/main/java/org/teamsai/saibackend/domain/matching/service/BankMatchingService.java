@@ -17,6 +17,7 @@ public class BankMatchingService {
 
     private final BankTransactionService bankTransactionService;
     private final BankMatchingTransactionService transactionService;
+    private final MatchingFailureService matchingFailureService;
 
     public AutoMatchingExecutionResult execute(
             Long userId,
@@ -94,23 +95,52 @@ public class BankMatchingService {
             boolean isBatch
     ) {
         return bankTransactions.stream()
-                .map(bankTransaction -> targetType == null
-                        ? transactionService.process(
+                .map(transaction -> processOneTransaction(
                         userId,
                         linkedAccountId,
-                        bankTransaction,
-                        isBatch
-                )
-                        : transactionService.process(
-                        userId,
-                        linkedAccountId,
-                        bankTransaction,
+                        transaction,
                         targetType,
                         aggregateId,
                         isBatch
                 ))
                 .filter(java.util.Objects::nonNull)
                 .toList();
+    }
+
+    private AutoMatchingTransactionResult processOneTransaction(
+            Long userId,
+            Long linkedAccountId,
+            BankTransaction transaction,
+            MatchingTargetType targetType,
+            Long aggregateId,
+            boolean isBatch
+    ) {
+        try {
+            return transactionService.process(
+                    userId,
+                    linkedAccountId,
+                    transaction,
+                    targetType,
+                    aggregateId,
+                    isBatch
+            );
+        } catch (RuntimeException processingFailure) {
+            try {
+                return matchingFailureService.recordFailure(
+                        userId,
+                        linkedAccountId,
+                        transaction.getBankTransactionId(),
+                        processingFailure,
+                        isBatch
+                );
+            } catch (RuntimeException recordingFailure) {
+                if (recordingFailure != processingFailure) {
+                    recordingFailure.addSuppressed(processingFailure);
+                }
+
+                throw recordingFailure;
+            }
+        }
     }
 
     private AutoMatchingExecutionResult toExecutionResult(

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
+import org.teamsai.saibackend.domain.matching.exception.AutoMatchingPaymentException;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.model.EvaluatedMatchingCandidate;
 import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
@@ -307,8 +308,8 @@ class AutoMatchingServiceTest {
         }
 
         @Test
-        @DisplayName("대여금 납부 반영 중 비즈니스 예외가 발생하면 확인 필요로 분류한다")
-        void executeClassifiesLoanPaymentBusinessExceptionAsNeedsCheck() {
+        @DisplayName("대여금 납부 예외를 후보 정보와 함께 호출자에게 전달한다")
+        void propagatesLoanPaymentFailureWithCandidate() {
             MatchingTransaction transaction = transaction(
                     101L,
                     AutoMatchingTransactionType.DEPOSIT,
@@ -331,9 +332,18 @@ class AutoMatchingServiceTest {
                             new BigDecimal("10000")
                     );
 
-            AutoMatchingExecutionResult result = autoMatchingService.execute(
+            assertThatThrownBy(() -> autoMatchingService.execute(
                     List.of(transaction),
                     List.of(candidate)
+            )).isInstanceOfSatisfying(
+                    AutoMatchingPaymentException.class,
+                    exception -> {
+                        assertThat(exception.getCandidate()).isEqualTo(
+                                new EvaluatedMatchingCandidate(candidate, MatchingAmountType.EXACT)
+                        );
+                        assertThat(exception.getPaymentFailure().getErrorCode())
+                                .isEqualTo(PaymentErrorCode.PAYMENT_OBLIGATION_NOT_ACTIVE);
+                    }
             );
 
             verify(loanPaymentService).applyAutoMatchedPayment(
@@ -341,18 +351,7 @@ class AutoMatchingServiceTest {
                     101L,
                     new BigDecimal("10000")
             );
-            verify(candidateService).saveAll(
-                    101L,
-                    List.of(new EvaluatedMatchingCandidate(
-                            candidate,
-                            MatchingAmountType.EXACT
-                    ))
-            );
-
-            assertThat(result.totalTransactionCount()).isEqualTo(1);
-            assertThat(result.appliedCount()).isZero();
-            assertThat(result.needsCheckCount()).isEqualTo(1);
-            assertThat(result.unmatchedCount()).isZero();
+            verify(candidateService, never()).saveAll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         }
 
         @Test
@@ -447,8 +446,8 @@ class AutoMatchingServiceTest {
         }
 
         @Test
-        @DisplayName("납부 반영 중 시스템 오류가 발생해도 해당 거래만 실패로 처리하고 다음 거래를 계속 처리한다")
-        void executeContinuesWhenApplyPaymentThrowsException() {
+        @DisplayName("납부 중 시스템 오류를 전파해 바깥 거래 트랜잭션이 롤백되게 한다")
+        void propagatesSystemFailureFromPayment() {
             MatchingTransaction firstTransaction = transaction(
                     101L,
                     AutoMatchingTransactionType.DEPOSIT,
@@ -483,33 +482,24 @@ class AutoMatchingServiceTest {
                             new BigDecimal("10000")
                     );
 
-            AutoMatchingExecutionResult result = autoMatchingService.execute(
+            assertThatThrownBy(() -> autoMatchingService.execute(
                     List.of(firstTransaction, secondTransaction),
                     List.of(firstCandidate, secondCandidate)
-            );
+            )).isInstanceOf(AutoMatchingPaymentException.class);
 
             verify(paymentService).applyAutoMatchedPayment(
                     1L,
                     101L,
                     new BigDecimal("10000")
             );
-            verify(paymentService).applyAutoMatchedPayment(
-                    2L,
-                    102L,
-                    new BigDecimal("20000")
+            verify(paymentService, never()).applyAutoMatchedPayment(
+                    2L, 102L, new BigDecimal("20000")
             );
-
-            assertThat(result.totalTransactionCount()).isEqualTo(2);
-            assertThat(result.appliedCount()).isEqualTo(1);
-            assertThat(result.needsCheckCount()).isZero();
-            assertThat(result.unmatchedCount()).isZero();
-            assertThat(result.duplicateCount()).isZero();
-            assertThat(result.failedCount()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("납부 반영 중 비즈니스 예외가 발생하면 확인 필요로 분류한다")
-        void executeClassifiesBusinessDomainExceptionAsNeedsCheck() {
+        @DisplayName("정산 납부 예외를 후보 정보와 함께 호출자에게 전달한다")
+        void propagatesBusinessPaymentFailureWithCandidate() {
             MatchingTransaction transaction = transaction(
                     101L,
                     AutoMatchingTransactionType.DEPOSIT,
@@ -532,9 +522,18 @@ class AutoMatchingServiceTest {
                             new BigDecimal("10000")
                     );
 
-            AutoMatchingExecutionResult result = autoMatchingService.execute(
+            assertThatThrownBy(() -> autoMatchingService.execute(
                     List.of(transaction),
                     List.of(candidate)
+            )).isInstanceOfSatisfying(
+                    AutoMatchingPaymentException.class,
+                    exception -> {
+                        assertThat(exception.getCandidate()).isEqualTo(
+                                new EvaluatedMatchingCandidate(candidate, MatchingAmountType.EXACT)
+                        );
+                        assertThat(exception.getPaymentFailure().getErrorCode())
+                                .isEqualTo(PaymentErrorCode.PAYMENT_OBLIGATION_NOT_ACTIVE);
+                    }
             );
 
             verify(paymentService).applyAutoMatchedPayment(
@@ -543,17 +542,12 @@ class AutoMatchingServiceTest {
                     new BigDecimal("10000")
             );
 
-            assertThat(result.totalTransactionCount()).isEqualTo(1);
-            assertThat(result.appliedCount()).isZero();
-            assertThat(result.needsCheckCount()).isEqualTo(1);
-            assertThat(result.unmatchedCount()).isZero();
-            assertThat(result.duplicateCount()).isZero();
-            assertThat(result.failedCount()).isZero();
+            verify(candidateService, never()).saveAll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         }
 
         @Test
-        @DisplayName("이미 반영된 은행 거래이면 중복으로 분류하고 확인 필요로 집계하지 않는다")
-        void executeClassifiesDuplicatePaymentRecordSeparately() {
+        @DisplayName("중복 납부 예외도 후보 정보와 함께 호출자에게 전달한다")
+        void propagatesDuplicatePaymentFailureWithCandidate() {
             MatchingTransaction transaction = transaction(
                     101L,
                     AutoMatchingTransactionType.DEPOSIT,
@@ -576,9 +570,18 @@ class AutoMatchingServiceTest {
                             new BigDecimal("10000")
                     );
 
-            AutoMatchingExecutionResult result = autoMatchingService.execute(
+            assertThatThrownBy(() -> autoMatchingService.execute(
                     List.of(transaction),
                     List.of(candidate)
+            )).isInstanceOfSatisfying(
+                    AutoMatchingPaymentException.class,
+                    exception -> {
+                        assertThat(exception.getCandidate()).isEqualTo(
+                                new EvaluatedMatchingCandidate(candidate, MatchingAmountType.EXACT)
+                        );
+                        assertThat(exception.getPaymentFailure().getErrorCode())
+                                .isEqualTo(PaymentErrorCode.DUPLICATE_PAYMENT_RECORD);
+                    }
             );
 
             verify(paymentService).applyAutoMatchedPayment(
@@ -587,25 +590,7 @@ class AutoMatchingServiceTest {
                     new BigDecimal("10000")
             );
 
-            assertThat(result.totalTransactionCount()).isEqualTo(1);
-            assertThat(result.appliedCount()).isZero();
-            assertThat(result.needsCheckCount()).isZero();
-            assertThat(result.unmatchedCount()).isZero();
-            assertThat(result.duplicateCount()).isEqualTo(1);
-            assertThat(result.failedCount()).isZero();
-            assertThat(result.transactionResults())
-                    .extracting(
-                            transactionResult -> transactionResult
-                                    .transactionId(),
-                            transactionResult -> transactionResult
-                                    .processStatus()
-                    )
-                    .containsExactly(
-                            org.assertj.core.groups.Tuple.tuple(
-                                    101L,
-                                    AutoMatchingProcessStatus.DUPLICATE
-                            )
-                    );
+            verify(candidateService, never()).saveAll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         }
 
         @Test

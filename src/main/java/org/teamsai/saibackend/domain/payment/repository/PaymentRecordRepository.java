@@ -9,6 +9,7 @@ import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 public interface PaymentRecordRepository
         extends JpaRepository<PaymentRecord, Long> {
@@ -52,5 +53,9 @@ public interface PaymentRecordRepository
 
             @Param("recordStatus")
             RecordStatus recordStatus
+    );
+
+    Optional<PaymentRecord> findByBankTransactionId(
+            Long bankTransactionId
     );
 }
