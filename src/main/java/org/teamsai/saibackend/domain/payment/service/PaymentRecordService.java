@@ -15,6 +15,7 @@ import org.teamsai.saibackend.domain.payment.type.SourceType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -118,11 +119,14 @@ public class PaymentRecordService {
     private boolean isBankTransactionDuplicate(Throwable failure) {
         Throwable cause = failure;
         while (cause != null) {
-            if (cause instanceof ConstraintViolationException constraintViolation
-                    && "uk_payment_record_bank_transaction".equalsIgnoreCase(
-                            constraintViolation.getConstraintName()
-                    )) {
-                return true;
+            if (cause instanceof ConstraintViolationException constraintViolation){
+                String constraintName = constraintViolation.getConstraintName();
+
+                if (constraintName != null
+                        && constraintName.toLowerCase(Locale.ROOT)
+                        .endsWith("uk_payment_record_bank_transaction")) {
+                    return true;
+                }
             }
             cause = cause.getCause();
         }
