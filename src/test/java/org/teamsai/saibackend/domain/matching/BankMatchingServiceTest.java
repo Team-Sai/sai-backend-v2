@@ -12,6 +12,7 @@ import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingTransactionService;
+import org.teamsai.saibackend.domain.matching.service.MatchingFailureService;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
@@ -44,6 +45,9 @@ class BankMatchingServiceTest {
     @Mock
     private BankMatchingTransactionService transactionService;
 
+    @Mock
+    private MatchingFailureService matchingFailureService;
+
     @InjectMocks
     private BankMatchingService bankMatchingService;
 
@@ -63,6 +67,8 @@ class BankMatchingServiceTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyBoolean()
         );
     }
@@ -77,11 +83,11 @@ class BankMatchingServiceTest {
         given(bankTransactionService
                 .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
                 .willReturn(List.of(first, second, third));
-        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, first, false))
+        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, first, null, null, false))
                 .willReturn(result(101L, AutoMatchingProcessStatus.APPLIED));
-        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, second, false))
+        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, second, null, null, false))
                 .willReturn(result(102L, AutoMatchingProcessStatus.NEEDS_CHECK));
-        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, third, false))
+        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, third, null, null, false))
                 .willReturn(result(103L, AutoMatchingProcessStatus.UNMATCHED));
 
         AutoMatchingExecutionResult result =
@@ -111,17 +117,17 @@ class BankMatchingServiceTest {
         given(bankTransactionService
                 .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
                 .willReturn(List.of(transaction));
-        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, transaction, true))
+        given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, transaction, null, null, true))
                 .willReturn(result(101L, AutoMatchingProcessStatus.NEEDS_CHECK));
 
         bankMatchingService.execute(USER_ID, LINKED_ACCOUNT_ID, true);
 
-        verify(transactionService).process(USER_ID, LINKED_ACCOUNT_ID, transaction, true);
+        verify(transactionService).process(USER_ID, LINKED_ACCOUNT_ID, transaction, null, null, true);
     }
 
     @Test
-    @DisplayName("단건 처리 실패를 그대로 전파한다")
-    void propagatesTransactionProcessingFailure() {
+    @DisplayName("단건 처리 실패를 별도 실패 기록 서비스에 전달한다")
+    void recordsTransactionProcessingFailureSeparately() {
         BankTransaction transaction = bankTransaction(101L);
         DomainException exception = MatchingErrorCode
                 .INVALID_MATCHING_REQUEST
@@ -132,11 +138,20 @@ class BankMatchingServiceTest {
                 .willReturn(List.of(transaction));
         willThrow(exception)
                 .given(transactionService)
-                .process(USER_ID, LINKED_ACCOUNT_ID, transaction, false);
+                .process(USER_ID, LINKED_ACCOUNT_ID, transaction, null, null, false);
+        given(matchingFailureService.recordFailure(
+                USER_ID, LINKED_ACCOUNT_ID, 101L, exception, false
+        )).willReturn(result(101L, AutoMatchingProcessStatus.FAILED));
 
-        assertThatThrownBy(
-                () -> bankMatchingService.execute(USER_ID, LINKED_ACCOUNT_ID, false)
-        ).isSameAs(exception);
+        AutoMatchingExecutionResult result =
+                bankMatchingService.execute(USER_ID, LINKED_ACCOUNT_ID, false);
+
+        assertThat(result.failedCount()).isEqualTo(1);
+        assertThat(result.transactionResults())
+                .containsExactly(result(101L, AutoMatchingProcessStatus.FAILED));
+        verify(matchingFailureService).recordFailure(
+                USER_ID, LINKED_ACCOUNT_ID, 101L, exception, false
+        );
     }
 
     @Test

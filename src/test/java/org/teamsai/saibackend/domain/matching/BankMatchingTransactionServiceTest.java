@@ -1,10 +1,10 @@
 package org.teamsai.saibackend.domain.matching;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -18,6 +18,7 @@ import org.teamsai.saibackend.domain.matching.repository.MatchingCandidateReposi
 import org.teamsai.saibackend.domain.matching.service.AutoMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingTransactionService;
 import org.teamsai.saibackend.domain.matching.service.BankTransactionMatchCandidateService;
+import org.teamsai.saibackend.domain.matching.service.MatchingReviewNotificationService;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
@@ -65,8 +66,25 @@ class BankMatchingTransactionServiceTest {
 
     @Mock
     private SettlementPaymentStatusChecker settlementPaymentStatusChecker;
-    @InjectMocks
+    private MatchingReviewNotificationService reviewNotificationService;
+
     private BankMatchingTransactionService transactionService;
+
+    @BeforeEach
+    void setUp() {
+        reviewNotificationService = new MatchingReviewNotificationService(
+                paymentObligationQueryService,
+                candidateService,
+                notificationService,
+                settlementPaymentStatusChecker
+        );
+        transactionService = new BankMatchingTransactionService(
+                matchingCandidateRepository,
+                autoMatchingService,
+                bankTransactionService,
+                reviewNotificationService
+        );
+    }
     @Test
     @DisplayName("상대방명이 없으면 후보를 조회하지 않고 미매칭으로 변경한다")
     void classifiesBlankCounterpartyNameAsUnmatched() {

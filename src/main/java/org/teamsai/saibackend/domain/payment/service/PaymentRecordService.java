@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
@@ -14,6 +15,8 @@ import org.teamsai.saibackend.domain.payment.type.SourceType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,14 @@ public class PaymentRecordService {
                 targetId,
                 RecordStatus.CONFIRMED
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PaymentRecord> findByBankTransactionId(
+            Long bankTransactionId) {
+        validateBankTransactionId(bankTransactionId);
+        return paymentRecordRepository.findByBankTransactionId(
+                bankTransactionId);
     }
 
     @Transactional
@@ -68,7 +79,11 @@ public class PaymentRecordService {
             return savedPaymentRecord.getPaymentRecordId();
 
         } catch (DataIntegrityViolationException exception) {
-            throw PaymentErrorCode.DUPLICATE_PAYMENT_RECORD.toException();
+            if (isBankTransactionDuplicate(exception)) {
+                throw PaymentErrorCode.DUPLICATE_PAYMENT_RECORD.toException();
+            }
+
+            throw exception;
         }
     }
 
@@ -99,6 +114,23 @@ public class PaymentRecordService {
         if (paymentRecordRepository.existsByBankTransactionId(bankTransactionId)) {
             throw PaymentErrorCode.DUPLICATE_PAYMENT_RECORD.toException();
         }
+    }
+
+    private boolean isBankTransactionDuplicate(Throwable failure) {
+        Throwable cause = failure;
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintViolation){
+                String constraintName = constraintViolation.getConstraintName();
+
+                if (constraintName != null
+                        && constraintName.toLowerCase(Locale.ROOT)
+                        .endsWith("uk_payment_record_bank_transaction")) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private void validateTarget(

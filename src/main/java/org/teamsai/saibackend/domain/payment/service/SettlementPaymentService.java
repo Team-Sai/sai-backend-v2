@@ -24,7 +24,7 @@ public class SettlementPaymentService {
     private final PaymentObligationRepository paymentObligationRepository;
     private final PaymentRecordService paymentRecordService;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void applyAutoMatchedPayment(
             Long paymentObligationId,
             Long bankTransactionId,
@@ -125,6 +125,54 @@ public class SettlementPaymentService {
                 );
 
         return savedPaymentObligation.getPaymentObligationId();
+    }
+
+    @Transactional
+    public boolean isPaymentConsistent(Long paymentObligationId) {
+        PaymentObligation obligation =
+                paymentObligationRepository.findByIdForUpdate(paymentObligationId)
+                        .orElse(null);
+
+        if (obligation == null) {
+            return false;
+        }
+
+        if (obligation.getObligationStatus() != ObligationStatus.ACTIVE) {
+            return false;
+        }
+
+        if (obligation.getReviewStatus() != ReviewStatus.NORMAL) {
+            return false;
+        }
+
+        BigDecimal paidAmount =
+                paymentRecordService.sumConfirmedAmountByTarget(
+                        PaymentTargetType.SETTLEMENT,
+                        paymentObligationId
+                );
+
+        if (paidAmount.signum() <= 0) {
+            return false;
+        }
+
+        if (paidAmount.compareTo(obligation.getExpectedAmount()) > 0) {
+            return false;
+        }
+
+        PaymentStatus expectedStatus = calculatePaymentStatus(
+                obligation.getExpectedAmount(),
+                paidAmount
+        );
+
+        if (obligation.getPaymentStatus() != expectedStatus) {
+            return false;
+        }
+
+        if (expectedStatus == PaymentStatus.PAID) {
+            return obligation.getOverdueSince() == null;
+        }
+
+        return true;
     }
 
     @Transactional
