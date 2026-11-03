@@ -7,6 +7,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
 import org.teamsai.saibackend.domain.contract.dto.ClauseChatSessionDTO;
 import org.teamsai.saibackend.domain.contract.dto.request.ClauseChatReplyRequest;
@@ -129,6 +130,42 @@ public class ClauseChatService {
                 session.isReadyToWrite()
         );
     }
+
+    /**
+     * 확정한 조건으로 특약을 쓴다. (SSE)
+     * 저장해 둔 쟁점을 그대로 보내서 AI가 ① 쟁점 분석을 다시 하지 않는다.
+     */
+    public SseEmitter write(
+            Long userId,
+            String sessionId
+    ) {
+        ClauseChatSessionDTO session = sessionStore.find(sessionId, userId)
+                .orElseThrow(ClauseChatErrorCode.CHAT_NOT_FOUND::toException);
+
+        if (!session.isReadyToWrite()) {
+            throw ClauseChatErrorCode.CHAT_NOT_READY_TO_WRITE.toException();
+        }
+
+        RagClauseChatRequest chatRequest = RagClauseChatRequest.builder()
+                .contract(session.getContract())
+                .message(session.getMessage())
+                .issues(orEmpty(session.getIssues()))
+                .slots(orEmpty(session.getSlots()))
+                .questions(orEmpty(session.getQuestions()))
+                .answers(session.getAnswers() != null ? session.getAnswers() : new HashMap<>())
+                .build();
+
+        log.info(
+                "대화형 특약 작성 시작 - slots={}, answers={}",
+                chatRequest.getSlots().size(),
+                chatRequest.getAnswers().size()
+        );
+
+        return contractClauseAgentService.relayStream(
+                listener -> ragApiClient.streamWrite(chatRequest, listener)
+        );
+    }
+
 
     private static <T> List<T> orEmpty(List<T> values) {
         return values != null ? values : List.of();

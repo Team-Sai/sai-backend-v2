@@ -198,14 +198,35 @@ public class RagApiClient {
             RagClauseSuggestionRequest request,
             RagSseReader.Listener listener
     ) {
-        String uri = "/rag/contracts/clause-suggestions/stream";
-
         // 요청 원문에는 금액·이름 같은 개인 정보가 있을 수 있어 길이만 남긴다.
         log.info(
                 "RAG 특약 Agent 스트리밍 요청 - messageLength={}",
                 request.getMessage() != null ? request.getMessage().length() : 0
         );
 
+        stream("/rag/contracts/clause-suggestions/stream", request, listener);
+    }
+
+    /**
+     * 대화형 특약: 확정한 조건으로 특약을 쓰는 스트리밍(SSE). 이벤트는 streamClause와 같다.
+     */
+    public void streamWrite(
+            RagClauseChatRequest request,
+            RagSseReader.Listener listener
+    ) {
+        log.info(
+                "RAG 대화형 특약 작성 스트리밍 요청 - messageLength={}",
+                request.getMessage() != null ? request.getMessage().length() : 0
+        );
+
+        stream("/rag/contracts/clause-chat/write/stream", request, listener);
+    }
+
+    private void stream(
+            String uri,
+            Object request,
+            RagSseReader.Listener listener
+    ) {
         try {
             restClient.post()
                     .uri(uri)

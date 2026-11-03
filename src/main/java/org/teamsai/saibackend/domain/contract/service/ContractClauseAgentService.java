@@ -10,6 +10,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -94,6 +95,21 @@ public class ContractClauseAgentService {
         RagClauseSuggestionRequest ragRequest =
                 toRagRequest(request);
 
+        return relayStream(
+                listener -> ragApiClient.streamClause(ragRequest, listener)
+        );
+
+    }
+
+    /**
+     * AI 스트림을 별도 스레드에서 읽어 브라우저로 중계한다.
+     *
+     * aiCall: 받은 Listener로 AI 서버 스트림을 부르는 일 (어느 주소를 부를지는 부르는 쪽이 정한다)
+     * 스레드가 모두 바쁘고 대기열도 차면 503.
+     */
+    public SseEmitter relayStream(
+            Consumer<RagSseReader.Listener> aiCall
+    ) {
         SseEmitter emitter =
                 new SseEmitter(STREAM_TIMEOUT_MILLIS);
 
@@ -106,7 +122,7 @@ public class ContractClauseAgentService {
 
         try {
             streamExecutor.execute(() ->
-                    relay(ragRequest, emitter, closed)
+                    relay(aiCall, emitter, closed)
             );
 
         } catch (RejectedExecutionException e) {
@@ -125,8 +141,9 @@ public class ContractClauseAgentService {
         return emitter;
     }
 
+
     private void relay(
-            RagClauseSuggestionRequest ragRequest,
+            Consumer<RagSseReader.Listener> aiCall,
             SseEmitter emitter,
             AtomicBoolean closed
     ) {
@@ -136,8 +153,7 @@ public class ContractClauseAgentService {
         }
 
         try {
-            ragApiClient.streamClause(
-                    ragRequest,
+            aiCall.accept(
                     new RagSseReader.Listener() {
                         @Override
                         public void onEvent(String event, String data) {

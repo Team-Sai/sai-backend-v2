@@ -4,12 +4,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.dto.request.ClauseChatReplyRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
 import org.teamsai.saibackend.domain.contract.dto.response.ClauseChatReplyResponse;
@@ -50,5 +52,26 @@ public class ClauseChatController {
             @Valid @RequestBody ClauseChatReplyRequest request
     ) {
         return clauseChatService.reply(userId, sessionId, request);
+    }
+
+    @Operation(
+            summary = "대화형 AI 특약 작성 (진행 상황 스트리밍)",
+            description = """
+                    확정한 조건으로 특약을 씁니다. 이벤트는 /api/contracts/clause-suggestions/stream과 같습니다.
+                    (progress는 retrieval부터 시작)
+
+                    - 404: 대화가 없거나 끝남
+                    - 409: 아직 확정 전
+                    """
+    )
+    @PostMapping(
+            value = "/{sessionId}/write",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public SseEmitter write(
+            @AuthenticationPrincipal(expression = "userId") Long userId,
+            @PathVariable String sessionId
+    ) {
+        return clauseChatService.write(userId, sessionId);
     }
 }
