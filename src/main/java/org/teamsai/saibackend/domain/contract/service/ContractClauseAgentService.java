@@ -271,7 +271,7 @@ public class ContractClauseAgentService {
         streamExecutor.shutdown();
     }
 
-    private RagClauseSuggestionRequest toRagRequest(
+    public RagClauseSuggestionRequest toRagRequest(
             ContractClauseRequest request
     ) {
         if (!StringUtils.hasText(request.getMessage())) {
