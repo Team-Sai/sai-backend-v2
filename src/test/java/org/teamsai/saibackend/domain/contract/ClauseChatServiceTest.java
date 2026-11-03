@@ -1,0 +1,160 @@
+package org.teamsai.saibackend.domain.contract;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.teamsai.saibackend.domain.contract.client.RagApiClient;
+import org.teamsai.saibackend.domain.contract.dto.ClauseChatSessionDTO;
+import org.teamsai.saibackend.domain.contract.dto.request.ClauseChatReplyRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseChatReplyResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseChatStartResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseRouteResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseUnderstandResponse;
+import org.teamsai.saibackend.domain.contract.exception.ClauseChatErrorCode;
+import org.teamsai.saibackend.domain.contract.service.ClauseChatService;
+import org.teamsai.saibackend.domain.contract.service.ClauseChatSessionStoreService;
+import org.teamsai.saibackend.domain.contract.service.ContractClauseAgentService;
+import org.teamsai.saibackend.global.exception.DomainException;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("ClauseChatService 단위 테스트")
+class ClauseChatServiceTest {
+
+    private static final Long USER_ID = 1L;
+
+    @Mock
+    private RagApiClient ragApiClient;
+
+    @Mock
+    private ClauseChatSessionStoreService sessionStore;
+
+    @Mock
+    private ContractClauseAgentService contractClauseAgentService;
+
+    @InjectMocks
+    private ClauseChatService clauseChatService;
+
+    private final ContractClauseRequest request = ContractClauseRequest.builder()
+            .message("3개월 연속 연체하면 전부 갚게 해 주세요")
+            .build();
+
+    private final RagClauseSuggestionRequest ragRequest = RagClauseSuggestionRequest.builder()
+            .message("3개월 연속 연체하면 전부 갚게 해 주세요")
+            .build();
+
+    private RagClauseUnderstandResponse understood(boolean inScope, List<Map<String, Object>> fieldEdits) {
+        return new RagClauseUnderstandResponse(
+                inScope,
+                List.of(Map.of("type", "DEFAULT")),
+                Map.of("summary", "요약", "slots", List.of(Map.of("name", "연속 연체 기간", "value", "3개월"))),
+                List.of(Map.of("id", "partial_payment", "text", "일부만 낸 달도 연체로 볼까요?")),
+                fieldEdits,
+                inScope ? null : "범위 밖 안내"
+        );
+    }
+
+    @Test
+    @DisplayName("이어갈 수 있는 요청이면 대화를 저장하고 번호를 준다")
+    void startCreatesSession() {
+        given(contractClauseAgentService.toRagRequest(request)).willReturn(ragRequest);
+        given(ragApiClient.understandClause(ragRequest)).willReturn(understood(true, List.of()));
+        given(sessionStore.create(any())).willReturn("session-1");
+
+        ClauseChatStartResponse response = clauseChatService.start(USER_ID, request);
+
+        ArgumentCaptor<ClauseChatSessionDTO> saved = ArgumentCaptor.forClass(ClauseChatSessionDTO.class);
+        verify(sessionStore).create(saved.capture());
+
+        assertThat(response.sessionId()).isEqualTo("session-1");
+        assertThat(response.summary()).isEqualTo("요약");
+        assertThat(saved.getValue().getOwnerUserId()).isEqualTo(USER_ID);
+        assertThat(saved.getValue().getIssues()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("범위 밖 요청은 대화를 만들지 않는다")
+    void outOfScopeCreatesNoSession() {
+        given(contractClauseAgentService.toRagRequest(request)).willReturn(ragRequest);
+        given(ragApiClient.understandClause(ragRequest)).willReturn(understood(false, List.of()));
+
+        ClauseChatStartResponse response = clauseChatService.start(USER_ID, request);
+
+        assertThat(response.sessionId()).isNull();
+        assertThat(response.guide()).isEqualTo("범위 밖 안내");
+        verify(sessionStore, never()).create(any());
+    }
+
+    @Test
+    @DisplayName("계약서 칸을 고치라는 안내면 대화를 만들지 않는다")
+    void fieldEditCreatesNoSession() {
+        given(contractClauseAgentService.toRagRequest(request)).willReturn(ragRequest);
+        given(ragApiClient.understandClause(ragRequest))
+                .willReturn(understood(true, List.of(Map.of("field", "interestRate"))));
+
+        ClauseChatStartResponse response = clauseChatService.start(USER_ID, request);
+
+        assertThat(response.sessionId()).isNull();
+        assertThat(response.fieldEdits()).hasSize(1);
+        verify(sessionStore, never()).create(any());
+    }
+
+    @Test
+    @DisplayName("없거나 남의 대화에 답하면 404")
+    void replyToMissingSessionIs404() {
+        given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> clauseChatService.reply(USER_ID, "session-1", new ClauseChatReplyRequest("네")))
+                .isInstanceOf(DomainException.class)
+                .extracting("errorCode")
+                .isEqualTo(ClauseChatErrorCode.CHAT_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("답장 결과를 대화에 저장하고 돌려준다")
+    void replySavesRoutedState() {
+        ClauseChatSessionDTO session = ClauseChatSessionDTO.builder()
+                .ownerUserId(USER_ID)
+                .slots(List.of())
+                .questions(List.of())
+                .answers(Map.of())
+                .build();
+
+        given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
+        given(ragApiClient.routeReply(any())).willReturn(
+                new RagClauseRouteResponse(
+                        "CONFIRM",
+                        List.of(Map.of("name", "연속 연체 기간", "confirmed", true)),
+                        Map.of(),
+                        List.of(),
+                        "확인했어요.",
+                        true
+                )
+        );
+
+        ClauseChatReplyResponse response =
+                clauseChatService.reply(USER_ID, "session-1", new ClauseChatReplyRequest(" 네 "));
+
+        assertThat(response.kind()).isEqualTo("CONFIRM");
+        assertThat(response.readyToWrite()).isTrue();
+        assertThat(session.isReadyToWrite()).isTrue();
+        verify(sessionStore).save(eq("session-1"), eq(session));
+    }
+}
