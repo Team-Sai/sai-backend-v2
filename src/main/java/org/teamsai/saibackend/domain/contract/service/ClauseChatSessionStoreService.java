@@ -29,6 +29,11 @@ public class ClauseChatSessionStoreService {
 
     static final Duration TTL = Duration.ofMinutes(30);
 
+    private static final String LOCK_KEY_PREFIX = "clause-chat:lock:";
+
+    /** 잠금은 AI 답장 분류 시간보다 넉넉하게. 서버가 죽어도 이 시간이 지나면 저절로 풀린다. */
+    static final Duration LOCK_TTL = Duration.ofSeconds(30);
+
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
     private final StringRedisTemplate redisTemplate;
@@ -46,6 +51,38 @@ public class ClauseChatSessionStoreService {
                 MAPPER.writeValueAsString(session),
                 TTL
         );
+    }
+
+    /**
+     * 대화가 아직 있을 때만 덮어쓴다. (Redis SET XX)
+     * AI를 부르는 사이 30분이 지나 대화가 사라졌으면 되살리지 않고 false.
+     */
+    public boolean saveIfPresent(String sessionId, ClauseChatSessionDTO session) {
+        return Boolean.TRUE.equals(
+                redisTemplate.opsForValue().setIfPresent(
+                        createKey(sessionId),
+                        MAPPER.writeValueAsString(session),
+                        TTL
+                )
+        );
+    }
+
+    /**
+     * 같은 대화에 요청이 겹치지 않게 짧게 잠근다. (Redis SET NX)
+     * 이미 잠겨 있으면 false.
+     */
+    public boolean tryLock(String sessionId) {
+        return Boolean.TRUE.equals(
+                redisTemplate.opsForValue().setIfAbsent(
+                        LOCK_KEY_PREFIX + sessionId,
+                        "1",
+                        LOCK_TTL
+                )
+        );
+    }
+
+    public void unlock(String sessionId) {
+        redisTemplate.delete(LOCK_KEY_PREFIX + sessionId);
     }
 
     /**

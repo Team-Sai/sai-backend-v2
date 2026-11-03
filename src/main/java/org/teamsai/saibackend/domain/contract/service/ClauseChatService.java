@@ -93,42 +93,55 @@ public class ClauseChatService {
             String sessionId,
             ClauseChatReplyRequest request
     ) {
-        ClauseChatSessionDTO session = sessionStore.find(sessionId, userId)
-                .orElseThrow(ClauseChatErrorCode.CHAT_NOT_FOUND::toException);
+        // 같은 대화의 답장이 겹치면 한쪽 답이 사라지므로, 하나씩만 처리한다.
+        if (!sessionStore.tryLock(sessionId)) {
+            throw ClauseChatErrorCode.CHAT_BUSY.toException();
+        }
 
-        RagClauseRouteResponse routed = ragApiClient.routeReply(
-                RagClauseChatRequest.builder()
-                        .contract(session.getContract())
-                        .message(request.message().trim())
-                        .slots(session.getSlots())
-                        .questions(session.getQuestions())
-                        .answers(session.getAnswers())
-                        .build()
-        );
+        try {
+            ClauseChatSessionDTO session = sessionStore.find(sessionId, userId)
+                    .orElseThrow(ClauseChatErrorCode.CHAT_NOT_FOUND::toException);
 
-        session.setSlots(orEmpty(routed.getSlots()));
-        session.setAnswers(
-                routed.getAnswers() != null ? routed.getAnswers() : new HashMap<>()
-        );
-        // 가장 최근 답이 "확정(CONFIRM)"일 때만 작성할 수 있다.
-        session.setReadyToWrite(Boolean.TRUE.equals(routed.getReadyToWrite()));
+            RagClauseRouteResponse routed = ragApiClient.routeReply(
+                    RagClauseChatRequest.builder()
+                            .contract(session.getContract())
+                            .message(request.message().trim())
+                            .slots(session.getSlots())
+                            .questions(session.getQuestions())
+                            .answers(session.getAnswers())
+                            .build()
+            );
 
-        sessionStore.save(sessionId, session);
+            session.setSlots(orEmpty(routed.getSlots()));
+            session.setAnswers(
+                    routed.getAnswers() != null ? routed.getAnswers() : new HashMap<>()
+            );
+            // 가장 최근 답이 "확정(CONFIRM)"일 때만 작성할 수 있다.
+            session.setReadyToWrite(Boolean.TRUE.equals(routed.getReadyToWrite()));
 
-        log.info(
-                "대화형 특약 답장 - kind={}, pendingQuestions={}, readyToWrite={}",
-                routed.getKind(),
-                orEmpty(routed.getPendingQuestions()).size(),
-                session.isReadyToWrite()
-        );
+            // AI를 부르는 사이 대화가 만료됐으면 되살리지 않는다.
+            if (!sessionStore.saveIfPresent(sessionId, session)) {
+                throw ClauseChatErrorCode.CHAT_NOT_FOUND.toException();
+            }
 
-        return new ClauseChatReplyResponse(
-                routed.getKind(),
-                routed.getEcho(),
-                session.getSlots(),
-                orEmpty(routed.getPendingQuestions()),
-                session.isReadyToWrite()
-        );
+            log.info(
+                    "대화형 특약 답장 - kind={}, pendingQuestions={}, readyToWrite={}",
+                    routed.getKind(),
+                    orEmpty(routed.getPendingQuestions()).size(),
+                    session.isReadyToWrite()
+            );
+
+            return new ClauseChatReplyResponse(
+                    routed.getKind(),
+                    routed.getEcho(),
+                    session.getSlots(),
+                    orEmpty(routed.getPendingQuestions()),
+                    session.isReadyToWrite()
+            );
+
+        } finally {
+            sessionStore.unlock(sessionId);
+        }
     }
 
     /**
@@ -139,21 +152,40 @@ public class ClauseChatService {
             Long userId,
             String sessionId
     ) {
-        ClauseChatSessionDTO session = sessionStore.find(sessionId, userId)
-                .orElseThrow(ClauseChatErrorCode.CHAT_NOT_FOUND::toException);
-
-        if (!session.isReadyToWrite()) {
-            throw ClauseChatErrorCode.CHAT_NOT_READY_TO_WRITE.toException();
+        if (!sessionStore.tryLock(sessionId)) {
+            throw ClauseChatErrorCode.CHAT_BUSY.toException();
         }
 
-        RagClauseChatRequest chatRequest = RagClauseChatRequest.builder()
-                .contract(session.getContract())
-                .message(session.getMessage())
-                .issues(orEmpty(session.getIssues()))
-                .slots(orEmpty(session.getSlots()))
-                .questions(orEmpty(session.getQuestions()))
-                .answers(session.getAnswers() != null ? session.getAnswers() : new HashMap<>())
-                .build();
+        RagClauseChatRequest chatRequest;
+
+        try {
+            ClauseChatSessionDTO session = sessionStore.find(sessionId, userId)
+                    .orElseThrow(ClauseChatErrorCode.CHAT_NOT_FOUND::toException);
+
+            if (!session.isReadyToWrite()) {
+                throw ClauseChatErrorCode.CHAT_NOT_READY_TO_WRITE.toException();
+            }
+
+            // 한 번 확정으로 한 번만 쓴다. (재시도·더블클릭으로 LLM 작성이 중복 실행되지 않게)
+            // 다시 쓰려면 사용자가 다시 확정해야 한다.
+            session.setReadyToWrite(false);
+
+            if (!sessionStore.saveIfPresent(sessionId, session)) {
+                throw ClauseChatErrorCode.CHAT_NOT_FOUND.toException();
+            }
+
+            chatRequest = RagClauseChatRequest.builder()
+                    .contract(session.getContract())
+                    .message(session.getMessage())
+                    .issues(orEmpty(session.getIssues()))
+                    .slots(orEmpty(session.getSlots()))
+                    .questions(orEmpty(session.getQuestions()))
+                    .answers(session.getAnswers() != null ? session.getAnswers() : new HashMap<>())
+                    .build();
+
+        } finally {
+            sessionStore.unlock(sessionId);
+        }
 
         log.info(
                 "대화형 특약 작성 시작 - slots={}, answers={}",
