@@ -122,6 +122,7 @@ class ClauseChatServiceTest {
     @Test
     @DisplayName("없거나 남의 대화에 답하면 404")
     void replyToMissingSessionIs404() {
+        given(sessionStore.tryLock("session-1")).willReturn(true);
         given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> clauseChatService.reply(USER_ID, "session-1", new ClauseChatReplyRequest("네")))
@@ -140,6 +141,8 @@ class ClauseChatServiceTest {
                 .answers(Map.of())
                 .build();
 
+        given(sessionStore.tryLock("session-1")).willReturn(true);
+        given(sessionStore.saveIfPresent("session-1", session)).willReturn(true);
         given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
         given(ragApiClient.routeReply(any())).willReturn(
                 new RagClauseRouteResponse(
@@ -158,12 +161,13 @@ class ClauseChatServiceTest {
         assertThat(response.kind()).isEqualTo("CONFIRM");
         assertThat(response.readyToWrite()).isTrue();
         assertThat(session.isReadyToWrite()).isTrue();
-        verify(sessionStore).save(eq("session-1"), eq(session));
+        verify(sessionStore).unlock("session-1");
     }
 
     @Test
     @DisplayName("확정 전에는 작성할 수 없다 (409)")
     void writeBeforeConfirmIsRejected() {
+        given(sessionStore.tryLock("session-1")).willReturn(true);
         given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(
                 ClauseChatSessionDTO.builder().ownerUserId(USER_ID).readyToWrite(false).build()
         ));
@@ -191,6 +195,8 @@ class ClauseChatServiceTest {
                 .build();
         SseEmitter emitter = new SseEmitter();
 
+        given(sessionStore.tryLock("session-1")).willReturn(true);
+        given(sessionStore.saveIfPresent("session-1", session)).willReturn(true);
         given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
         given(contractClauseAgentService.relayStream(any())).willReturn(emitter);
 
@@ -209,5 +215,45 @@ class ClauseChatServiceTest {
 
         assertThat(sent.getValue().getIssues()).hasSize(1);
         assertThat(sent.getValue().getMessage()).isEqualTo("3개월 연속 연체하면 전부 갚게 해 주세요");
+        assertThat(session.isReadyToWrite()).isFalse();
+    }
+
+    @Test
+    @DisplayName("같은 대화에 답장이 겹치면 두 번째는 409이고 AI를 부르지 않는다")
+    void concurrentReplyIsRejected() {
+        given(sessionStore.tryLock("session-1")).willReturn(false);
+
+        assertThatThrownBy(() -> clauseChatService.reply(USER_ID, "session-1", new ClauseChatReplyRequest("네")))
+                .isInstanceOf(DomainException.class)
+                .extracting("errorCode")
+                .isEqualTo(ClauseChatErrorCode.CHAT_BUSY);
+
+        verify(ragApiClient, never()).routeReply(any());
+        verify(sessionStore, never()).unlock(any());
+    }
+
+    @Test
+    @DisplayName("AI를 부르는 사이 대화가 만료되면 되살리지 않고 404")
+    void expiredDuringReplyIsNotRevived() {
+        ClauseChatSessionDTO session = ClauseChatSessionDTO.builder()
+                .ownerUserId(USER_ID)
+                .slots(List.of())
+                .questions(List.of())
+                .answers(Map.of())
+                .build();
+
+        given(sessionStore.tryLock("session-1")).willReturn(true);
+        given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
+        given(ragApiClient.routeReply(any())).willReturn(
+                new RagClauseRouteResponse("CONFIRM", List.of(), Map.of(), List.of(), "확인했어요.", true)
+        );
+        given(sessionStore.saveIfPresent("session-1", session)).willReturn(false);
+
+        assertThatThrownBy(() -> clauseChatService.reply(USER_ID, "session-1", new ClauseChatReplyRequest("네")))
+                .isInstanceOf(DomainException.class)
+                .extracting("errorCode")
+                .isEqualTo(ClauseChatErrorCode.CHAT_NOT_FOUND);
+
+        verify(sessionStore).unlock("session-1");
     }
 }

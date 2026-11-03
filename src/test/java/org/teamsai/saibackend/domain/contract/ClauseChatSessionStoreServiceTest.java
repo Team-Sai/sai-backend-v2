@@ -19,8 +19,7 @@ import org.teamsai.saibackend.domain.contract.service.ClauseChatSessionStoreServ
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -110,5 +109,26 @@ class ClauseChatSessionStoreServiceTest {
         given(valueOperations.get(anyString())).willReturn("{깨진 값");
 
         assertThat(store.find("broken", OWNER_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("만료된 대화는 되살리지 않는다 (SET XX)")
+    void saveIfPresentDoesNotReviveExpiredSession() {
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
+        given(valueOperations.setIfPresent(eq("clause-chat:gone"), anyString(), eq(Duration.ofMinutes(30))))
+                .willReturn(false);
+
+        assertThat(store.saveIfPresent("gone", session())).isFalse();
+    }
+
+    @Test
+    @DisplayName("이미 잠긴 대화는 잠글 수 없다 (SET NX)")
+    void tryLockFailsWhenAlreadyLocked() {
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
+        given(valueOperations.setIfAbsent(eq("clause-chat:lock:session-1"), any(), any(Duration.class)))
+                .willReturn(true, false);
+
+        assertThat(store.tryLock("session-1")).isTrue();
+        assertThat(store.tryLock("session-1")).isFalse();
     }
 }
