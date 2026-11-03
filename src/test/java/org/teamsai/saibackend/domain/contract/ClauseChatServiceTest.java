@@ -3,6 +3,7 @@ package org.teamsai.saibackend.domain.contract;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,10 +12,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
+import org.teamsai.saibackend.domain.contract.client.RagSseReader;
 import org.teamsai.saibackend.domain.contract.dto.ClauseChatSessionDTO;
 import org.teamsai.saibackend.domain.contract.dto.request.ClauseChatReplyRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseChatRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
 import org.teamsai.saibackend.domain.contract.dto.response.ClauseChatReplyResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ClauseChatStartResponse;
@@ -31,8 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ClauseChatService 단위 테스트")
@@ -156,5 +159,55 @@ class ClauseChatServiceTest {
         assertThat(response.readyToWrite()).isTrue();
         assertThat(session.isReadyToWrite()).isTrue();
         verify(sessionStore).save(eq("session-1"), eq(session));
+    }
+
+    @Test
+    @DisplayName("확정 전에는 작성할 수 없다 (409)")
+    void writeBeforeConfirmIsRejected() {
+        given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(
+                ClauseChatSessionDTO.builder().ownerUserId(USER_ID).readyToWrite(false).build()
+        ));
+
+        assertThatThrownBy(() -> clauseChatService.write(USER_ID, "session-1"))
+                .isInstanceOf(DomainException.class)
+                .extracting("errorCode")
+                .isEqualTo(ClauseChatErrorCode.CHAT_NOT_READY_TO_WRITE);
+
+        verify(contractClauseAgentService, never()).relayStream(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("확정했으면 저장한 쟁점과 확정값으로 작성 스트림을 연다")
+    void writeAfterConfirmRelaysWithSavedState() {
+        ClauseChatSessionDTO session = ClauseChatSessionDTO.builder()
+                .ownerUserId(USER_ID)
+                .message("3개월 연속 연체하면 전부 갚게 해 주세요")
+                .issues(List.of(Map.of("type", "DEFAULT")))
+                .slots(List.of())
+                .questions(List.of())
+                .answers(Map.of())
+                .readyToWrite(true)
+                .build();
+        SseEmitter emitter = new SseEmitter();
+
+        given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
+        given(contractClauseAgentService.relayStream(any())).willReturn(emitter);
+
+        assertThat(clauseChatService.write(USER_ID, "session-1")).isSameAs(emitter);
+
+        // relayStream에 넘긴 "AI 부르기"를 꺼내 실제로 실행해 보고,
+        // 저장해 둔 쟁점과 처음 요청이 AI 요청에 들어가는지 확인한다.
+        ArgumentCaptor<Consumer<RagSseReader.Listener>> aiCall = ArgumentCaptor.forClass(Consumer.class);
+        verify(contractClauseAgentService).relayStream(aiCall.capture());
+
+        RagSseReader.Listener listener = mock(RagSseReader.Listener.class);
+        aiCall.getValue().accept(listener);
+
+        ArgumentCaptor<RagClauseChatRequest> sent = ArgumentCaptor.forClass(RagClauseChatRequest.class);
+        verify(ragApiClient).streamWrite(sent.capture(), eq(listener));
+
+        assertThat(sent.getValue().getIssues()).hasSize(1);
+        assertThat(sent.getValue().getMessage()).isEqualTo("3개월 연속 연체하면 전부 갚게 해 주세요");
     }
 }
