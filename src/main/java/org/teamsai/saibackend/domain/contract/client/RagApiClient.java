@@ -23,10 +23,13 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseChatRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagContractReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractLegalReviewResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseRouteResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseUnderstandResponse;
 
 @Slf4j
 @Component
@@ -128,6 +131,64 @@ public class RagApiClient {
 
         return response;
     }
+
+    /**
+     * 대화형 특약 1턴: 쓰기 전에 AI가 이해한 내용과 정해야 할 것을 받는다.
+     */
+    public RagClauseUnderstandResponse understandClause(
+            RagClauseSuggestionRequest request
+    ) {
+        // 요청 원문에는 개인 정보가 있을 수 있어 길이만 남긴다.
+        log.info(
+                "RAG 대화형 특약 이해 확인 요청 - messageLength={}",
+                request.getMessage() != null ? request.getMessage().length() : 0
+        );
+
+        RagClauseUnderstandResponse response =
+                executeRequest(
+                        "/rag/contracts/clause-chat/understand",
+                        request,
+                        RagClauseUnderstandResponse.class
+                );
+
+        if (response.getInScope() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "RAG 이해 확인 결과가 누락되었습니다."
+            );
+        }
+
+        return response;
+    }
+
+    /**
+     * 대화형 특약: 사용자 답장을 AI 서버가 규칙으로 분류한다. (LLM 없음)
+     */
+    public RagClauseRouteResponse routeReply(
+            RagClauseChatRequest request
+    ) {
+        log.info(
+                "RAG 대화형 특약 답장 분류 요청 - messageLength={}",
+                request.getMessage() != null ? request.getMessage().length() : 0
+        );
+
+        RagClauseRouteResponse response =
+                executeRequest(
+                        "/rag/contracts/clause-chat/route",
+                        request,
+                        RagClauseRouteResponse.class
+                );
+
+        if (response.getKind() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "RAG 답장 분류 결과가 누락되었습니다."
+            );
+        }
+
+        return response;
+    }
+
 
     /**
      * AI 특약 생성 스트리밍(SSE)을 받아 이벤트마다 listener에 넘긴다.
