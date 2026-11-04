@@ -29,4 +29,6 @@ public class RagClauseUnderstandResponse {
     private List<Map<String, Object>> fieldEdits;
 
     private String guide;
+
+    private List<String> notices;
 }

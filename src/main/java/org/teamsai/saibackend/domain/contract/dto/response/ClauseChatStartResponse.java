@@ -15,6 +15,7 @@ public record ClauseChatStartResponse(
         List<Map<String, Object>> slots,
         List<Map<String, Object>> questions,
         List<Map<String, Object>> fieldEdits,
-        String guide
+        String guide,
+        List<String> notices
 ) {
 }

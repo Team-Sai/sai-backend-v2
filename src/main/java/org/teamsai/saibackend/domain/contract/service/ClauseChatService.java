@@ -84,7 +84,8 @@ public class ClauseChatService {
                 slots,
                 questions,
                 fieldEdits,
-                understood.getGuide()
+                understood.getGuide(),
+                orEmpty(understood.getNotices())
         );
     }
 
