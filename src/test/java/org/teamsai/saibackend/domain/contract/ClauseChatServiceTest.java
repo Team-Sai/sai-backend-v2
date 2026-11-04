@@ -70,7 +70,8 @@ class ClauseChatServiceTest {
                 Map.of("summary", "요약", "slots", List.of(Map.of("name", "연속 연체 기간", "value", "3개월"))),
                 List.of(Map.of("id", "partial_payment", "text", "일부만 낸 달도 연체로 볼까요?")),
                 fieldEdits,
-                inScope ? null : "범위 밖 안내"
+                inScope ? null : "범위 밖 안내",
+                List.of("보증은 서면으로 해야 효력이 있어요 (민법 제428조의2제1항)")
         );
     }
 
@@ -90,6 +91,7 @@ class ClauseChatServiceTest {
         assertThat(response.summary()).isEqualTo("요약");
         assertThat(saved.getValue().getOwnerUserId()).isEqualTo(USER_ID);
         assertThat(saved.getValue().getIssues()).hasSize(1);
+        assertThat(response.notices()).hasSize(1);
     }
 
     @Test
