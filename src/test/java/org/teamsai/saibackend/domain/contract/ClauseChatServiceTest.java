@@ -12,6 +12,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
 import org.teamsai.saibackend.domain.contract.client.RagSseReader;
@@ -218,6 +220,32 @@ class ClauseChatServiceTest {
         assertThat(sent.getValue().getIssues()).hasSize(1);
         assertThat(sent.getValue().getMessage()).isEqualTo("3개월 연속 연체하면 전부 갚게 해 주세요");
         assertThat(session.isReadyToWrite()).isFalse();
+    }
+
+    @Test
+    @DisplayName("작성 요청이 몰려 시작하지 못하면 다시 작성할 수 있게 되돌린다")
+    void rejectedWriteRestoresReadyToWrite() {
+        ClauseChatSessionDTO session = ClauseChatSessionDTO.builder()
+                .ownerUserId(USER_ID)
+                .message("3개월 연속 연체하면 전부 갚게 해 주세요")
+                .issues(List.of(Map.of("type", "DEFAULT")))
+                .slots(List.of())
+                .questions(List.of())
+                .answers(Map.of())
+                .readyToWrite(true)
+                .build();
+
+        given(sessionStore.tryLock("session-1")).willReturn(true);
+        given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
+        given(sessionStore.saveIfPresent("session-1", session)).willReturn(true);
+        given(contractClauseAgentService.relayStream(any()))
+                .willThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "지금 AI 요청이 많아요."));
+
+        assertThatThrownBy(() -> clauseChatService.write(USER_ID, "session-1"))
+                .isInstanceOf(ResponseStatusException.class);
+
+        assertThat(session.isReadyToWrite()).isTrue();
+        verify(sessionStore, times(2)).saveIfPresent("session-1", session);
     }
 
     @Test

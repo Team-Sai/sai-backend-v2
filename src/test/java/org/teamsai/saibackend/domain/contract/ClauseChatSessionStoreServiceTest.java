@@ -10,6 +10,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -34,6 +37,9 @@ class ClauseChatSessionStoreServiceTest {
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Spy
+    private ObjectMapper objectMapper = JsonMapper.builder().build();
 
     @InjectMocks
     private ClauseChatSessionStoreService store;
