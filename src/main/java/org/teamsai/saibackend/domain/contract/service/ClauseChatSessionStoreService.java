@@ -34,7 +34,7 @@ public class ClauseChatSessionStoreService {
     /** 잠금은 AI 답장 분류 시간보다 넉넉하게. 서버가 죽어도 이 시간이 지나면 저절로 풀린다. */
     static final Duration LOCK_TTL = Duration.ofSeconds(30);
 
-    private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+    private final ObjectMapper objectMapper;
 
     private final StringRedisTemplate redisTemplate;
 
@@ -48,7 +48,7 @@ public class ClauseChatSessionStoreService {
     public void save(String sessionId, ClauseChatSessionDTO session) {
         redisTemplate.opsForValue().set(
                 createKey(sessionId),
-                MAPPER.writeValueAsString(session),
+                objectMapper.writeValueAsString(session),
                 TTL
         );
     }
@@ -61,7 +61,7 @@ public class ClauseChatSessionStoreService {
         return Boolean.TRUE.equals(
                 redisTemplate.opsForValue().setIfPresent(
                         createKey(sessionId),
-                        MAPPER.writeValueAsString(session),
+                        objectMapper.writeValueAsString(session),
                         TTL
                 )
         );
@@ -99,7 +99,7 @@ public class ClauseChatSessionStoreService {
         ClauseChatSessionDTO session;
 
         try {
-            session = MAPPER.readValue(json, ClauseChatSessionDTO.class);
+            session = objectMapper.readValue(json, ClauseChatSessionDTO.class);
 
         } catch (JacksonException e) {
             // 저장된 값이 깨졌으면 이어갈 수 없으니 새 대화를 시작하게 한다.

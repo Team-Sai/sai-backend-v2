@@ -7,6 +7,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
 import org.teamsai.saibackend.domain.contract.dto.ClauseChatSessionDTO;
@@ -194,9 +195,23 @@ public class ClauseChatService {
                 chatRequest.getAnswers().size()
         );
 
-        return contractClauseAgentService.relayStream(
-                listener -> ragApiClient.streamWrite(chatRequest, listener)
-        );
+        try {
+            return contractClauseAgentService.relayStream(
+                    listener -> ragApiClient.streamWrite(chatRequest, listener)
+            );
+
+        } catch (ResponseStatusException e) {
+            // 요청이 몰려 작성을 시작조차 못 했으면(503) 다시 [작성하기]를 누를 수 있게 되돌린다.
+            restoreReadyToWrite(userId, sessionId);
+            throw e;
+        }
+    }
+
+    private void restoreReadyToWrite(Long userId, String sessionId) {
+        sessionStore.find(sessionId, userId).ifPresent(session -> {
+            session.setReadyToWrite(true);
+            sessionStore.saveIfPresent(sessionId, session);
+        });
     }
 
 
