@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.contract.service;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -94,11 +95,22 @@ public class ContractClauseAgentService {
         // 계약 정보·원래 요청은 특약 생성과 같은 규칙으로 바꾼다.
         RagClauseSuggestionRequest ragRequest = toRagRequest(request.request());
 
+        // 브라우저가 보낸 쟁점에서 type(문자열)만 골라 AI로 보낸다. (다른 칸·큰 JSON은 버린다)
+        List<Map<String, Object>> issues = request.issues().stream()
+                .map(issue -> issue == null ? null : issue.get("type"))
+                .filter(type -> type instanceof String text && !text.isBlank())
+                .map(type -> Map.<String, Object>of("type", type))
+                .toList();
+
+        if (issues.isEmpty()) {
+            throw new IllegalArgumentException("쟁점 정보가 올바르지 않습니다.");
+        }
+
         return ragApiClient.reviewClause(
                 RagClauseReviewRequest.builder()
                         .contract(ragRequest.getContract())
                         .message(ragRequest.getMessage())
-                        .issues(request.issues())
+                        .issues(issues)
                         .clause(request.clause().trim())
                         .build()
         );

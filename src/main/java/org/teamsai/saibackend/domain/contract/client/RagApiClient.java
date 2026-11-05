@@ -27,7 +27,11 @@ import org.teamsai.saibackend.domain.contract.dto.request.RagClauseChatRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagContractReviewRequest;
-import org.teamsai.saibackend.domain.contract.dto.response.*;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseReviewResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.ContractLegalReviewResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseRouteResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseUnderstandResponse;
 
 @Slf4j
 @Component

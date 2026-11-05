@@ -22,6 +22,7 @@ public record ClauseReviewRequest(
         ContractClauseRequest request,
 
         @NotEmpty(message = "쟁점 정보가 필요합니다.")
+        @Size(max = 10, message = "쟁점은 10개 이내로 보내 주세요.")
         List<Map<String, Object>> issues,
 
         @NotBlank(message = "검토할 조항 문장을 입력해 주세요.")
