@@ -31,6 +31,10 @@ public class ClauseChatSessionStoreService {
 
     private static final String REFERENCES_KEY_PREFIX = "clause-chat:refs:";
 
+    /** 근거 법령 목록 JSON을 읽을 때 쓰는 타입. 매번 만들지 않도록 한 번만 만든다. */
+    private static final TypeReference<List<Map<String, Object>>> REFERENCES_TYPE =
+            new TypeReference<List<Map<String, Object>>>() {};
+
     /** 잠금은 AI 답장 분류 시간보다 넉넉하게. 서버가 죽어도 이 시간이 지나면 저절로 풀린다. */
     static final Duration LOCK_TTL = Duration.ofSeconds(30);
 
@@ -97,16 +101,19 @@ public class ClauseChatSessionStoreService {
         );
     }
 
-    /** 없거나(아직 안 끝남·실패·만료) 깨졌으면 빈 값. 그러면 AI가 지금처럼 검색한다. */
-    public Optional<List<Map<String, Object>>> findReferences(String sessionId) {
-        String json = redisTemplate.opsForValue().get(REFERENCES_KEY_PREFIX + sessionId);
+    /**
+     * 미리 찾은 법령을 꺼내면서 지운다. (작성 때 한 번 쓰면 더 필요 없다)
+     * 없거나(아직 안 끝남·실패·만료) 깨졌으면 빈 값. 그러면 AI가 지금처럼 검색한다.
+     */
+    public Optional<List<Map<String, Object>>> takeReferences(String sessionId) {
+        String json = redisTemplate.opsForValue().getAndDelete(REFERENCES_KEY_PREFIX + sessionId);
 
         if (json == null) {
             return Optional.empty();
         }
 
         try {
-            return Optional.of(objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {}));
+            return Optional.of(objectMapper.readValue(json, REFERENCES_TYPE));
 
         } catch (JacksonException e) {
             log.warn("대화형 특약 근거 법령 읽기 실패 - exceptionType={}", e.getClass().getName());

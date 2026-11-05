@@ -196,7 +196,7 @@ public class ClauseChatService {
                     .slots(orEmpty(session.getSlots()))
                     .questions(orEmpty(session.getQuestions()))
                     .answers(session.getAnswers() != null ? session.getAnswers() : new HashMap<>())
-                    .references(sessionStore.findReferences(sessionId).orElse(null))
+                    .references(sessionStore.takeReferences(sessionId).orElse(null))
                     .build();
 
         } finally {
