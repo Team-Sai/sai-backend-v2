@@ -209,7 +209,7 @@ class ClauseChatServiceTest {
         given(sessionStore.saveIfPresent("session-1", session)).willReturn(true);
         given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
         given(contractClauseAgentService.relayStream(any())).willReturn(emitter);
-        given(sessionStore.findReferences("session-1"))
+        given(sessionStore.takeReferences("session-1"))
                 .willReturn(Optional.of(List.of(Map.of("document_id", "민법-398"))));
 
         assertThat(clauseChatService.write(USER_ID, "session-1")).isSameAs(emitter);
