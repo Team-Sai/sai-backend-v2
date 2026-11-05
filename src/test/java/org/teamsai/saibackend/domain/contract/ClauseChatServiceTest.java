@@ -27,6 +27,7 @@ import org.teamsai.saibackend.domain.contract.dto.response.ClauseChatStartRespon
 import org.teamsai.saibackend.domain.contract.dto.response.RagClauseRouteResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RagClauseUnderstandResponse;
 import org.teamsai.saibackend.domain.contract.exception.ClauseChatErrorCode;
+import org.teamsai.saibackend.domain.contract.service.ClauseChatPrepareService;
 import org.teamsai.saibackend.domain.contract.service.ClauseChatService;
 import org.teamsai.saibackend.domain.contract.service.ClauseChatSessionStoreService;
 import org.teamsai.saibackend.domain.contract.service.ContractClauseAgentService;
@@ -53,6 +54,9 @@ class ClauseChatServiceTest {
 
     @Mock
     private ContractClauseAgentService contractClauseAgentService;
+
+    @Mock
+    private ClauseChatPrepareService prepareService;
 
     @InjectMocks
     private ClauseChatService clauseChatService;
@@ -94,6 +98,7 @@ class ClauseChatServiceTest {
         assertThat(saved.getValue().getOwnerUserId()).isEqualTo(USER_ID);
         assertThat(saved.getValue().getIssues()).hasSize(1);
         assertThat(response.notices()).hasSize(1);
+        verify(prepareService).prepareInBackground(eq("session-1"), any());
     }
 
     @Test
@@ -107,6 +112,7 @@ class ClauseChatServiceTest {
         assertThat(response.sessionId()).isNull();
         assertThat(response.guide()).isEqualTo("범위 밖 안내");
         verify(sessionStore, never()).create(any());
+        verify(prepareService, never()).prepareInBackground(any(), any());
     }
 
     @Test
@@ -203,6 +209,8 @@ class ClauseChatServiceTest {
         given(sessionStore.saveIfPresent("session-1", session)).willReturn(true);
         given(sessionStore.find("session-1", USER_ID)).willReturn(Optional.of(session));
         given(contractClauseAgentService.relayStream(any())).willReturn(emitter);
+        given(sessionStore.findReferences("session-1"))
+                .willReturn(Optional.of(List.of(Map.of("document_id", "민법-398"))));
 
         assertThat(clauseChatService.write(USER_ID, "session-1")).isSameAs(emitter);
 
@@ -219,6 +227,7 @@ class ClauseChatServiceTest {
 
         assertThat(sent.getValue().getIssues()).hasSize(1);
         assertThat(sent.getValue().getMessage()).isEqualTo("3개월 연속 연체하면 전부 갚게 해 주세요");
+        assertThat(sent.getValue().getReferences()).hasSize(1);
         assertThat(session.isReadyToWrite()).isFalse();
     }
 
