@@ -1,9 +1,7 @@
 package org.teamsai.saibackend.domain.contract.service;
 
 import java.time.Duration;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.teamsai.saibackend.domain.contract.dto.ClauseChatSessionDTO;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.core.type.TypeReference;
 
 /**
  * 대화형 AI 특약의 대화 상태를 Redis에 보관한다.
@@ -30,6 +28,8 @@ public class ClauseChatSessionStoreService {
     static final Duration TTL = Duration.ofMinutes(30);
 
     private static final String LOCK_KEY_PREFIX = "clause-chat:lock:";
+
+    private static final String REFERENCES_KEY_PREFIX = "clause-chat:refs:";
 
     /** 잠금은 AI 답장 분류 시간보다 넉넉하게. 서버가 죽어도 이 시간이 지나면 저절로 풀린다. */
     static final Duration LOCK_TTL = Duration.ofSeconds(30);
@@ -83,6 +83,35 @@ public class ClauseChatSessionStoreService {
 
     public void unlock(String sessionId) {
         redisTemplate.delete(LOCK_KEY_PREFIX + sessionId);
+    }
+
+    /**
+     * 미리 찾은 근거 법령을 대화와 다른 키에 둔다.
+     * 같은 키에 두면 답장 저장(대화 전체 덮어쓰기)이 방금 넣은 법령을 지울 수 있다.
+     */
+    public void saveReferences(String sessionId, List<Map<String, Object>> references) {
+        redisTemplate.opsForValue().set(
+                REFERENCES_KEY_PREFIX + sessionId,
+                objectMapper.writeValueAsString(references),
+                TTL
+        );
+    }
+
+    /** 없거나(아직 안 끝남·실패·만료) 깨졌으면 빈 값. 그러면 AI가 지금처럼 검색한다. */
+    public Optional<List<Map<String, Object>>> findReferences(String sessionId) {
+        String json = redisTemplate.opsForValue().get(REFERENCES_KEY_PREFIX + sessionId);
+
+        if (json == null) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {}));
+
+        } catch (JacksonException e) {
+            log.warn("대화형 특약 근거 법령 읽기 실패 - exceptionType={}", e.getClass().getName());
+            return Optional.empty();
+        }
     }
 
     /**
