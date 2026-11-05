@@ -25,8 +25,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
 import org.teamsai.saibackend.domain.contract.client.RagSseReader;
 import org.teamsai.saibackend.domain.contract.client.RagStreamEventFilter;
+import org.teamsai.saibackend.domain.contract.dto.request.ClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseReviewResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
 
 @Slf4j
@@ -79,6 +82,25 @@ public class ContractClauseAgentService {
     ) {
         return ragApiClient.suggestClause(
                 toRagRequest(request)
+        );
+    }
+
+    /**
+     * 반영한 AI 조항을 사용자가 채우거나 고친 뒤 다시 검토한다.
+     */
+    public ClauseReviewResponse reviewClause(
+            ClauseReviewRequest request
+    ) {
+        // 계약 정보·원래 요청은 특약 생성과 같은 규칙으로 바꾼다.
+        RagClauseSuggestionRequest ragRequest = toRagRequest(request.request());
+
+        return ragApiClient.reviewClause(
+                RagClauseReviewRequest.builder()
+                        .contract(ragRequest.getContract())
+                        .message(ragRequest.getMessage())
+                        .issues(request.issues())
+                        .clause(request.clause().trim())
+                        .build()
         );
     }
 

@@ -24,12 +24,10 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseChatRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagContractReviewRequest;
-import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.ContractLegalReviewResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.RagClauseRouteResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.RagClauseUnderstandResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.*;
 
 @Slf4j
 @Component
@@ -183,6 +181,36 @@ public class RagApiClient {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
                     "RAG 답장 분류 결과가 누락되었습니다."
+            );
+        }
+
+        return response;
+    }
+
+
+    /**
+     * 반영한 AI 조항 다시 검토. (생성 없이 검증만)
+     */
+    public ClauseReviewResponse reviewClause(
+            RagClauseReviewRequest request
+    ) {
+        // 조항·요청에는 개인 정보가 있을 수 있어 길이만 남긴다.
+        log.info(
+                "RAG 조항 다시 검토 요청 - clauseLength={}",
+                request.getClause() != null ? request.getClause().length() : 0
+        );
+
+        ClauseReviewResponse response =
+                executeRequest(
+                        "/rag/contracts/clause-review",
+                        request,
+                        ClauseReviewResponse.class
+                );
+
+        if (response.status() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "RAG 다시 검토 결과가 누락되었습니다."
             );
         }
 
