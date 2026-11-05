@@ -12,10 +12,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseChatRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagContractReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractLegalReviewResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseRouteResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.RagClauseUnderstandResponse;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -23,6 +26,8 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -61,6 +66,11 @@ class RagApiClientTest {
 
         server.createContext(
                 "/rag/contracts/review",
+                this::handleRequest
+        );
+
+        server.createContext(
+                "/rag/contracts/clause-chat",
                 this::handleRequest
         );
 
@@ -402,6 +412,74 @@ class RagApiClientTest {
                                     .build()
                     )
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("대화형 특약")
+    class ClauseChat {
+
+        @Test
+        @DisplayName("이해 확인 응답을 받아 온다 (debug는 버림)")
+        void understandClause() {
+            responseBody = """
+                    {"inScope": true,
+                     "issues": [{"type": "DEFAULT", "reason": "연체", "searchTerms": ["이행지체"]}],
+                     "understanding": {"summary": "요약", "slots": []},
+                     "questions": [], "fieldEdits": [], "guide": null,
+                     "debug": {"performance": {"issueAnalysisMs": 1.0}}}
+                    """;
+
+            RagClauseUnderstandResponse response = client.understandClause(
+                    RagClauseSuggestionRequest.builder()
+                            .message("3개월 연속 연체하면 전부 갚게 해 주세요")
+                            .build()
+            );
+
+            assertTrue(response.getInScope());
+            assertEquals("DEFAULT", response.getIssues().get(0).get("type"));
+            assertEquals("요약", response.getUnderstanding().get("summary"));
+        }
+
+        @Test
+        @DisplayName("답장 분류 요청에 대화 상태를 그대로 보낸다")
+        void routeReply() throws Exception {
+            responseBody = """
+                    {"kind": "CONFIRM", "slots": [], "answers": {}, "pendingQuestions": [],
+                     "echo": "확인했어요.", "readyToWrite": true}
+                    """;
+
+            RagClauseRouteResponse response = client.routeReply(
+                    RagClauseChatRequest.builder()
+                            .message("네")
+                            .slots(List.of())
+                            .questions(List.of())
+                            .answers(Map.of())
+                            .build()
+            );
+
+            assertEquals("CONFIRM", response.getKind());
+            assertTrue(response.getReadyToWrite());
+
+            JsonNode sent = mapper.readTree(receivedBody.get());
+            assertEquals("네", sent.get("message").asText());
+            assertTrue(sent.get("answers").isObject());
+        }
+
+        @Test
+        @DisplayName("AI 서버 오류는 502로 바꾼다")
+        void routeReplyServerError() {
+            responseStatus = 500;
+            responseBody = "{\"detail\": \"error\"}";
+
+            ResponseStatusException e = assertThrows(
+                    ResponseStatusException.class,
+                    () -> client.routeReply(
+                            RagClauseChatRequest.builder().message("네").build()
+                    )
+            );
+
+            assertEquals(HttpStatus.BAD_GATEWAY, e.getStatusCode());
         }
     }
 }

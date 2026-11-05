@@ -29,6 +29,21 @@ class RagStreamEventFilterTest {
     }
 
     @Test
+    @DisplayName("final 이벤트의 측정용 필드(validatorMode, llmReasons)는 화면으로 보내지 않는다")
+    void finalDropsValidatorModeAndLlmReasons() {
+        Optional<String> result = RagStreamEventFilter.filter(
+                "final",
+                "{\"suggestedClause\":\"제1조\",\"validatorMode\":\"LLM\","
+                        + "\"llmReasons\":[\"slot_not_reflected\"]}"
+        );
+
+        assertTrue(result.isPresent());
+        assertTrue(result.get().contains("\"suggestedClause\":\"제1조\""));
+        assertFalse(result.get().contains("validatorMode"));
+        assertFalse(result.get().contains("llmReasons"));
+    }
+
+    @Test
     @DisplayName("delta 이벤트는 text만 남긴다")
     void deltaKeepsText() {
         assertEquals(

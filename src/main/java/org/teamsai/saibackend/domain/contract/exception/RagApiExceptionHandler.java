@@ -10,11 +10,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.teamsai.saibackend.domain.contract.controller.ClauseChatController;
 import org.teamsai.saibackend.domain.contract.controller.ContractClauseAgentController;
 import org.teamsai.saibackend.domain.contract.controller.ContractLegalReviewController;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = {
+        ClauseChatController.class,
         ContractClauseAgentController.class,
         ContractLegalReviewController.class
 })
