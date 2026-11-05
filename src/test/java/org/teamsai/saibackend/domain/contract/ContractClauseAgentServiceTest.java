@@ -9,13 +9,19 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
+import org.teamsai.saibackend.domain.contract.dto.request.ClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseReviewResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
 import org.teamsai.saibackend.domain.contract.service.ContractClauseAgentService;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -111,6 +117,60 @@ class ContractClauseAgentServiceTest {
                 assertEquals("AI에게 요청할 내용을 입력해 주세요.", exception.getMessage());
             }
             verifyNoInteractions(ragApiClient);
+        }
+    }
+
+    @Nested
+    @DisplayName("반영한 조항 다시 검토")
+    class ReviewClause {
+
+        @Test
+        @DisplayName("계약 정보·원래 요청·쟁점과 공백을 정리한 조항을 AI에 보낸다")
+        void reviewClause_sendsContractIssuesAndTrimmedClause() {
+            ContractClauseRequest request = ContractClauseRequest.builder()
+                    .principalAmount(new BigDecimal("5000000"))
+                    .interestRate(new BigDecimal("5"))
+                    .message("  중도상환 수수료 없이 해 주세요  ")
+                    .build();
+            ClauseReviewResponse expected = new ClauseReviewResponse(
+                    "PASS", true, List.of(), List.of(), List.of(), null
+            );
+            when(ragApiClient.reviewClause(any(RagClauseReviewRequest.class))).thenReturn(expected);
+
+            ClauseReviewResponse actual = service.reviewClause(new ClauseReviewRequest(
+                    request,
+                    List.of(Map.of("type", "EARLY_REPAYMENT")),
+                    "  채무자는 언제든지 중도상환할 수 있다.  "
+            ));
+
+            assertSame(expected, actual);
+            ArgumentCaptor<RagClauseReviewRequest> captor =
+                    ArgumentCaptor.forClass(RagClauseReviewRequest.class);
+            verify(ragApiClient).reviewClause(captor.capture());
+            RagClauseReviewRequest sent = captor.getValue();
+            assertEquals("중도상환 수수료 없이 해 주세요", sent.getMessage());
+            assertEquals("채무자는 언제든지 중도상환할 수 있다.", sent.getClause());
+            assertEquals("EARLY_REPAYMENT", sent.getIssues().get(0).get("type"));
+            assertEquals(new BigDecimal("5000000"), sent.getContract().getPrincipal());
+        }
+
+        @Test
+        @DisplayName("AI 응답의 내부 칸(validatorMode 등)은 받을 때 버린다")
+        void reviewResponse_dropsInternalFields() {
+            String aiJson = """
+                    {"status":"REVIEW","isSafeToSuggest":true,"checks":[],"warnings":["확인"],
+                     "openSlots":["사전 통지 기간"],"suggestedClause":null,
+                     "validatorMode":"LLM","debug":{"llmReasons":["x"]}}
+                    """;
+
+            ClauseReviewResponse response = JsonMapper.builder().build()
+                    .readValue(aiJson, ClauseReviewResponse.class);
+
+            assertEquals("REVIEW", response.status());
+            assertEquals(List.of("사전 통지 기간"), response.openSlots());
+            String sentToBrowser = JsonMapper.builder().build().writeValueAsString(response);
+            assertFalse(sentToBrowser.contains("validatorMode"));
+            assertFalse(sentToBrowser.contains("debug"));
         }
     }
 }
