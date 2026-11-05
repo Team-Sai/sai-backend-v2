@@ -155,6 +155,35 @@ class ContractClauseAgentServiceTest {
         }
 
         @Test
+        @DisplayName("쟁점에서 type만 골라 보내고, 쓸 수 있는 type이 없으면 거절한다")
+        void reviewClause_sendsOnlyIssueTypes() {
+            ContractClauseRequest request = ContractClauseRequest.builder()
+                    .principalAmount(new BigDecimal("5000000"))
+                    .interestRate(new BigDecimal("5"))
+                    .message("중도상환 수수료 없이 해 주세요")
+                    .build();
+            when(ragApiClient.reviewClause(any(RagClauseReviewRequest.class)))
+                    .thenReturn(new ClauseReviewResponse("PASS", true, List.of(), List.of(), List.of(), null));
+
+            service.reviewClause(new ClauseReviewRequest(
+                    request,
+                    List.of(Map.of("type", "EARLY_REPAYMENT", "searchTerms", List.of("아주", "긴", "목록"))),
+                    "채무자는 언제든지 중도상환할 수 있다."
+            ));
+
+            ArgumentCaptor<RagClauseReviewRequest> captor =
+                    ArgumentCaptor.forClass(RagClauseReviewRequest.class);
+            verify(ragApiClient).reviewClause(captor.capture());
+            assertEquals(List.of(Map.of("type", "EARLY_REPAYMENT")), captor.getValue().getIssues());
+
+            assertThrows(IllegalArgumentException.class, () -> service.reviewClause(new ClauseReviewRequest(
+                    request,
+                    List.of(Map.of("reason", "type 없음")),
+                    "채무자는 언제든지 중도상환할 수 있다."
+            )));
+        }
+
+        @Test
         @DisplayName("AI 응답의 내부 칸(validatorMode 등)은 받을 때 버린다")
         void reviewResponse_dropsInternalFields() {
             String aiJson = """
