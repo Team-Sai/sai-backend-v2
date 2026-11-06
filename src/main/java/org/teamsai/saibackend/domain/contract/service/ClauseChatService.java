@@ -67,6 +67,7 @@ public class ClauseChatService {
                             .slots(slots)
                             .questions(questions)
                             .answers(new HashMap<>())
+                            .demo(ragRequest.isDemo())
                             .build()
             );
 
@@ -78,6 +79,7 @@ public class ClauseChatService {
                             .contract(ragRequest.getContract())
                             .message(ragRequest.getMessage())
                             .issues(orEmpty(understood.getIssues()))
+                            .demo(ragRequest.isDemo())
                             .build()
             );
         }
@@ -197,6 +199,7 @@ public class ClauseChatService {
                     .questions(orEmpty(session.getQuestions()))
                     .answers(session.getAnswers() != null ? session.getAnswers() : new HashMap<>())
                     .references(sessionStore.takeReferences(sessionId).orElse(null))
+                    .demo(session.isDemo())
                     .build();
 
         } finally {

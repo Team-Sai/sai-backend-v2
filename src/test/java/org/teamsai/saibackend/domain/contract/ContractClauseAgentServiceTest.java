@@ -83,6 +83,25 @@ class ContractClauseAgentServiceTest {
         }
 
         @Test
+        @DisplayName("발표 시연 표시는 있으면 true, 없으면 false로 전달한다")
+        void toRagRequest_mapsDemoFlag() {
+            ContractClauseRequest normal = ContractClauseRequest.builder()
+                    .principalAmount(new BigDecimal("1000000"))
+                    .interestRate(new BigDecimal("5"))
+                    .message("연체 특약을 만들어 줘")
+                    .build();
+            ContractClauseRequest demo = ContractClauseRequest.builder()
+                    .principalAmount(new BigDecimal("1000000"))
+                    .interestRate(new BigDecimal("5"))
+                    .message("연체 특약을 만들어 줘")
+                    .demo(true)
+                    .build();
+
+            assertFalse(service.toRagRequest(normal).isDemo());
+            assertTrue(service.toRagRequest(demo).isDemo());
+        }
+
+        @Test
         @DisplayName("계약 날짜가 없으면 null로 전달한다")
         void suggestClause_withNullDates_preservesNullDates() {
             ContractClauseRequest request = ContractClauseRequest.builder()

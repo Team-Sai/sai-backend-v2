@@ -372,6 +372,7 @@ public class ContractClauseAgentService {
                 .message(
                         request.getMessage().trim()
                 )
+                .demo(Boolean.TRUE.equals(request.getDemo()))
                 .build();
     }
 
