@@ -35,6 +35,8 @@ public class ClauseChatService {
 
     private final ClauseChatSessionStoreService sessionStore;
 
+    private final ClauseChatPrepareService prepareService;
+
     private final ContractClauseAgentService contractClauseAgentService;
 
     public ClauseChatStartResponse start(
@@ -65,6 +67,17 @@ public class ClauseChatService {
                             .slots(slots)
                             .questions(questions)
                             .answers(new HashMap<>())
+                            .build()
+            );
+
+
+            // 사용자가 질문에 답하는 동안 근거 법령을 미리 찾아 둔다. (응답은 기다리지 않는다)
+            prepareService.prepareInBackground(
+                    sessionId,
+                    RagClauseChatRequest.builder()
+                            .contract(ragRequest.getContract())
+                            .message(ragRequest.getMessage())
+                            .issues(orEmpty(understood.getIssues()))
                             .build()
             );
         }
@@ -183,6 +196,7 @@ public class ClauseChatService {
                     .slots(orEmpty(session.getSlots()))
                     .questions(orEmpty(session.getQuestions()))
                     .answers(session.getAnswers() != null ? session.getAnswers() : new HashMap<>())
+                    .references(sessionStore.takeReferences(sessionId).orElse(null))
                     .build();
 
         } finally {

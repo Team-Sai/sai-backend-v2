@@ -24,6 +24,7 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -136,5 +137,19 @@ class ClauseChatSessionStoreServiceTest {
 
         assertThat(store.tryLock("session-1")).isTrue();
         assertThat(store.tryLock("session-1")).isFalse();
+    }
+
+    @Test
+    @DisplayName("미리 찾은 법령은 꺼내면서 지운다")
+    void takeReferencesReadsAndDeletes() {
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
+        given(valueOperations.getAndDelete("clause-chat:refs:session-1"))
+                .willReturn("[{\"document_id\":\"민법-398\"}]");
+
+        Optional<List<Map<String, Object>>> references = store.takeReferences("session-1");
+
+        assertThat(references).isPresent();
+        assertThat(references.get().get(0)).containsEntry("document_id", "민법-398");
+        verify(valueOperations, never()).get("clause-chat:refs:session-1");
     }
 }

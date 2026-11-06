@@ -31,4 +31,7 @@ public class RagClauseChatRequest {
     private List<Map<String, Object>> questions;
 
     private Map<String, String> answers;
+
+    /** /prepare로 미리 찾은 근거 법령 (write에서만). 없으면 null → AI가 지금처럼 검색한다. */
+    private List<Map<String, Object>> references;
 }

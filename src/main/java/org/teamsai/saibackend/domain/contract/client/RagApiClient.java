@@ -26,10 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseChatRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagContractReviewRequest;
-import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.ContractLegalReviewResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.RagClauseRouteResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.RagClauseUnderstandResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.*;
 
 @Slf4j
 @Component
@@ -187,6 +184,19 @@ public class RagApiClient {
         }
 
         return response;
+    }
+
+    /**
+     * 대화형 특약: 사용자가 답하는 동안 근거 법령을 미리 찾는다. (뒤에서 부른다)
+     */
+    public RagClausePrepareResponse prepareReferences(
+            RagClauseChatRequest request
+    ) {
+        return executeRequest(
+                "/rag/contracts/clause-chat/prepare",
+                request,
+                RagClausePrepareResponse.class
+        );
     }
 
 
