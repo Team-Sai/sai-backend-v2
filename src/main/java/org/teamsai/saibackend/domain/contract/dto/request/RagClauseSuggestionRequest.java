@@ -17,6 +17,9 @@ public class RagClauseSuggestionRequest {
 
     private String message;
 
+    /** 발표 시연 표시 (기본 false) */
+    private boolean demo;
+
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
