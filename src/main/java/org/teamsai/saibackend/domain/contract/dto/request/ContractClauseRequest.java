@@ -58,4 +58,7 @@ public class ContractClauseRequest {
             message = "요청 내용은 1,000자 이내로 입력해 주세요."
     )
     private String message;
+
+    /** 발표 시연 표시. 없으면 일반 요청이다. (AI 서버가 허용했을 때만 쓰인다) */
+    private Boolean demo;
 }

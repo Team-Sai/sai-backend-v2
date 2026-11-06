@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.contract.service;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +26,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
 import org.teamsai.saibackend.domain.contract.client.RagSseReader;
 import org.teamsai.saibackend.domain.contract.client.RagStreamEventFilter;
+import org.teamsai.saibackend.domain.contract.dto.request.ClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseReviewResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
 
 @Slf4j
@@ -82,6 +87,36 @@ public class ContractClauseAgentService {
     }
 
     /**
+     * 반영한 AI 조항을 사용자가 채우거나 고친 뒤 다시 검토한다.
+     */
+    public ClauseReviewResponse reviewClause(
+            ClauseReviewRequest request
+    ) {
+        // 계약 정보·원래 요청은 특약 생성과 같은 규칙으로 바꾼다.
+        RagClauseSuggestionRequest ragRequest = toRagRequest(request.request());
+
+        // 브라우저가 보낸 쟁점에서 type(문자열)만 골라 AI로 보낸다. (다른 칸·큰 JSON은 버린다)
+        List<Map<String, Object>> issues = request.issues().stream()
+                .map(issue -> issue == null ? null : issue.get("type"))
+                .filter(type -> type instanceof String text && !text.isBlank())
+                .map(type -> Map.<String, Object>of("type", type))
+                .toList();
+
+        if (issues.isEmpty()) {
+            throw new IllegalArgumentException("쟁점 정보가 올바르지 않습니다.");
+        }
+
+        return ragApiClient.reviewClause(
+                RagClauseReviewRequest.builder()
+                        .contract(ragRequest.getContract())
+                        .message(ragRequest.getMessage())
+                        .issues(issues)
+                        .clause(request.clause().trim())
+                        .build()
+        );
+    }
+
+    /**
      * AI 특약 생성 진행 상황을 SSE로 중계한다.
      *
      * progress → draft(생성 직후 초안) → final(최종 결과) 순서로 전달하고,
@@ -94,6 +129,21 @@ public class ContractClauseAgentService {
         RagClauseSuggestionRequest ragRequest =
                 toRagRequest(request);
 
+        return relayStream(
+                listener -> ragApiClient.streamClause(ragRequest, listener)
+        );
+
+    }
+
+    /**
+     * AI 스트림을 별도 스레드에서 읽어 브라우저로 중계한다.
+     *
+     * aiCall: 받은 Listener로 AI 서버 스트림을 부르는 일 (어느 주소를 부를지는 부르는 쪽이 정한다)
+     * 스레드가 모두 바쁘고 대기열도 차면 503.
+     */
+    public SseEmitter relayStream(
+            Consumer<RagSseReader.Listener> aiCall
+    ) {
         SseEmitter emitter =
                 new SseEmitter(STREAM_TIMEOUT_MILLIS);
 
@@ -106,7 +156,7 @@ public class ContractClauseAgentService {
 
         try {
             streamExecutor.execute(() ->
-                    relay(ragRequest, emitter, closed)
+                    relay(aiCall, emitter, closed)
             );
 
         } catch (RejectedExecutionException e) {
@@ -125,8 +175,9 @@ public class ContractClauseAgentService {
         return emitter;
     }
 
+
     private void relay(
-            RagClauseSuggestionRequest ragRequest,
+            Consumer<RagSseReader.Listener> aiCall,
             SseEmitter emitter,
             AtomicBoolean closed
     ) {
@@ -136,8 +187,7 @@ public class ContractClauseAgentService {
         }
 
         try {
-            ragApiClient.streamClause(
-                    ragRequest,
+            aiCall.accept(
                     new RagSseReader.Listener() {
                         @Override
                         public void onEvent(String event, String data) {
@@ -271,7 +321,7 @@ public class ContractClauseAgentService {
         streamExecutor.shutdown();
     }
 
-    private RagClauseSuggestionRequest toRagRequest(
+    public RagClauseSuggestionRequest toRagRequest(
             ContractClauseRequest request
     ) {
         if (!StringUtils.hasText(request.getMessage())) {
@@ -322,6 +372,7 @@ public class ContractClauseAgentService {
                 .message(
                         request.getMessage().trim()
                 )
+                .demo(Boolean.TRUE.equals(request.getDemo()))
                 .build();
     }
 
