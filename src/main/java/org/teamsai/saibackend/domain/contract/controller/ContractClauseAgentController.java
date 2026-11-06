@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.teamsai.saibackend.domain.contract.dto.request.ClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseReviewResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
 import org.teamsai.saibackend.domain.contract.service.ContractClauseAgentService;
 
@@ -81,5 +83,22 @@ public class ContractClauseAgentController {
             @Valid @RequestBody ContractClauseRequest request
     ) {
         return contractClauseAgentService.streamClause(request);
+    }
+
+    @Operation(
+            summary = "반영한 AI 조항 다시 검토",
+            description = """
+                    사용자가 [입력 필요] 칸을 채우거나 조항 문장을 고친 뒤,
+                    원래 요청·계약과 맞는지 다시 검토합니다. (생성 없이 검증만)
+
+                    - openSlots: 아직 채우지 않은 칸
+                    - suggestedClause: 검증에서 문장을 고쳤을 때만 값이 있음
+                    """
+    )
+    @PostMapping("/api/contracts/clause-review")
+    public ClauseReviewResponse reviewClause(
+            @Valid @RequestBody ClauseReviewRequest request
+    ) {
+        return contractClauseAgentService.reviewClause(request);
     }
 }

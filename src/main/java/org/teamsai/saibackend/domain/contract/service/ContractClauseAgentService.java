@@ -1,6 +1,7 @@
 package org.teamsai.saibackend.domain.contract.service;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,8 +26,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.teamsai.saibackend.domain.contract.client.RagApiClient;
 import org.teamsai.saibackend.domain.contract.client.RagSseReader;
 import org.teamsai.saibackend.domain.contract.client.RagStreamEventFilter;
+import org.teamsai.saibackend.domain.contract.dto.request.ClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.ContractClauseRequest;
+import org.teamsai.saibackend.domain.contract.dto.request.RagClauseReviewRequest;
 import org.teamsai.saibackend.domain.contract.dto.request.RagClauseSuggestionRequest;
+import org.teamsai.saibackend.domain.contract.dto.response.ClauseReviewResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.ContractClauseResponse;
 
 @Slf4j
@@ -79,6 +83,36 @@ public class ContractClauseAgentService {
     ) {
         return ragApiClient.suggestClause(
                 toRagRequest(request)
+        );
+    }
+
+    /**
+     * 반영한 AI 조항을 사용자가 채우거나 고친 뒤 다시 검토한다.
+     */
+    public ClauseReviewResponse reviewClause(
+            ClauseReviewRequest request
+    ) {
+        // 계약 정보·원래 요청은 특약 생성과 같은 규칙으로 바꾼다.
+        RagClauseSuggestionRequest ragRequest = toRagRequest(request.request());
+
+        // 브라우저가 보낸 쟁점에서 type(문자열)만 골라 AI로 보낸다. (다른 칸·큰 JSON은 버린다)
+        List<Map<String, Object>> issues = request.issues().stream()
+                .map(issue -> issue == null ? null : issue.get("type"))
+                .filter(type -> type instanceof String text && !text.isBlank())
+                .map(type -> Map.<String, Object>of("type", type))
+                .toList();
+
+        if (issues.isEmpty()) {
+            throw new IllegalArgumentException("쟁점 정보가 올바르지 않습니다.");
+        }
+
+        return ragApiClient.reviewClause(
+                RagClauseReviewRequest.builder()
+                        .contract(ragRequest.getContract())
+                        .message(ragRequest.getMessage())
+                        .issues(issues)
+                        .clause(request.clause().trim())
+                        .build()
         );
     }
 
