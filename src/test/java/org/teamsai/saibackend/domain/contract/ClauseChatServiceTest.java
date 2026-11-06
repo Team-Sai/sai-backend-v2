@@ -130,6 +130,28 @@ class ClauseChatServiceTest {
     }
 
     @Test
+    @DisplayName("발표 시연 표시는 대화에 저장되고 미리 찾기 요청까지 전달된다")
+    void demoFlagIsSavedAndSentToPrepare() {
+        RagClauseSuggestionRequest demoRagRequest = RagClauseSuggestionRequest.builder()
+                .message("3개월 연속 연체하면 전부 갚게 해 주세요")
+                .demo(true)
+                .build();
+        given(contractClauseAgentService.toRagRequest(request)).willReturn(demoRagRequest);
+        given(ragApiClient.understandClause(demoRagRequest)).willReturn(understood(true, List.of()));
+        given(sessionStore.create(any())).willReturn("session-1");
+
+        clauseChatService.start(USER_ID, request);
+
+        ArgumentCaptor<ClauseChatSessionDTO> saved = ArgumentCaptor.forClass(ClauseChatSessionDTO.class);
+        verify(sessionStore).create(saved.capture());
+        ArgumentCaptor<RagClauseChatRequest> prepared = ArgumentCaptor.forClass(RagClauseChatRequest.class);
+        verify(prepareService).prepareInBackground(eq("session-1"), prepared.capture());
+
+        assertThat(saved.getValue().isDemo()).isTrue();
+        assertThat(prepared.getValue().isDemo()).isTrue();
+    }
+
+    @Test
     @DisplayName("없거나 남의 대화에 답하면 404")
     void replyToMissingSessionIs404() {
         given(sessionStore.tryLock("session-1")).willReturn(true);
@@ -202,6 +224,7 @@ class ClauseChatServiceTest {
                 .questions(List.of())
                 .answers(Map.of())
                 .readyToWrite(true)
+                .demo(true)
                 .build();
         SseEmitter emitter = new SseEmitter();
 
@@ -229,6 +252,7 @@ class ClauseChatServiceTest {
         assertThat(sent.getValue().getMessage()).isEqualTo("3개월 연속 연체하면 전부 갚게 해 주세요");
         assertThat(sent.getValue().getReferences()).hasSize(1);
         assertThat(session.isReadyToWrite()).isFalse();
+        assertThat(sent.getValue().isDemo()).isTrue();
     }
 
     @Test
