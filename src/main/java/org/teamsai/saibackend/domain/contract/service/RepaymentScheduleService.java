@@ -16,6 +16,7 @@ import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +44,8 @@ public class RepaymentScheduleService {
 
         List<RepaymentSchedule> schedules = repaymentScheduleGenerateService.generate(
                 contractId, contract.getRepaymentType(), contract.getPrincipalAmount(),
-                contract.getInterestRate(), contract.getStartDate(), contract.getMaturityDate());
+                contract.getInterestRate(), contract.getStartDate(), contract.getMaturityDate(),
+                contract.getRepaymentDay());
 
         repaymentScheduleRepository.saveAll(schedules);
     }
@@ -84,16 +86,23 @@ public class RepaymentScheduleService {
 
         BigDecimal openingPrincipal = lastPaid.map(RepaymentSchedule::getRemainingPrincipal)
                 .orElse(v1.getPrincipalAmount());
-        LocalDate baseDate = lastPaid.map(RepaymentSchedule::getDueDate)
+        LocalDate baseDate = lastPaid
+                .map(paid -> alignToStartDay(paid.getDueDate(), v1.getStartDate()))
                 .orElse(v1.getStartDate());
 
         repaymentScheduleRepository.deleteByContractIdAndStatus(v1ContractId, RepaymentScheduleStatus.PENDING);
 
         List<RepaymentSchedule> newSchedules = repaymentScheduleGenerateService.generate(
                 v2ContractId, v2.getRepaymentType(), openingPrincipal,
-                v2.getInterestRate(), baseDate, v2.getMaturityDate());
+                v2.getInterestRate(), baseDate, v2.getMaturityDate(), v2.getRepaymentDay());
 
         repaymentScheduleRepository.saveAll(newSchedules);
+    }
+
+    // 회차 수는 납부 예정일이 아니라 지급일의 일자를 기준으로 세야 남은 회차가 줄지 않는다.
+    private static LocalDate alignToStartDay(LocalDate dueDate, LocalDate startDate) {
+        YearMonth month = YearMonth.from(dueDate);
+        return month.atDay(Math.min(startDate.getDayOfMonth(), month.lengthOfMonth()));
     }
 
     public RepaymentScheduleDTO getScheduleByScheduleId(Long scheduleId) {
