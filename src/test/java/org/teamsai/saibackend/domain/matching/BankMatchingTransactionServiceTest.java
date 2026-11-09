@@ -94,7 +94,7 @@ class BankMatchingTransactionServiceTest {
                 transactionService.process(
                         USER_ID,
                         LINKED_ACCOUNT_ID,
-                        transaction,
+                        transaction.getBankTransactionId(),
                         false
                 );
         assertThat(result.processStatus())
@@ -102,8 +102,8 @@ class BankMatchingTransactionServiceTest {
         verify(matchingCandidateRepository, never())
                 .findMatchCandidatesByLinkedAccountId(any(), any());
         verify(autoMatchingService, never()).execute(any(), any());
-        verify(bankTransactionService).updateStatus(
-                101L,
+        verify(bankTransactionService).updateStatusForLockedTransaction(
+                transaction,
                 BankTransactionProcessingStatus.PENDING,
                 BankTransactionProcessingStatus.UNMATCHED
         );
@@ -122,22 +122,18 @@ class BankMatchingTransactionServiceTest {
         AutoMatchingTransactionResult result = transactionService.process(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
-                transaction,
+                transaction.getBankTransactionId(),
                 MatchingTargetType.SETTLEMENT,
                 999L,
                 false
         );
         assertThat(result).isNull();
-        verify(bankTransactionService, never()).updateStatus(any(), any(), any());
+        verify(bankTransactionService, never()).updateStatusForLockedTransaction(any(), any(), any());
         verify(autoMatchingService, never()).execute(any(), any());
     }
     @Test
     @DisplayName("후보를 조회해 자동매칭하고 은행 거래 상태를 변경한다")
     void executesAutoMatchingAndUpdatesStatus() {
-        BankTransaction staleTransaction = bankTransaction(
-                101L,
-                "Old Name"
-        );
         BankTransaction lockedTransaction = bankTransaction(
                 101L,
                 "Hong Gil Dong"
@@ -158,7 +154,7 @@ class BankMatchingTransactionServiceTest {
                 transactionService.process(
                         USER_ID,
                         LINKED_ACCOUNT_ID,
-                        staleTransaction,
+                        101L,
                         false
                 );
         ArgumentCaptor<List<MatchingTransaction>> transactionsCaptor =
@@ -177,11 +173,12 @@ class BankMatchingTransactionServiceTest {
         assertThat(matchingTransaction.counterpartyName())
                 .isEqualTo("Hong Gil Dong");
         assertThat(result).isEqualTo(transactionResult);
-        verify(bankTransactionService).updateStatus(
-                101L,
+        verify(bankTransactionService).updateStatusForLockedTransaction(
+                lockedTransaction,
                 BankTransactionProcessingStatus.PENDING,
                 BankTransactionProcessingStatus.APPLIED
         );
+        verify(bankTransactionService, never()).updateStatus(any(), any(), any());
     }
     @Test
     @DisplayName("중복 납부 결과는 이미 반영된 거래로 저장한다")
@@ -200,9 +197,9 @@ class BankMatchingTransactionServiceTest {
                         101L,
                         AutoMatchingProcessStatus.DUPLICATE
                 )));
-        transactionService.process(USER_ID, LINKED_ACCOUNT_ID, transaction, false);
-        verify(bankTransactionService).updateStatus(
-                101L,
+        transactionService.process(USER_ID, LINKED_ACCOUNT_ID, transaction.getBankTransactionId(), false);
+        verify(bankTransactionService).updateStatusForLockedTransaction(
+                transaction,
                 BankTransactionProcessingStatus.PENDING,
                 BankTransactionProcessingStatus.APPLIED
         );
@@ -225,7 +222,7 @@ class BankMatchingTransactionServiceTest {
                 () -> transactionService.process(
                         USER_ID,
                         LINKED_ACCOUNT_ID,
-                        transaction,
+                        transaction.getBankTransactionId(),
                         false
                 )
         ).isInstanceOfSatisfying(
@@ -233,7 +230,7 @@ class BankMatchingTransactionServiceTest {
                 exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(MatchingErrorCode.INVALID_MATCHING_REQUEST)
         );
-        verify(bankTransactionService, never()).updateStatus(
+        verify(bankTransactionService, never()).updateStatusForLockedTransaction(
                 any(),
                 any(),
                 any()
@@ -260,8 +257,8 @@ class BankMatchingTransactionServiceTest {
                 .BANK_TRANSACTION_STATUS_UPDATE_FAILED
                 .toException())
                 .given(bankTransactionService)
-                .updateStatus(
-                        101L,
+                .updateStatusForLockedTransaction(
+                        transaction,
                         BankTransactionProcessingStatus.PENDING,
                         BankTransactionProcessingStatus.NEEDS_CHECK
                 );
@@ -269,7 +266,7 @@ class BankMatchingTransactionServiceTest {
                 () -> transactionService.process(
                         USER_ID,
                         LINKED_ACCOUNT_ID,
-                        transaction,
+                        transaction.getBankTransactionId(),
                         false
                 )
         ).isInstanceOf(DomainException.class);
@@ -294,7 +291,7 @@ class BankMatchingTransactionServiceTest {
         transactionService.process(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
-                transaction,
+                transaction.getBankTransactionId(),
                 false
         );
         verify(candidateService, never()).findAllByBankTransactionId(any());
@@ -322,7 +319,7 @@ class BankMatchingTransactionServiceTest {
         transactionService.process(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
-                transaction,
+                transaction.getBankTransactionId(),
                 false
         );
         verify(candidateService, never()).findAllByBankTransactionId(any());
@@ -365,7 +362,7 @@ class BankMatchingTransactionServiceTest {
         transactionService.process(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
-                transaction,
+                transaction.getBankTransactionId(),
                 true
         );
         verify(notificationService).createIfAbsent(
@@ -406,7 +403,7 @@ class BankMatchingTransactionServiceTest {
         transactionService.process(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
-                transaction,
+                transaction.getBankTransactionId(),
                 true
         );
         verify(notificationService, never()).createIfAbsent(
@@ -438,7 +435,7 @@ class BankMatchingTransactionServiceTest {
         transactionService.process(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
-                transaction,
+                transaction.getBankTransactionId(),
                 true
         );
         verify(notificationService).createIfAbsent(
@@ -464,7 +461,7 @@ class BankMatchingTransactionServiceTest {
         AutoMatchingTransactionResult result = transactionService.process(
                 USER_ID,
                 LINKED_ACCOUNT_ID,
-                transaction,
+                transaction.getBankTransactionId(),
                 false
         );
         assertThat(result.processStatus())
@@ -477,7 +474,7 @@ class BankMatchingTransactionServiceTest {
         verify(notificationService, never()).createIfAbsent(
                 any(), any(), any(), any(), any(), any()
         );
-        verify(bankTransactionService, never()).updateStatus(
+        verify(bankTransactionService, never()).updateStatusForLockedTransaction(
                 any(), any(), any()
         );
     }

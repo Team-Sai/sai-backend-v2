@@ -102,7 +102,7 @@ class PaymentServiceTest {
 
 
             verify(paymentRecordService)
-                    .createConfirmedRecord(
+                    .createConfirmedRecordAfterDuplicateCheck(
                             BANK_TRANSACTION_ID,
                             PaymentTargetType.SETTLEMENT,
                             PAYMENT_OBLIGATION_ID,
@@ -199,7 +199,7 @@ class PaymentServiceTest {
             verify(
                     paymentRecordService,
                     never()
-            ).createConfirmedRecord(
+            ).createConfirmedRecordAfterDuplicateCheck(
                     any(),
                     any(),
                     any(),
@@ -245,7 +245,7 @@ class PaymentServiceTest {
             verify(
                     paymentRecordService,
                     never()
-            ).createConfirmedRecord(
+            ).createConfirmedRecordAfterDuplicateCheck(
                     any(),
                     any(),
                     any(),
@@ -277,7 +277,7 @@ class PaymentServiceTest {
             verify(
                     paymentRecordService,
                     never()
-            ).createConfirmedRecord(
+            ).createConfirmedRecordAfterDuplicateCheck(
                     any(),
                     any(),
                     any(),
@@ -316,7 +316,7 @@ class PaymentServiceTest {
             verify(
                     paymentRecordService,
                     never()
-            ).createConfirmedRecord(
+            ).createConfirmedRecordAfterDuplicateCheck(
                     any(),
                     any(),
                     any(),
@@ -349,7 +349,7 @@ class PaymentServiceTest {
 
             verify(paymentObligationRepository, never()).findByIdForUpdate(any());
             verify(paymentRecordService, never())
-                    .createConfirmedRecord(any(), any(), any(), any(), any());
+                    .createConfirmedRecordAfterDuplicateCheck(any(), any(), any(), any(), any());
         }
 
 
@@ -397,7 +397,7 @@ class PaymentServiceTest {
             verify(
                     paymentRecordService,
                     never()
-            ).createConfirmedRecord(
+            ).createConfirmedRecordAfterDuplicateCheck(
                     any(),
                     any(),
                     any(),
@@ -441,7 +441,7 @@ class PaymentServiceTest {
                             .toException()
             ).given(
                     paymentRecordService
-            ).createConfirmedRecord(
+            ).createConfirmedRecordAfterDuplicateCheck(
                     any(),
                     any(),
                     any(),
@@ -501,7 +501,7 @@ class PaymentServiceTest {
                             .toException()
             ).given(
                     paymentRecordService
-            ).createConfirmedRecord(
+            ).createConfirmedRecordAfterDuplicateCheck(
                     any(),
                     any(),
                     any(),
@@ -545,7 +545,7 @@ class PaymentServiceTest {
 
             assertThat(obligation.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
             verify(paymentRecordService, never())
-                    .createConfirmedRecord(any(), any(), any(), any(), any());
+                    .createConfirmedRecordAfterDuplicateCheck(any(), any(), any(), any(), any());
         }
 
 

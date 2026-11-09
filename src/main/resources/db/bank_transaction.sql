@@ -38,7 +38,15 @@ CREATE TABLE IF NOT EXISTS bank_transaction (
 
     INDEX idx_bank_transaction_linked_account (
        linked_account_id
+    ),
+
+    INDEX idx_bank_transaction_account_matching (
+    linked_account_id,
+    processing_status,
+    transaction_type,
+    transaction_at
     )
+
     ) ENGINE=InnoDB
     DEFAULT CHARSET=utf8mb4
     COLLATE=utf8mb4_unicode_ci;

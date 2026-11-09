@@ -7,7 +7,6 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
@@ -19,7 +18,6 @@ import org.teamsai.saibackend.domain.transaction.service.TransactionSyncMatchSer
 import org.teamsai.saibackend.domain.transaction.service.TransactionSyncService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +45,24 @@ class TransactionSyncMatchServiceTest {
     private static final Long USER_ID = 10L;
     private static final Long LINKED_ACCOUNT_ID = 1L;
     private static final Long SECOND_LINKED_ACCOUNT_ID = 2L;
+
+    @Test
+    @DisplayName("신규 수집이 0건이어도 기존 PENDING 매칭 결과를 반영한다")
+    void matchesExistingPendingWhenBankReturnsNoNewTransactions() {
+        given(linkedBankAccountService.getLinkedAccountIdsForSync(USER_ID))
+                .willReturn(List.of(LINKED_ACCOUNT_ID));
+        given(transactionSyncService.syncTransactions(USER_ID, LINKED_ACCOUNT_ID)).willReturn(0);
+        given(bankMatchingService.execute(USER_ID, LINKED_ACCOUNT_ID, false))
+                .willReturn(new AutoMatchingExecutionResult(1, 1, 0, 0, 0, 0,
+                        List.of(new AutoMatchingTransactionResult(100L, AutoMatchingProcessStatus.APPLIED))));
+
+        TransactionSyncAllResponse result = transactionSyncMatchService.syncAll(USER_ID);
+
+        assertThat(result.appliedCount()).isEqualTo(1);
+        assertThat(result.totalTransactionCount()).isEqualTo(1);
+        assertThat(result.syncedAccountCount()).isEqualTo(1);
+        verify(bankMatchingService).execute(USER_ID, LINKED_ACCOUNT_ID, false);
+    }
 
     @Test
     @DisplayName("동기화를 먼저 실행한 뒤 매칭을 실행하고, 매칭 결과를 그대로 반환한다")
@@ -133,10 +149,10 @@ class TransactionSyncMatchServiceTest {
     @Test
     @DisplayName("전체 동기화는 사용자의 모든 연동계좌를 계좌별로 동기화하고 매칭 결과를 합산한다")
     void syncAllSyncsEveryLinkedAccountAndAggregatesMatchingResults() {
-        given(linkedBankAccountService.getLinkedAccounts(USER_ID))
+        given(linkedBankAccountService.getLinkedAccountIdsForSync(USER_ID))
                 .willReturn(List.of(
-                        linkedAccount(LINKED_ACCOUNT_ID),
-                        linkedAccount(SECOND_LINKED_ACCOUNT_ID)
+                        LINKED_ACCOUNT_ID,
+                        SECOND_LINKED_ACCOUNT_ID
                 ));
 
         AutoMatchingExecutionResult firstResult =
@@ -208,7 +224,8 @@ class TransactionSyncMatchServiceTest {
                 transactionSyncService,
                 bankMatchingService
         );
-        inOrder.verify(linkedBankAccountService).getLinkedAccounts(USER_ID);
+        inOrder.verify(linkedBankAccountService).getLinkedAccountIdsForSync(USER_ID);
+        verify(linkedBankAccountService, never()).getLinkedAccounts(any());
         inOrder.verify(transactionSyncService)
                 .syncTransactions(USER_ID, LINKED_ACCOUNT_ID);
         inOrder.verify(bankMatchingService).execute(USER_ID, LINKED_ACCOUNT_ID, false);
@@ -224,10 +241,10 @@ class TransactionSyncMatchServiceTest {
     @Test
     @DisplayName("계좌 하나의 동기화가 실패해도 나머지 계좌를 계속 처리한다")
     void syncAllContinuesWhenOneAccountFails() {
-        given(linkedBankAccountService.getLinkedAccounts(USER_ID))
+        given(linkedBankAccountService.getLinkedAccountIdsForSync(USER_ID))
                 .willReturn(List.of(
-                        linkedAccount(LINKED_ACCOUNT_ID),
-                        linkedAccount(SECOND_LINKED_ACCOUNT_ID)
+                        LINKED_ACCOUNT_ID,
+                        SECOND_LINKED_ACCOUNT_ID
                 ));
 
         DomainException syncFailure =
@@ -259,12 +276,13 @@ class TransactionSyncMatchServiceTest {
                 .isEqualTo("BANK_SERVER_UNAVAILABLE");
         assertThat(result.totalTransactionCount()).isEqualTo(1);
         assertThat(result.appliedCount()).isEqualTo(1);
+        verify(bankMatchingService, never()).execute(USER_ID, LINKED_ACCOUNT_ID, false);
     }
 
     @Test
     @DisplayName("전체 동기화는 연동계좌가 없으면 동기화와 매칭을 실행하지 않고 빈 결과를 반환한다")
     void syncAllReturnsEmptyResultWhenUserHasNoLinkedAccounts() {
-        given(linkedBankAccountService.getLinkedAccounts(USER_ID))
+        given(linkedBankAccountService.getLinkedAccountIdsForSync(USER_ID))
                 .willReturn(List.of());
 
         TransactionSyncAllResponse result =
@@ -282,16 +300,4 @@ class TransactionSyncMatchServiceTest {
         verify(bankMatchingService, never()).execute(any(), any(), anyBoolean());
     }
 
-    private LinkedBankAccountResponse linkedAccount(Long linkedAccountId) {
-        return new LinkedBankAccountResponse(
-                linkedAccountId,
-                "088",
-                "신한은행",
-                "110-***-123456",
-                "정산 계좌",
-                "홍길동",
-                BigDecimal.ZERO,
-                "AVAILABLE"
-        );
-    }
 }

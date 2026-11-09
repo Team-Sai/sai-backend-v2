@@ -235,6 +235,74 @@ class BankTransactionServiceTest {
         verify(bankTransactionRepository).flush();
     }
 
+    @Test
+    void updatesLockedEntityWithoutAnotherLookupOrExplicitFlush() {
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.PENDING);
+
+        bankTransactionService.updateStatusForLockedTransaction(transaction,
+                BankTransactionProcessingStatus.PENDING, BankTransactionProcessingStatus.APPLIED);
+
+        assertThat(transaction.getProcessingStatus()).isEqualTo(BankTransactionProcessingStatus.APPLIED);
+        org.mockito.Mockito.verifyNoInteractions(bankTransactionRepository);
+    }
+
+    @Test
+    void rejectsLockedEntityWhoseStatusHasAlreadyChanged() {
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.APPLIED);
+
+        assertThatThrownBy(() -> bankTransactionService.updateStatusForLockedTransaction(transaction,
+                BankTransactionProcessingStatus.PENDING, BankTransactionProcessingStatus.UNMATCHED))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(BankTransactionErrorCode.BANK_TRANSACTION_STATUS_UPDATE_FAILED));
+
+        assertThat(transaction.getProcessingStatus()).isEqualTo(BankTransactionProcessingStatus.APPLIED);
+        verifyNoInteractions(bankTransactionRepository);
+    }
+
+    @Test
+    void rejectsInvalidTransitionForLockedEntity() {
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.APPLIED);
+
+        assertThatThrownBy(() -> bankTransactionService.updateStatusForLockedTransaction(transaction,
+                BankTransactionProcessingStatus.APPLIED, BankTransactionProcessingStatus.UNMATCHED))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(BankTransactionErrorCode.INVALID_BANK_TRANSACTION_STATUS_TRANSITION));
+
+        assertThat(transaction.getProcessingStatus()).isEqualTo(BankTransactionProcessingStatus.APPLIED);
+        verifyNoInteractions(bankTransactionRepository);
+    }
+
+    @Test
+    void mandatoryStatusUpdateRejectsCallsOutsideATransaction() {
+        // Real Spring transaction interceptor, with a transaction manager that uses no database.
+        var manager = new org.springframework.transaction.support.AbstractPlatformTransactionManager() {
+            @Override protected Object doGetTransaction() { return new Object(); }
+            @Override protected void doBegin(Object tx, org.springframework.transaction.TransactionDefinition definition) {
+                throw new AssertionError("MANDATORY must not start a transaction");
+            }
+            @Override protected void doCommit(org.springframework.transaction.support.DefaultTransactionStatus status) {
+                throw new AssertionError("No transaction should be committed");
+            }
+            @Override protected void doRollback(org.springframework.transaction.support.DefaultTransactionStatus status) {
+                throw new AssertionError("No transaction should be rolled back");
+            }
+        };
+        var interceptor = new org.springframework.transaction.interceptor.TransactionInterceptor(manager,
+                new org.springframework.transaction.annotation.AnnotationTransactionAttributeSource());
+        var factory = new org.springframework.aop.framework.ProxyFactory(bankTransactionService);
+        factory.addAdvice(interceptor);
+        var proxy = (BankTransactionService) factory.getProxy();
+        BankTransaction transaction = transaction(BankTransactionProcessingStatus.PENDING);
+
+        assertThatThrownBy(() -> proxy.updateStatusForLockedTransaction(transaction,
+                BankTransactionProcessingStatus.PENDING, BankTransactionProcessingStatus.APPLIED))
+                .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        assertThat(transaction.getProcessingStatus()).isEqualTo(BankTransactionProcessingStatus.PENDING);
+        verifyNoInteractions(bankTransactionRepository);
+    }
+
     private BankTransaction transaction(BankTransactionProcessingStatus status) {
         BankTransaction transaction = new BankTransaction(
                 1L, "TX-TEST", java.math.BigDecimal.ONE,

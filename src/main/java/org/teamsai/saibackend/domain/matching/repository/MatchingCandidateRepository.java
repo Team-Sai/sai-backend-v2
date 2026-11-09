@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
+import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Repository;
 import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
@@ -18,7 +19,7 @@ public class MatchingCandidateRepository {
     @PersistenceContext
     private EntityManager entityManager;
 
-    private static final String FIND_CANDIDATES_SQL = """
+    private static final String SETTLEMENT_CANDIDATES_SQL = """
             SELECT
                 'SETTLEMENT' AS target_type,
                 po.payment_obligation_id AS target_id,
@@ -31,20 +32,23 @@ public class MatchingCandidateRepository {
                 ON sp.participant_id = po.participant_id
             JOIN settlement s
                 ON s.settlement_id = sp.settlement_id
-            JOIN settlement_account sa
-                ON sa.settlement_id = s.settlement_id
             JOIN users u
                 ON u.user_id = sp.user_id
             LEFT JOIN payment_record pr
                 ON pr.payment_target_type = 'SETTLEMENT'
                 AND pr.target_id = po.payment_obligation_id
                 AND pr.record_status = 'CONFIRMED'
-            WHERE sa.linked_account_id = :linkedAccountId
-                AND sa.selected_at <= :transactionAt
-                AND (
-                    sa.ended_at IS NULL
-                    OR sa.ended_at > :transactionAt
-                )
+            WHERE EXISTS (
+                SELECT 1
+                FROM settlement_account sa
+                WHERE sa.settlement_id = s.settlement_id
+                    AND sa.linked_account_id = :linkedAccountId
+                    AND sa.selected_at <= :transactionAt
+                    AND (
+                        sa.ended_at IS NULL
+                        OR sa.ended_at > :transactionAt
+                    )
+            )
                 AND s.created_at <= :transactionAt
                 AND s.settlement_status = 'IN_PROGRESS'
                 AND po.obligation_status = 'ACTIVE'
@@ -59,8 +63,9 @@ public class MatchingCandidateRepository {
             HAVING
                 po.expected_amount - COALESCE(SUM(pr.amount), 0) > 0
 
-            UNION ALL
+            """;
 
+    private static final String LOAN_CANDIDATES_SQL = """
             SELECT
                 'LOAN' AS target_type,
                 rs.schedule_id AS target_id,
@@ -104,6 +109,16 @@ public class MatchingCandidateRepository {
             """;
 
 
+    private static final String FIND_CANDIDATES_SQL =
+            SETTLEMENT_CANDIDATES_SQL + "UNION ALL\n\n" + LOAN_CANDIDATES_SQL;
+
+    // Keep these query spaces in sync with both branches of FIND_CANDIDATES_SQL.
+    private static final List<String> CANDIDATE_QUERY_SPACES = List.of(
+            "payment_obligation", "settlement_participant", "settlement", "users",
+            "payment_record", "settlement_account", "repayment_schedule", "loan_contract",
+            "contract_account"
+    );
+
     public List<MatchingCandidate> findMatchCandidatesByLinkedAccountId(
             Long linkedAccountId,
             LocalDateTime transactionAt
@@ -145,6 +160,8 @@ public class MatchingCandidateRepository {
         );
 
         Query query = entityManager.createNativeQuery(sql, Tuple.class);
+        NativeQuery<?> nativeQuery = query.unwrap(NativeQuery.class);
+        CANDIDATE_QUERY_SPACES.forEach(nativeQuery::addSynchronizedQuerySpace);
 
         query.setParameter("linkedAccountId", linkedAccountId);
 

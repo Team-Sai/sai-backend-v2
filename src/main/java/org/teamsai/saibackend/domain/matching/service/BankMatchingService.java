@@ -6,7 +6,6 @@ import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingTransactionResult;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
 import java.util.List;
@@ -37,12 +36,12 @@ public class BankMatchingService {
         validateLinkedAccountId(linkedAccountId);
         validateMatchingScope(targetType, aggregateId);
 
-        List<BankTransaction> bankTransactions =
-                bankTransactionService.findPendingDepositsByLinkedAccountId(
+        List<Long> bankTransactionIds =
+                bankTransactionService.findPendingDepositIdsByLinkedAccountId(
                         linkedAccountId
                 );
 
-        if (bankTransactions.isEmpty()) {
+        if (bankTransactionIds.isEmpty()) {
             return emptyResult();
         }
 
@@ -50,7 +49,7 @@ public class BankMatchingService {
                 processTransactions(
                         userId,
                         linkedAccountId,
-                        bankTransactions,
+                        bankTransactionIds,
                         targetType,
                         aggregateId,
                         isBatch
@@ -89,16 +88,16 @@ public class BankMatchingService {
     private List<AutoMatchingTransactionResult> processTransactions(
             Long userId,
             Long linkedAccountId,
-            List<BankTransaction> bankTransactions,
+            List<Long> bankTransactionIds,
             MatchingTargetType targetType,
             Long aggregateId,
             boolean isBatch
     ) {
-        return bankTransactions.stream()
-                .map(transaction -> processOneTransaction(
+        return bankTransactionIds.stream()
+                .map(bankTransactionId -> processOneTransaction(
                         userId,
                         linkedAccountId,
-                        transaction,
+                        bankTransactionId,
                         targetType,
                         aggregateId,
                         isBatch
@@ -110,7 +109,7 @@ public class BankMatchingService {
     private AutoMatchingTransactionResult processOneTransaction(
             Long userId,
             Long linkedAccountId,
-            BankTransaction transaction,
+            Long bankTransactionId,
             MatchingTargetType targetType,
             Long aggregateId,
             boolean isBatch
@@ -119,7 +118,7 @@ public class BankMatchingService {
             return transactionService.process(
                     userId,
                     linkedAccountId,
-                    transaction,
+                    bankTransactionId,
                     targetType,
                     aggregateId,
                     isBatch
@@ -129,7 +128,7 @@ public class BankMatchingService {
                 return matchingFailureService.recordFailure(
                         userId,
                         linkedAccountId,
-                        transaction.getBankTransactionId(),
+                        bankTransactionId,
                         processingFailure,
                         isBatch
                 );

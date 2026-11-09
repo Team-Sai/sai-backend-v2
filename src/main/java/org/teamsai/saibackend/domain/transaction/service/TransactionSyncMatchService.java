@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.teamsai.saibackend.domain.account.dto.response.LinkedBankAccountResponse;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
@@ -49,8 +48,8 @@ public class TransactionSyncMatchService {
     }
 
     public TransactionSyncAllResponse syncAll(Long userId){
-        List<LinkedBankAccountResponse> accounts =
-                linkedBankAccountService.getLinkedAccounts(userId);
+        List<Long> linkedAccountIds =
+                linkedBankAccountService.getLinkedAccountIdsForSync(userId);
 
         int syncedAccountCount = 0;
         int totalTransactionCount = 0;
@@ -61,10 +60,10 @@ public class TransactionSyncMatchService {
         int failedCount = 0;
         List<AccountSyncFailureResponse> failedAccounts = new ArrayList<>();
 
-        for(LinkedBankAccountResponse account : accounts){
+        for(Long linkedAccountId : linkedAccountIds){
             try {
                 AutoMatchingExecutionResult result =
-                        syncAndMatch(userId, account.linkedAccountId(), false);
+                        syncAndMatch(userId, linkedAccountId, false);
 
                 syncedAccountCount++;
                 totalTransactionCount += result.totalTransactionCount();
@@ -76,12 +75,12 @@ public class TransactionSyncMatchService {
             } catch (DomainException e) {
                 String errorCode = e.getErrorCode().toString();
                 failedAccounts.add(new AccountSyncFailureResponse(
-                        account.linkedAccountId(),
+                        linkedAccountId,
                         errorCode
                 ));
                 log.warn(
                         "Account sync failed - linkedAccountId: {}, errorCode: {}",
-                        account.linkedAccountId(),
+                        linkedAccountId,
                         errorCode,
                         e
                 );

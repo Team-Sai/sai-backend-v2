@@ -37,10 +37,10 @@ public class BankMatchingTransactionService {
     public AutoMatchingTransactionResult process(
             Long userId,
             Long linkedAccountId,
-            BankTransaction bankTransaction,
+            Long bankTransactionId,
             boolean isBatch
     ) {
-        return process(userId, linkedAccountId, bankTransaction, null, null, isBatch);
+        return process(userId, linkedAccountId, bankTransactionId, null, null, isBatch);
     }
 
     @Transactional(
@@ -50,7 +50,7 @@ public class BankMatchingTransactionService {
     public AutoMatchingTransactionResult process(
             Long userId,
             Long linkedAccountId,
-            BankTransaction bankTransaction,
+            Long bankTransactionId,
             MatchingTargetType targetType,
             Long aggregateId,
             boolean isBatch
@@ -58,7 +58,7 @@ public class BankMatchingTransactionService {
         BankTransaction lockedTransaction =
                 bankTransactionService
                         .findByIdAndLinkedAccountIdForUpdate(
-                                bankTransaction.getBankTransactionId(),
+                                bankTransactionId,
                                 linkedAccountId
                         );
         if (lockedTransaction.getProcessingStatus()
@@ -87,8 +87,8 @@ public class BankMatchingTransactionService {
                     isBatch
             );
         }
-        bankTransactionService.updateStatus(
-                lockedTransaction.getBankTransactionId(),
+        bankTransactionService.updateStatusForLockedTransaction(
+                lockedTransaction,
                 BankTransactionProcessingStatus.PENDING,
                 toBankTransactionProcessingStatus(result.processStatus())
         );

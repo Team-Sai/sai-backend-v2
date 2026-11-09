@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.teamsai.saibackend.domain.account.type.ConnectionStatus;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -81,5 +80,29 @@ public interface LinkedBankAccountRepository extends JpaRepository<LinkedBankAcc
     int updateBalance(
             @Param("linkedAccountId") Long linkedAccountId,
             @Param("balance") BigDecimal balance
+    );
+
+    @Query("""
+            select a.linkedAccountId
+            from LinkedBankAccount a
+            where a.userId = :userId
+                and a.connectionStatus = :status
+            """)
+    List<Long> findLinkedAccountIdsForSync(
+            @Param("userId") Long userId,
+            @Param("status") ConnectionStatus status
+    );
+
+    @Query("""
+        select a.userId as userId,
+               a.accountId as bankAccountId,
+               u.userKey as userKey,
+               a.lastSyncedTransactionId as lastSyncedTransactionId
+         from LinkedBankAccount a
+         left join User u on u.userId = a.userId
+         where a.linkedAccountId = :linkedAccountId
+    """)
+    Optional<SyncAccountProjection> findSyncAccountContext(
+            @Param("linkedAccountId") Long linkedAccountId
     );
 }

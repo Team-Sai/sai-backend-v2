@@ -1,6 +1,5 @@
 package org.teamsai.saibackend.domain.matching;
 
-import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,14 +13,9 @@ import org.teamsai.saibackend.domain.matching.service.BankMatchingService;
 import org.teamsai.saibackend.domain.matching.service.BankMatchingTransactionService;
 import org.teamsai.saibackend.domain.matching.service.MatchingFailureService;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingProcessStatus;
-import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
-import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
-import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 import org.teamsai.saibackend.global.exception.DomainException;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +49,7 @@ class BankMatchingServiceTest {
     @DisplayName("처리 대기 거래가 없으면 빈 결과를 반환한다")
     void returnsEmptyResultWhenPendingDepositsDoNotExist() {
         given(bankTransactionService
-                .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
+                .findPendingDepositIdsByLinkedAccountId(LINKED_ACCOUNT_ID))
                 .willReturn(List.of());
 
         AutoMatchingExecutionResult result =
@@ -76,12 +70,12 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("각 거래를 조회 순서대로 처리하고 결과를 집계한다")
     void processesTransactionsInOrderAndAggregatesResults() {
-        BankTransaction first = bankTransaction(101L);
-        BankTransaction second = bankTransaction(102L);
-        BankTransaction third = bankTransaction(103L);
+        Long first = 101L;
+        Long second = 102L;
+        Long third = 103L;
 
         given(bankTransactionService
-                .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
+                .findPendingDepositIdsByLinkedAccountId(LINKED_ACCOUNT_ID))
                 .willReturn(List.of(first, second, third));
         given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, first, null, null, false))
                 .willReturn(result(101L, AutoMatchingProcessStatus.APPLIED));
@@ -112,10 +106,10 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("배치 실행 여부를 거래 처리 단계까지 그대로 전달한다")
     void passesBatchFlagDownToTransactionProcessing() {
-        BankTransaction transaction = bankTransaction(101L);
+        Long transaction = 101L;
 
         given(bankTransactionService
-                .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
+                .findPendingDepositIdsByLinkedAccountId(LINKED_ACCOUNT_ID))
                 .willReturn(List.of(transaction));
         given(transactionService.process(USER_ID, LINKED_ACCOUNT_ID, transaction, null, null, true))
                 .willReturn(result(101L, AutoMatchingProcessStatus.NEEDS_CHECK));
@@ -128,13 +122,13 @@ class BankMatchingServiceTest {
     @Test
     @DisplayName("단건 처리 실패를 별도 실패 기록 서비스에 전달한다")
     void recordsTransactionProcessingFailureSeparately() {
-        BankTransaction transaction = bankTransaction(101L);
+        Long transaction = 101L;
         DomainException exception = MatchingErrorCode
                 .INVALID_MATCHING_REQUEST
                 .toException();
 
         given(bankTransactionService
-                .findPendingDepositsByLinkedAccountId(LINKED_ACCOUNT_ID))
+                .findPendingDepositIdsByLinkedAccountId(LINKED_ACCOUNT_ID))
                 .willReturn(List.of(transaction));
         willThrow(exception)
                 .given(transactionService)
@@ -165,22 +159,6 @@ class BankMatchingServiceTest {
                                         MatchingErrorCode.INVALID_MATCHING_REQUEST
                                 )
                 );
-    }
-
-    private BankTransaction bankTransaction(Long bankTransactionId) {
-        BankTransaction transaction = new BankTransaction(
-                LINKED_ACCOUNT_ID,
-                "external-" + bankTransactionId,
-                new BigDecimal("10000.00"),
-                BankTransactionType.DEPOSIT,
-                LocalDateTime.of(2026, 8, 5, 10, 0),
-                "Hong Gil Dong",
-                null,
-                LocalDateTime.of(2026, 8, 5, 10, 5)
-        );
-        ReflectionTestUtils.setField(transaction, "bankTransactionId", bankTransactionId);
-        transaction.changeProcessingStatus(BankTransactionProcessingStatus.PENDING);
-        return transaction;
     }
 
     private AutoMatchingTransactionResult result(
