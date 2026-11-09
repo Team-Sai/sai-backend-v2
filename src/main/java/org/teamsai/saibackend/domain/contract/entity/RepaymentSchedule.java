@@ -65,10 +65,6 @@ public class RepaymentSchedule {
         this.status = RepaymentScheduleStatus.WRITTEN_OFF;
     }
 
-    public void changeDueDate(LocalDate dueDate) {
-        this.dueDate = dueDate;
-    }
-
     public void reschedule(BigDecimal principalDue, BigDecimal interestDue, BigDecimal remainingPrincipal) {
         this.principalDue = principalDue;
         this.interestDue = interestDue;

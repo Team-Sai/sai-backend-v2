@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.temporal.ChronoUnit;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +27,7 @@ public class RepaymentScheduleGenerateService {
 
     public List<RepaymentSchedule> generate(
             Long contractId, RepaymentMethod repaymentType, BigDecimal principal,
-            BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate
+            BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate, int repaymentDay
     ) {
         Period period = Period.between(startDate, maturityDate);
         int months = period.getYears() * 12 + period.getMonths();
@@ -35,24 +36,27 @@ public class RepaymentScheduleGenerateService {
             throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
         }
 
+        List<LocalDate> dueDates = calculateDueDates(startDate, maturityDate, repaymentDay, months);
+
         return switch (repaymentType) {
             case EQUAL_PRINCIPAL_AND_INTEREST -> generateEqualPrincipalAndInterest(
-                    contractId, principal, annualInterestRate, months, startDate);
+                    contractId, principal, annualInterestRate, dueDates);
             case EQUAL_PRINCIPAL -> generateEqualPrincipal(
-                    contractId, principal, annualInterestRate, months, startDate);
+                    contractId, principal, annualInterestRate, dueDates);
             case BULLET_REPAYMENT -> generateBulletRepayment(
-                    contractId, principal, annualInterestRate, months, startDate);
+                    contractId, principal, annualInterestRate, dueDates);
         };
     }
 
     public List<RepaymentSchedule> generateWithDailyInterest(
             Long contractId, RepaymentMethod repaymentType, BigDecimal principal,
-            BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate
+            BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate,
+            int repaymentDay, LocalDate interestFrom
     ) {
         List<RepaymentSchedule> schedules = generate(
-                contractId, repaymentType, principal, annualInterestRate, startDate, maturityDate);
+                contractId, repaymentType, principal, annualInterestRate, startDate, maturityDate, repaymentDay);
 
-        applyDailyInterest(schedules, repaymentType, principal, annualInterestRate, startDate);
+        applyDailyInterest(schedules, repaymentType, principal, annualInterestRate, interestFrom);
         return schedules;
     }
 
@@ -63,16 +67,13 @@ public class RepaymentScheduleGenerateService {
     ) {
         List<RepaymentSchedule> schedules = switch (repaymentType) {
             case EQUAL_PRINCIPAL_AND_INTEREST -> generateEqualPrincipalAndInterest(
-                    contractId, principal, annualInterestRate, dueDates.size(), interestFrom);
+                    contractId, principal, annualInterestRate, dueDates);
             case EQUAL_PRINCIPAL -> generateEqualPrincipal(
-                    contractId, principal, annualInterestRate, dueDates.size(), interestFrom);
+                    contractId, principal, annualInterestRate, dueDates);
             case BULLET_REPAYMENT -> generateBulletRepayment(
-                    contractId, principal, annualInterestRate, dueDates.size(), interestFrom);
+                    contractId, principal, annualInterestRate, dueDates);
         };
 
-        for (int i = 0; i < schedules.size(); i++) {
-            schedules.get(i).changeDueDate(dueDates.get(i));
-        }
         applyDailyInterest(schedules, repaymentType, principal, annualInterestRate, interestFrom);
         return schedules;
     }
@@ -113,12 +114,13 @@ public class RepaymentScheduleGenerateService {
 
     public List<RepaymentSchedule> generateEqualPrincipalAndInterest(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
-            int months, LocalDate startDate
+            List<LocalDate> dueDates
     ) {
+        int months = dueDates.size();
         BigDecimal monthlyRate = calculateMonthlyRate(annualInterestRate);
 
         if (monthlyRate.compareTo(BigDecimal.ZERO) == 0) {
-            return generateZeroInterestRows(contractId, principal, months, startDate);
+            return generateZeroInterestRows(contractId, principal, dueDates);
         }
 
         BigDecimal compoundFactor = BigDecimal.ONE.add(monthlyRate).pow(months);
@@ -167,7 +169,7 @@ public class RepaymentScheduleGenerateService {
             allocatedInterest = allocatedInterest.add(interestDue);
 
             schedules.add(buildScheduleRow(
-                    contractId, i, startDate.plusMonths(i),
+                    contractId, i, dueDates.get(i - 1),
                     principalDue, interestDue, remainingPrincipal
             ));
         }
@@ -178,8 +180,9 @@ public class RepaymentScheduleGenerateService {
 
     public List<RepaymentSchedule> generateEqualPrincipal(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
-            int months, LocalDate startDate
+            List<LocalDate> dueDates
     ) {
+        int months = dueDates.size();
         BigDecimal monthlyRate = calculateMonthlyRate(annualInterestRate);
         BigDecimal monthlyPrincipal = principal
                 .divide(BigDecimal.valueOf(months), WON_SCALE, RoundingMode.DOWN);
@@ -212,7 +215,7 @@ public class RepaymentScheduleGenerateService {
             allocatedInterest = allocatedInterest.add(interestDue);
 
             schedules.add(buildScheduleRow(
-                    contractId, i, startDate.plusMonths(i),
+                    contractId, i, dueDates.get(i - 1),
                     principalDue, interestDue, remainingPrincipal
             ));
         }
@@ -223,8 +226,9 @@ public class RepaymentScheduleGenerateService {
 
     public List<RepaymentSchedule> generateBulletRepayment(
             Long contractId, BigDecimal principal, BigDecimal annualInterestRate,
-            int months, LocalDate startDate
+            List<LocalDate> dueDates
     ) {
+        int months = dueDates.size();
         BigDecimal monthlyRate = calculateMonthlyRate(annualInterestRate);
         BigDecimal theoreticalMonthlyInterest = principal.multiply(monthlyRate);
         BigDecimal finalizedTotalInterest = floorToWon(
@@ -245,13 +249,28 @@ public class RepaymentScheduleGenerateService {
             allocatedInterest = allocatedInterest.add(interestDue);
 
             schedules.add(buildScheduleRow(
-                    contractId, i, startDate.plusMonths(i),
+                    contractId, i, dueDates.get(i - 1),
                     principalDue, interestDue, remainingPrincipal
             ));
         }
 
         validateSchedule(schedules, principal, finalizedTotalInterest);
         return schedules;
+    }
+
+    private static List<LocalDate> calculateDueDates(
+            LocalDate startDate, LocalDate maturityDate, int repaymentDay, int months
+    ) {
+        YearMonth startMonth = YearMonth.from(startDate);
+        List<LocalDate> dueDates = new ArrayList<>();
+
+        for (int i = 1; i < months; i++) {
+            YearMonth month = startMonth.plusMonths(i);
+            dueDates.add(month.atDay(Math.min(repaymentDay, month.lengthOfMonth())));
+        }
+        dueDates.add(maturityDate);
+
+        return dueDates;
     }
 
     private static BigDecimal calculateMonthlyRate(BigDecimal annualInterestRate) {
@@ -293,8 +312,9 @@ public class RepaymentScheduleGenerateService {
     }
 
     private static List<RepaymentSchedule> generateZeroInterestRows(
-            Long contractId, BigDecimal principal, int months, LocalDate startDate
+            Long contractId, BigDecimal principal, List<LocalDate> dueDates
     ) {
+        int months = dueDates.size();
         BigDecimal monthlyPrincipal = principal
                 .divide(BigDecimal.valueOf(months), WON_SCALE, RoundingMode.DOWN);
         List<RepaymentSchedule> schedules = new ArrayList<>();
@@ -304,7 +324,7 @@ public class RepaymentScheduleGenerateService {
             BigDecimal principalDue = (i == months) ? remainingPrincipal : monthlyPrincipal;
             remainingPrincipal = remainingPrincipal.subtract(principalDue);
             schedules.add(buildScheduleRow(
-                    contractId, i, startDate.plusMonths(i),
+                    contractId, i, dueDates.get(i - 1),
                     principalDue, BigDecimal.ZERO, remainingPrincipal
             ));
         }
