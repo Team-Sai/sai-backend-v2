@@ -82,7 +82,7 @@ class EarlyRepaymentServiceTest {
         when(deposit.getAmount()).thenReturn(new BigDecimal("150000"));
         when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        service.process(1L, 10L, new EarlyRepaymentRequest(99L, BigDecimal.ZERO));
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L));
 
         assertThat(rows).extracting(RepaymentSchedule::getSequence).containsExactly(1, 2, 3);
         assertThat(rows).allMatch(row -> row.getTotalPaymentDue().compareTo(new BigDecimal("50000")) == 0);
@@ -94,7 +94,7 @@ class EarlyRepaymentServiceTest {
     void rejectsTooMuch() {
         when(deposit.getAmount()).thenReturn(new BigDecimal("400000"));
 
-        assertThatThrownBy(() -> service.process(1L, 10L, new EarlyRepaymentRequest(99L, BigDecimal.ZERO)))
+        assertThatThrownBy(() -> service.process(1L, 10L, new EarlyRepaymentRequest(99L)))
                 .isInstanceOf(DomainException.class);
         verify(deposit, never()).changeProcessingStatus(any());
     }

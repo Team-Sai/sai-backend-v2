@@ -95,13 +95,12 @@ public class EarlyRepaymentService {
             throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED.toException();
         }
 
-        // 3. 입금액을 부족 회차 → 경과 이자 → 수수료 → 원금 순서로 나눈다.
+        // 3. 입금액을 부족 회차 → 경과 이자 → 원금 순서로 나눈다.
         RepaymentSchedule first = futureRows.get(0);
         LocalDate paidOn = deposit.getTransactionAt().toLocalDate();
         BigDecimal shortfall = shortfallOf(shortfallRows, paid);
         BigDecimal accrued = accruedInterest(contract, all, first, paidOn);
-        BigDecimal principalPart = deposit.getAmount()
-                .subtract(shortfall).subtract(accrued).subtract(request.feeAmount());
+        BigDecimal principalPart = deposit.getAmount().subtract(shortfall).subtract(accrued);
         BigDecimal balance = balanceOf(first);
         if (principalPart.signum() <= 0 || principalPart.compareTo(balance) > 0) {
             throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_AMOUNT_INVALID.toException();
@@ -123,7 +122,7 @@ public class EarlyRepaymentService {
 
         EarlyRepayment saved = earlyRepaymentRepository.save(new EarlyRepayment(
                 contractId, request.bankTransactionId(), deposit.getAmount(),
-                shortfall, accrued, request.feeAmount(), principalPart, now));
+                shortfall, accrued, BigDecimal.ZERO, principalPart, now));
         return EarlyRepaymentResponse.from(saved);
     }
 
@@ -172,11 +171,17 @@ public class EarlyRepaymentService {
 
     private BigDecimal accruedInterest(LoanContractResponse contract, List<RepaymentSchedule> all,
                                        RepaymentSchedule first, LocalDate paidOn) {
-        LocalDate from = all.stream()
+        LocalDate previousDue = all.stream()
                 .filter(schedule -> schedule.getSequence() == first.getSequence() - 1)
                 .map(RepaymentSchedule::getDueDate)
                 .findFirst()
                 .orElse(contract.getStartDate());
+        LocalDate lastEarly = earlyRepaymentRepository
+                .findFirstByContractIdOrderByProcessedAtDesc(contract.getContractId())
+                .flatMap(early -> bankTransactionService.findById(early.getBankTransactionId()))
+                .map(tx -> tx.getTransactionAt().toLocalDate())
+                .orElse(previousDue);
+        LocalDate from = lastEarly.isAfter(previousDue) ? lastEarly : previousDue;
         return repaymentScheduleGenerateService.calculateDailyInterest(
                 balanceOf(first), contract.getInterestRate(), from, paidOn);
     }
