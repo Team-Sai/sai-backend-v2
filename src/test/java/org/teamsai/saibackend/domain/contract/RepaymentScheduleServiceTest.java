@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
@@ -45,6 +46,9 @@ class RepaymentScheduleServiceTest {
 
     @Mock
     private LoanContractService loanContractService;
+
+    @Mock
+    private EarlyRepaymentService earlyRepaymentService;
 
     @Spy
     private RepaymentScheduleGenerateService repaymentScheduleGenerateService = new RepaymentScheduleGenerateService();
@@ -179,6 +183,25 @@ class RepaymentScheduleServiceTest {
         assertThat(saved).hasSize(12);
         assertThat(saved.get(0).getDueDate()).isEqualTo(LocalDate.of(2026, 12, 12));
     }
+
+    @Test
+    @DisplayName("계약 변경 시 중도상환으로 줄어든 원금을 시작 원금으로 쓴다")
+    void generateChangedSchedule_keepsEarlyRepaidPrincipal() {
+        RepaymentSchedule pending = new RepaymentSchedule(
+                V1_CONTRACT_ID, 1, LocalDate.of(2026, 12, 12),
+                new BigDecimal("200000"), BigDecimal.ZERO, new BigDecimal("200000"),
+                new BigDecimal("1800000"), RepaymentScheduleStatus.PENDING, LocalDateTime.now());
+        givenChangedContract(12, List.of(pending));
+
+        repaymentScheduleService.generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+
+        verify(repaymentScheduleRepository).saveAll(schedulesCaptor.capture());
+        BigDecimal principalSum = schedulesCaptor.getValue().stream()
+                .map(RepaymentSchedule::getPrincipalDue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertThat(principalSum).isEqualByComparingTo("2000000");
+    }
+
 
     private void givenChangedContract(int v2RepaymentDay, List<RepaymentSchedule> v1Schedules) {
         when(repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(V1_CONTRACT_ID)).thenReturn(v1Schedules);

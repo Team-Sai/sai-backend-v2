@@ -24,7 +24,9 @@ public enum RepaymentScheduleErrorCode implements BaseErrorCode<DomainException>
 
     EARLY_REPAYMENT_DEPOSIT_INVALID(HttpStatus.CONFLICT, "중도상환에 사용할 수 없는 입금입니다."),
 
-    EARLY_REPAYMENT_AMOUNT_INVALID(HttpStatus.BAD_REQUEST, "입금액이 부족하거나 남은 원금보다 많습니다.");
+    EARLY_REPAYMENT_AMOUNT_INVALID(HttpStatus.BAD_REQUEST, "입금액이 부족하거나 남은 원금보다 많습니다."),
+
+    EARLY_REPAYMENT_DEPOSIT_OUT_OF_ORDER(HttpStatus.CONFLICT, "이전 중도상환보다 앞선 입금은 처리할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class RepaymentScheduleService {
 
+    private final EarlyRepaymentService earlyRepaymentService;
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final LoanContractService loanContractService;
     private final RepaymentScheduleGenerateService repaymentScheduleGenerateService;
@@ -84,18 +85,28 @@ public class RepaymentScheduleService {
         LoanContractResponse v1 = loanContractService.getContractForInternalUse(v1ContractId);
         LoanContractResponse v2 = loanContractService.getContractForInternalUse(v2ContractId);
 
-        BigDecimal openingPrincipal = lastPaid.map(RepaymentSchedule::getRemainingPrincipal)
-                .orElse(v1.getPrincipalAmount());
+        // 남은 첫 회차 기준으로 잡아야 중도상환으로 줄어든 원금이 유지된다.
+        BigDecimal openingPrincipal = v1Schedules.stream()
+                .filter(s -> s.getStatus().isUnresolved())
+                .min(Comparator.comparing(RepaymentSchedule::getSequence))
+                .map(s -> s.getRemainingPrincipal().add(s.getPrincipalDue()))
+                .orElseGet(() -> lastPaid.map(RepaymentSchedule::getRemainingPrincipal)
+                        .orElse(v1.getPrincipalAmount()));
         LocalDate baseDate = lastPaid
                 .map(paid -> alignToStartDay(paid.getDueDate(), v1.getStartDate()))
                 .orElse(v1.getStartDate());
+
+        LocalDate lastDue = lastPaid.map(RepaymentSchedule::getDueDate).orElse(v1.getStartDate());
+        LocalDate interestFrom = earlyRepaymentService.findLatestPaidOn(v1ContractId)
+                .filter(lastDue::isBefore)
+                .orElse(lastDue);
 
         repaymentScheduleRepository.deleteByContractIdAndStatus(v1ContractId, RepaymentScheduleStatus.PENDING);
 
         List<RepaymentSchedule> newSchedules = repaymentScheduleGenerateService.generateWithDailyInterest(
                 v2ContractId, v2.getRepaymentType(), openingPrincipal,
                 v2.getInterestRate(), baseDate, v2.getMaturityDate(), v2.getRepaymentDay(),
-                lastPaid.map(RepaymentSchedule::getDueDate).orElse(v1.getStartDate()));
+                interestFrom);
 
         repaymentScheduleRepository.saveAll(newSchedules);
     }

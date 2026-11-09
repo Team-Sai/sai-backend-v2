@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,6 +45,13 @@ public class EarlyRepaymentService {
     private final ContractAccountRepository contractAccountRepository;
     private final BankTransactionService bankTransactionService;
     private final PaymentRecordService paymentRecordService;
+
+    public Optional<LocalDate> findLatestPaidOn(Long contractId) {
+        return earlyRepaymentRepository.findFirstByContractIdOrderByProcessedAtDesc(contractId)
+                .flatMap(early -> bankTransactionService.findById(early.getBankTransactionId()))
+                .map(tx -> tx.getTransactionAt().toLocalDate());
+    }
+
 
     public List<EarlyRepaymentDepositResponse> getDeposits(Long contractId, Long userId) {
         LoanContractResponse contract = validateCreditor(contractId, userId);
@@ -60,12 +68,10 @@ public class EarlyRepaymentService {
         RepaymentSchedule first = futureRows.get(0);
         BigDecimal shortfall = shortfallOf(shortfallRows, paid);
         BigDecimal balance = balanceOf(first);
-        String debtorName = normalizeName(contract.getDebtorName());
 
         return bankTransactionService.findUnmatchedDepositsByLinkedAccountId(activeLinkedAccountId(contractId))
                 .stream()
-                .filter(tx -> debtorName.equals(normalizeName(tx.getCounterpartyName())))
-                .filter(tx -> !tx.getTransactionAt().toLocalDate().isBefore(contract.getStartDate()))
+                .filter(tx -> isEligibleDeposit(contract, tx))
                 .map(tx -> EarlyRepaymentDepositResponse.of(
                         tx, shortfall,
                         accruedInterest(contract, all, first, tx.getTransactionAt().toLocalDate()),
@@ -81,8 +87,15 @@ public class EarlyRepaymentService {
         BankTransaction deposit = bankTransactionService.findByIdAndLinkedAccountIdForUpdate(
                 request.bankTransactionId(), activeLinkedAccountId(contractId));
         if (deposit.getTransactionType() != BankTransactionType.DEPOSIT
-                || deposit.getProcessingStatus() != BankTransactionProcessingStatus.UNMATCHED) {
+                || deposit.getProcessingStatus() != BankTransactionProcessingStatus.UNMATCHED
+                || !isEligibleDeposit(contract, deposit)) {
             throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_DEPOSIT_INVALID.toException();
+        }
+
+
+        LocalDate depositDate = deposit.getTransactionAt().toLocalDate();
+        if (findLatestPaidOn(contractId).filter(depositDate::isBefore).isPresent()) {
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_DEPOSIT_OUT_OF_ORDER.toException();
         }
 
         // 2. 끝나지 않은 회차를 부족 회차와 앞으로 낼 회차로 나눈다.
@@ -176,11 +189,7 @@ public class EarlyRepaymentService {
                 .map(RepaymentSchedule::getDueDate)
                 .findFirst()
                 .orElse(contract.getStartDate());
-        LocalDate lastEarly = earlyRepaymentRepository
-                .findFirstByContractIdOrderByProcessedAtDesc(contract.getContractId())
-                .flatMap(early -> bankTransactionService.findById(early.getBankTransactionId()))
-                .map(tx -> tx.getTransactionAt().toLocalDate())
-                .orElse(previousDue);
+        LocalDate lastEarly = findLatestPaidOn(contract.getContractId()).orElse(previousDue);
         LocalDate from = lastEarly.isAfter(previousDue) ? lastEarly : previousDue;
         return repaymentScheduleGenerateService.calculateDailyInterest(
                 balanceOf(first), contract.getInterestRate(), from, paidOn);
@@ -213,6 +222,12 @@ public class EarlyRepaymentService {
         }
         return contract;
     }
+
+    private boolean isEligibleDeposit(LoanContractResponse contract, BankTransaction deposit) {
+        return normalizeName(contract.getDebtorName()).equals(normalizeName(deposit.getCounterpartyName()))
+                && !deposit.getTransactionAt().toLocalDate().isBefore(contract.getStartDate());
+    }
+
 
     private String normalizeName(String name) {
         return name == null ? "" : name.replaceAll("\\s+", "");
