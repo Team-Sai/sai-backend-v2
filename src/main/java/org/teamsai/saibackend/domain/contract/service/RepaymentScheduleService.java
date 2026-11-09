@@ -41,10 +41,9 @@ public class RepaymentScheduleService {
     public void generateSchedule(Long contractId) {
         LoanContractResponse contract = loanContractService.getContractForInternalUse(contractId);
 
-        List<RepaymentSchedule> schedules = repaymentScheduleGenerateService.generate(
+        List<RepaymentSchedule> schedules = repaymentScheduleGenerateService.generateWithDailyInterest(
                 contractId, contract.getRepaymentType(), contract.getPrincipalAmount(),
                 contract.getInterestRate(), contract.getStartDate(), contract.getMaturityDate());
-
         repaymentScheduleRepository.saveAll(schedules);
     }
 
@@ -89,10 +88,9 @@ public class RepaymentScheduleService {
 
         repaymentScheduleRepository.deleteByContractIdAndStatus(v1ContractId, RepaymentScheduleStatus.PENDING);
 
-        List<RepaymentSchedule> newSchedules = repaymentScheduleGenerateService.generate(
+        List<RepaymentSchedule> newSchedules = repaymentScheduleGenerateService.generateWithDailyInterest(
                 v2ContractId, v2.getRepaymentType(), openingPrincipal,
                 v2.getInterestRate(), baseDate, v2.getMaturityDate());
-
         repaymentScheduleRepository.saveAll(newSchedules);
     }
 

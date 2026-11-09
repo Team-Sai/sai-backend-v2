@@ -20,8 +20,9 @@ public class RepaymentScheduleResponse {
     private BigDecimal remainingPrincipal;
     private RepaymentScheduleStatus status;
     private LocalDateTime paidAt;
+    private BigDecimal paidAmount;
 
-    public static RepaymentScheduleResponse from(RepaymentSchedule entity) {
+    public static RepaymentScheduleResponse from(RepaymentSchedule entity, BigDecimal paidAmount) {
         return RepaymentScheduleResponse.builder()
                 .scheduleId(entity.getScheduleId())
                 .sequence(entity.getSequence())
@@ -32,6 +33,7 @@ public class RepaymentScheduleResponse {
                 .remainingPrincipal(entity.getRemainingPrincipal())
                 .status(entity.getStatus())
                 .paidAt(entity.getPaidAt())
+                .paidAmount(paidAmount)
                 .build();
     }
 }

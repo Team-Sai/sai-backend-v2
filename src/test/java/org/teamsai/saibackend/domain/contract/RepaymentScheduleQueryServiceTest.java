@@ -10,10 +10,12 @@ import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.exception.LoanContractErrorCode;
+import org.teamsai.saibackend.domain.contract.repository.EarlyRepaymentRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleQueryService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
+import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
@@ -36,6 +38,12 @@ class RepaymentScheduleQueryServiceTest {
 
     @Mock
     private LoanContractService loanContractService;
+
+    @Mock
+    private PaymentRecordService paymentRecordService;
+
+    @Mock
+    private EarlyRepaymentRepository earlyRepaymentRepository;
 
     @InjectMocks
     private RepaymentScheduleQueryService repaymentScheduleQueryService;

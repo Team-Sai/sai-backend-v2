@@ -1,5 +1,6 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
+import org.teamsai.saibackend.domain.contract.dto.response.EarlyRepaymentResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
@@ -9,6 +10,7 @@ import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public final class RepaymentScheduleAssembler {
 
@@ -18,7 +20,9 @@ public final class RepaymentScheduleAssembler {
     public static RepaymentScheduleSummaryResponse toSummary(
             LoanContractResponse contract,
             List<RepaymentSchedule> schedules,
-            LocalDate nextDueDate
+            LocalDate nextDueDate,
+            Map<Long, BigDecimal> paidByScheduleId,
+            List<EarlyRepaymentResponse> earlyRepayments
     ) {
         BigDecimal totalScheduledAmount = schedules.stream()
                 .map(RepaymentSchedule::getTotalPaymentDue)
@@ -37,7 +41,7 @@ public final class RepaymentScheduleAssembler {
         int totalCount = schedules.size();
 
         List<RepaymentScheduleResponse> scheduleResponses = schedules.stream()
-                .map(RepaymentScheduleResponse::from)
+                .map(s -> RepaymentScheduleResponse.from(s, paidAmountOf(s, paidByScheduleId)))
                 .toList();
 
         return RepaymentScheduleSummaryResponse.builder()
@@ -50,6 +54,14 @@ public final class RepaymentScheduleAssembler {
                 .totalCount(totalCount)
                 .schedules(scheduleResponses)
                 .nextDueDate(nextDueDate)
+                .earlyRepayments(earlyRepayments)
                 .build();
+    }
+
+    private static BigDecimal paidAmountOf(RepaymentSchedule schedule, Map<Long, BigDecimal> paidByScheduleId) {
+        if (schedule.getStatus() == RepaymentScheduleStatus.PAID) {
+            return schedule.getTotalPaymentDue();
+        }
+        return paidByScheduleId.getOrDefault(schedule.getScheduleId(), BigDecimal.ZERO);
     }
 }

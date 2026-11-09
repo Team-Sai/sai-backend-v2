@@ -20,4 +20,5 @@ public class RepaymentScheduleSummaryResponse {
     private Integer paidCount;
     private Integer totalCount;
     private List<RepaymentScheduleResponse> schedules;
+    private List<EarlyRepaymentResponse> earlyRepayments;
 }

@@ -8,6 +8,7 @@ import org.teamsai.saibackend.domain.matching.model.MatchingCandidate;
 import org.teamsai.saibackend.domain.matching.model.MatchingTransaction;
 import org.teamsai.saibackend.domain.matching.type.AutoMatchingTransactionType;
 import org.teamsai.saibackend.domain.matching.type.MatchingAmountType;
+import org.teamsai.saibackend.domain.matching.type.MatchingTargetType;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,6 +21,8 @@ public class AutoMatchingJudge {
             new BigDecimal("0.10");
     private static final BigDecimal MAXIMUM_MATCH_RATIO =
             new BigDecimal("1.10");
+    private static final BigDecimal LOAN_MAXIMUM_MATCH_RATIO =
+            BigDecimal.ONE;
 
     public AutoMatchingResult judge(
             MatchingTransaction transaction,
@@ -55,8 +58,11 @@ public class AutoMatchingJudge {
         BigDecimal expectedAmount = candidate.remainingAmount();
         BigDecimal minimumAmount = expectedAmount
                 .multiply(MINIMUM_MATCH_RATIO);
+        BigDecimal maximumRatio = candidate.targetType() == MatchingTargetType.LOAN
+                ? LOAN_MAXIMUM_MATCH_RATIO
+                : MAXIMUM_MATCH_RATIO;
         BigDecimal maximumAmount = expectedAmount
-                .multiply(MAXIMUM_MATCH_RATIO);
+                .multiply(maximumRatio);
 
         if (transactionAmount.compareTo(minimumAmount) < 0
                 || transactionAmount.compareTo(maximumAmount) > 0) {

@@ -16,7 +16,15 @@ public enum RepaymentScheduleErrorCode implements BaseErrorCode<DomainException>
 
     SCHEDULE_NOT_PENDING(HttpStatus.CONFLICT, "이미 상환 완료되었거나 처리 불가능한 스케줄입니다."),
 
-    SCHEDULE_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "상환 스케줄 생성 중 오류가 발생했습니다.");
+    SCHEDULE_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "상환 스케줄 생성 중 오류가 발생했습니다."),
+
+    EARLY_REPAYMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "채권자만 중도상환을 처리할 수 있습니다."),
+
+    EARLY_REPAYMENT_NOT_ALLOWED(HttpStatus.CONFLICT, "중도상환을 처리할 수 없는 계약입니다."),
+
+    EARLY_REPAYMENT_DEPOSIT_INVALID(HttpStatus.CONFLICT, "중도상환에 사용할 수 없는 입금입니다."),
+
+    EARLY_REPAYMENT_AMOUNT_INVALID(HttpStatus.BAD_REQUEST, "입금액이 부족하거나 남은 원금보다 많습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;
