@@ -69,6 +69,11 @@ class RepaymentWriteOffTransactionExecutorIntegrationTest {
         LoanContractService loanContractService() {
             return org.mockito.Mockito.mock(LoanContractService.class);
         }
+
+        @Bean
+        org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService earlyRepaymentService() {
+            return org.mockito.Mockito.mock(org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService.class);
+        }
     }
 
     @Autowired
