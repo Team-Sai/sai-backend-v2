@@ -282,13 +282,37 @@ class RepaymentScheduleGenerateServiceTest {
                 );
     }
 
-    @Test
-    @DisplayName("마지막 회차가 최종 변제기일 이전이면 상환일을 유지한다")
-    void generate_keepsLastRoundBeforeMaturityDate() {
+    @ParameterizedTest
+    @EnumSource(RepaymentMethod.class)
+    @DisplayName("상환일이 최종 변제기일보다 빨라도 마지막 회차는 최종 변제기일이다")
+    void generate_lastRoundIsAlwaysMaturityDate(RepaymentMethod method) {
         List<RepaymentSchedule> schedules = generateWithDates(
-                RepaymentMethod.EQUAL_PRINCIPAL, LocalDate.of(2026, 11, 11), LocalDate.of(2027, 3, 11), 5);
+                method, LocalDate.of(2026, 11, 11), LocalDate.of(2027, 3, 11), 5);
 
-        assertThat(schedules.get(schedules.size() - 1).getDueDate()).isEqualTo(LocalDate.of(2027, 3, 5));
+        assertThat(schedules)
+                .extracting(RepaymentSchedule::getDueDate)
+                .containsExactly(
+                        LocalDate.of(2026, 12, 5),
+                        LocalDate.of(2027, 1, 5),
+                        LocalDate.of(2027, 2, 5),
+                        LocalDate.of(2027, 3, 11)
+                );
+    }
+
+    @Test
+    @DisplayName("기간에 잔여 일수가 있어도 회차 수를 유지하고 마지막 회차는 최종 변제기일이다")
+    void generate_keepsRoundCountWhenPeriodHasRemainingDays() {
+        List<RepaymentSchedule> schedules = generateWithDates(
+                RepaymentMethod.EQUAL_PRINCIPAL, LocalDate.of(2027, 1, 10), LocalDate.of(2027, 6, 5), 25);
+
+        assertThat(schedules)
+                .extracting(RepaymentSchedule::getDueDate)
+                .containsExactly(
+                        LocalDate.of(2027, 2, 25),
+                        LocalDate.of(2027, 3, 25),
+                        LocalDate.of(2027, 4, 25),
+                        LocalDate.of(2027, 6, 5)
+                );
     }
 
     @ParameterizedTest

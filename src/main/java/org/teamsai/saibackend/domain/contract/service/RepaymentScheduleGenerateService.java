@@ -198,11 +198,11 @@ public class RepaymentScheduleGenerateService {
         YearMonth startMonth = YearMonth.from(startDate);
         List<LocalDate> dueDates = new ArrayList<>();
 
-        for (int i = 1; i <= months; i++) {
+        for (int i = 1; i < months; i++) {
             YearMonth month = startMonth.plusMonths(i);
-            LocalDate dueDate = month.atDay(Math.min(repaymentDay, month.lengthOfMonth()));
-            dueDates.add(dueDate.isAfter(maturityDate) ? maturityDate : dueDate);
+            dueDates.add(month.atDay(Math.min(repaymentDay, month.lengthOfMonth())));
         }
+        dueDates.add(maturityDate);
 
         return dueDates;
     }
