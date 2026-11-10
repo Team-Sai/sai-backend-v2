@@ -12,6 +12,7 @@ import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.service.ContractChangeQueryService;
 import org.teamsai.saibackend.domain.contract.service.ContractDetailQueryService;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
+import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -40,6 +41,7 @@ class ContractDetailQueryServiceTest {
                 .debtorId(DEBTOR_ID)
                 .creditorAddress("서울시 채권자로 1")
                 .debtorAddress("서울시 채무자로 1")
+                .status(ContractStatus.COMPLETED)
                 .build();
     }
 
@@ -89,6 +91,19 @@ class ContractDetailQueryServiceTest {
             boolean result = contractDetailService.canRequestChange(CONTRACT_ID, DEBTOR_ID);
 
             assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("채권자가 채무자에게 전송만 한 PENDING 계약은 변경을 요청할 수 없다")
+        void falseWhenContractIsNotCompleted() {
+            LoanContractResponse sentContract = contract().toBuilder()
+                    .status(ContractStatus.PENDING)
+                    .build();
+            given(loanContractService.findContract(CONTRACT_ID, CREDITOR_ID)).willReturn(sentContract);
+            given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID)).willReturn(sentContract);
+
+            assertThat(contractDetailService.canRequestChange(CONTRACT_ID, CREDITOR_ID)).isFalse();
+            assertThat(contractDetailService.getCheck(CONTRACT_ID, DEBTOR_ID).isCanRequestChange()).isFalse();
         }
 
         @Test

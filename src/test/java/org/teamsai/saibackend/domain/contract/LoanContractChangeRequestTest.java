@@ -43,15 +43,6 @@ class LoanContractChangeRequestTest {
     }
 
     @Test
-    @DisplayName("요청자 본인이면 통과, 아니면 NOT_CONTRACT_PARTY")
-    void validateRequestedBy() {
-        LoanContractChangeRequest request = request(ChangeRequestStatus.PENDING);
-
-        assertThatCode(() -> request.validateRequestedBy(USER_ID)).doesNotThrowAnyException();
-        assertErrorCode(() -> request.validateRequestedBy(20L), ContractChangeErrorCode.NOT_CONTRACT_PARTY);
-    }
-
-    @Test
     @DisplayName("PENDING이면 통과, 이미 처리됐으면 ALREADY_BEING_REQUEST")
     void validatePending() {
         assertThatCode(() -> request(ChangeRequestStatus.PENDING).validatePending()).doesNotThrowAnyException();
@@ -59,12 +50,12 @@ class LoanContractChangeRequestTest {
     }
 
     @Test
-    @DisplayName("서명 전이면 통과, 이미 서명했으면 ALREADY_SIGNED")
-    void validateNotSigned() {
+    @DisplayName("요청자 서명이 있으면 통과, 없으면 REQUESTER_SIGNATURE_REQUIRED")
+    void validateSigned() {
         LoanContractChangeRequest request = request(ChangeRequestStatus.PENDING);
-        assertThatCode(request::validateNotSigned).doesNotThrowAnyException();
+        assertErrorCode(request::validateSigned, ContractChangeErrorCode.REQUESTER_SIGNATURE_REQUIRED);
 
         request.attachRequesterSignature("signature.png");
-        assertErrorCode(request::validateNotSigned, ContractChangeErrorCode.ALREADY_SIGNED);
+        assertThatCode(request::validateSigned).doesNotThrowAnyException();
     }
 }

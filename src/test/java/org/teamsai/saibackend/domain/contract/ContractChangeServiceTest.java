@@ -22,6 +22,7 @@ import org.teamsai.saibackend.domain.contract.repository.ContractChangeRepositor
 import org.teamsai.saibackend.domain.contract.service.*;
 import org.teamsai.saibackend.domain.contract.type.ChangeRequestStatus;
 import org.teamsai.saibackend.domain.identity.service.IdentityService;
+import org.teamsai.saibackend.domain.identity.type.IdentityPurpose;
 import org.teamsai.saibackend.domain.notification.service.NotificationService;
 import org.teamsai.saibackend.domain.notification.type.NotificationType;
 import org.teamsai.saibackend.domain.user.dto.response.UserResponse;
@@ -37,6 +38,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -47,6 +49,9 @@ class ContractChangeServiceTest {
     private static final Long CONTRACT_ID = 1L;
     private static final Long USER_ID = 10L;
     private static final Long DEBTOR_ID = 20L;
+    private static final Long NEW_CHANGE_REQUEST_ID = 77L;
+    private static final String REQUEST_IDENTITY_ID = "request-identity-id";
+    private static final String REQUEST_SIGNATURE_PATH = "uploads/signatures/77_signature.png";
 
     @Mock
     private ContractChangeRepository contractChangeRepository;
@@ -56,6 +61,9 @@ class ContractChangeServiceTest {
 
     @Mock
     private LoanChangeService loanChangeService;
+
+    @Mock
+    private ContractAccountService contractAccountService;
 
     @Mock
     private NotificationService notificationService;
@@ -77,6 +85,17 @@ class ContractChangeServiceTest {
 
     @InjectMocks
     private ContractChangeService contractChangeService;
+
+    private final MultipartFile signatureFile = mock(MultipartFile.class);
+
+    private void givenSaveAssignsChangeRequestId() {
+        given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequest.class)))
+                .willAnswer(invocation -> {
+                    LoanContractChangeRequest saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "changeRequestId", NEW_CHANGE_REQUEST_ID);
+                    return saved;
+                });
+    }
 
     private LoanContractChangeRequest entity(
             Long changeRequestId,
@@ -141,12 +160,24 @@ class ContractChangeServiceTest {
                     .willReturn(createContract(ContractStatus.COMPLETED));
             given(contractChangeRepository.findByContractId(CONTRACT_ID))
                     .willReturn(List.of());
-            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequest.class)))
-                    .willAnswer(invocation -> invocation.getArgument(0));
+            givenSaveAssignsChangeRequestId();
+            given(fileService.saveSignatureFile(NEW_CHANGE_REQUEST_ID, signatureFile))
+                    .willReturn(REQUEST_SIGNATURE_PATH);
+            given(userService.getMyInfo(USER_ID))
+                    .willReturn(UserResponse.builder().name("채권자").build());
 
-            contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID);
+            contractChangeService.requestChange(CONTRACT_ID, changeRequest(), signatureFile, REQUEST_IDENTITY_ID, USER_ID);
 
-            verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequest.class));
+            ArgumentCaptor<LoanContractChangeRequest> savedCaptor =
+                    ArgumentCaptor.forClass(LoanContractChangeRequest.class);
+            verify(contractChangeRepository).save(savedCaptor.capture());
+            assertThat(savedCaptor.getValue().getRequesterSignature()).isEqualTo(REQUEST_SIGNATURE_PATH);
+            verify(identityService).consume(USER_ID, REQUEST_IDENTITY_ID, IdentityPurpose.LOAN_CONTRACT);
+            verify(notificationService).create(
+                    eq(DEBTOR_ID),
+                    eq(NotificationType.CONTRACT_CHANGE),
+                    any(), any(), eq(CONTRACT_ID), eq(NEW_CHANGE_REQUEST_ID)
+            );
 
             ArgumentCaptor<ChangedLoanContractDTO> captor =
                     ArgumentCaptor.forClass(ChangedLoanContractDTO.class);
@@ -163,7 +194,7 @@ class ContractChangeServiceTest {
             given(loanContractService.findContract(CONTRACT_ID, USER_ID))
                     .willReturn(createContract(ContractStatus.DRAFT));
 
-            assertThatThrownBy(() -> contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID))
+            assertThatThrownBy(() -> contractChangeService.requestChange(CONTRACT_ID, changeRequest(), signatureFile, REQUEST_IDENTITY_ID, USER_ID))
                     .isInstanceOfSatisfying(
                             DomainException.class,
                             exception -> assertThat(exception.getErrorCode())
@@ -182,7 +213,7 @@ class ContractChangeServiceTest {
             given(contractChangeRepository.findByContractId(CONTRACT_ID))
                     .willReturn(List.of(pendingRequest));
 
-            assertThatThrownBy(() -> contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID))
+            assertThatThrownBy(() -> contractChangeService.requestChange(CONTRACT_ID, changeRequest(), signatureFile, REQUEST_IDENTITY_ID, USER_ID))
                     .isInstanceOfSatisfying(
                             DomainException.class,
                             exception -> assertThat(exception.getErrorCode())
@@ -203,7 +234,7 @@ class ContractChangeServiceTest {
             given(loanContractService.findContract(CONTRACT_ID, USER_ID))
                     .willReturn(contract);
 
-            assertThatThrownBy(() -> contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID))
+            assertThatThrownBy(() -> contractChangeService.requestChange(CONTRACT_ID, changeRequest(), signatureFile, REQUEST_IDENTITY_ID, USER_ID))
                     .isInstanceOfSatisfying(
                             DomainException.class,
                             exception -> assertThat(exception.getErrorCode())
@@ -225,13 +256,53 @@ class ContractChangeServiceTest {
                     .willReturn(contract);
             given(contractChangeRepository.findByContractId(CONTRACT_ID))
                     .willReturn(List.of());
-            given(contractChangeRepository.saveAndFlush(any(LoanContractChangeRequest.class)))
-                    .willAnswer(invocation -> invocation.getArgument(0));
+            givenSaveAssignsChangeRequestId();
+            given(fileService.saveSignatureFile(NEW_CHANGE_REQUEST_ID, signatureFile))
+                    .willReturn(REQUEST_SIGNATURE_PATH);
+            given(userService.getMyInfo(USER_ID))
+                    .willReturn(UserResponse.builder().name("채무자").build());
 
-            contractChangeService.requestChange(CONTRACT_ID, changeRequest(), USER_ID);
+            contractChangeService.requestChange(CONTRACT_ID, changeRequest(), signatureFile, REQUEST_IDENTITY_ID, USER_ID);
 
             verify(contractChangeRepository).saveAndFlush(any(LoanContractChangeRequest.class));
             verify(loanChangeService).insertChangedContract(any());
+            verify(notificationService).create(
+                    eq(888L),
+                    eq(NotificationType.CONTRACT_CHANGE),
+                    any(), any(), eq(CONTRACT_ID), eq(NEW_CHANGE_REQUEST_ID)
+            );
+        }
+
+        @Test
+        @DisplayName("서명 저장에 실패하면 예외를 그대로 던져 트랜잭션을 롤백하고 알림을 보내지 않는다")
+        void requestChangeFailsWhenSignatureCannotBeSaved() {
+            given(loanContractService.findContract(CONTRACT_ID, USER_ID))
+                    .willReturn(createContract(ContractStatus.COMPLETED));
+            given(contractChangeRepository.findByContractId(CONTRACT_ID))
+                    .willReturn(List.of());
+            givenSaveAssignsChangeRequestId();
+            given(fileService.saveSignatureFile(NEW_CHANGE_REQUEST_ID, signatureFile))
+                    .willThrow(new IllegalStateException("저장 실패"));
+
+            assertThatThrownBy(() -> contractChangeService.requestChange(
+                    CONTRACT_ID, changeRequest(), signatureFile, REQUEST_IDENTITY_ID, USER_ID))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(contractChangeRepository, never()).save(any());
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("요청을 만들 수 없는 상태면 본인인증을 소모하지 않고 서명도 저장하지 않는다")
+        void requestChangeDoesNotConsumeIdentityWhenRejected() {
+            given(loanContractService.findContract(CONTRACT_ID, USER_ID))
+                    .willReturn(createContract(ContractStatus.DRAFT));
+
+            assertThatThrownBy(() -> contractChangeService.requestChange(
+                    CONTRACT_ID, changeRequest(), signatureFile, REQUEST_IDENTITY_ID, USER_ID))
+                    .isInstanceOf(DomainException.class);
+
+            verifyNoInteractions(identityService, fileService);
         }
     }
 
@@ -244,6 +315,7 @@ class ContractChangeServiceTest {
         private static final Long CHANGE_REQUEST_ID = 5L;
         private static final String IDENTITY_VERIFICATION_ID = "identity-verification-id";
         private static final String SAVED_PATH = "uploads/signatures/change_2_signature.png";
+        private static final String REQUESTER_SIGNATURE = "uploads/signatures/change_5_signature.png";
 
         private LoanContractResponse pendingV2Contract() {
             return LoanContractResponse.builder()
@@ -265,6 +337,7 @@ class ContractChangeServiceTest {
         void approveChangeSupersedesV1Contract() {
             MultipartFile signature = mock(MultipartFile.class);
             LoanContractChangeRequest changeRequest = pendingChangeRequest();
+            changeRequest.attachRequesterSignature(REQUESTER_SIGNATURE);
 
             given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
                     .willReturn(pendingV2Contract());
@@ -284,10 +357,71 @@ class ContractChangeServiceTest {
             contractChangeService.approveChange(V2_CONTRACT_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID);
 
             verify(loanChangeService).updateDebtorSignatureOnly(V2_CONTRACT_ID, SAVED_PATH);
+            verify(loanChangeService).updateCreditorSignatureOnly(V2_CONTRACT_ID, REQUESTER_SIGNATURE);
+            verify(loanChangeService).buildCompletedSnapshot(
+                    argThat(contract -> REQUESTER_SIGNATURE.equals(contract.getCreditorSignature())
+                            && SAVED_PATH.equals(contract.getDebtorSignature())),
+                    eq(false),
+                    eq(SAVED_PATH));
             verify(contractChangeRepository).save(changeRequest);
             assertThat(changeRequest.getStatus()).isEqualTo(ChangeRequestStatus.APPROVED);
             verify(loanChangeService).supersedeContract(V1_CONTRACT_ID);
+            verify(contractAccountService).copyActiveAccount(V1_CONTRACT_ID, V2_CONTRACT_ID);
             verify(repaymentScheduleService).generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+        }
+
+        @Test
+        @DisplayName("채무자가 요청하고 채권자가 승인해도 양쪽 서명을 변경 계약서에 기록한다")
+        void approveChangeRecordsBothSignaturesWhenCreditorApproves() {
+            MultipartFile signature = mock(MultipartFile.class);
+            LoanContractChangeRequest changeRequest =
+                    entity(CHANGE_REQUEST_ID, V1_CONTRACT_ID, DEBTOR_ID, ChangeRequestStatus.PENDING, null);
+            changeRequest.attachRequesterSignature(REQUESTER_SIGNATURE);
+
+            given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
+                    .willReturn(pendingV2Contract());
+            given(contractChangeRepository.findByContractId(V1_CONTRACT_ID))
+                    .willReturn(List.of(changeRequest));
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
+                    .willReturn(Optional.of(changeRequest));
+            given(fileService.saveSignatureFile(V2_CONTRACT_ID, signature))
+                    .willReturn(SAVED_PATH);
+            given(loanChangeService.buildCompletedSnapshot(any(), eq(true), eq(SAVED_PATH)))
+                    .willReturn(pendingV2Contract());
+            given(userService.getMyInfo(USER_ID))
+                    .willReturn(UserResponse.builder().name("채권자").build());
+
+            contractChangeService.approveChange(V2_CONTRACT_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID);
+
+            verify(loanChangeService).updateCreditorSignatureOnly(V2_CONTRACT_ID, SAVED_PATH);
+            verify(loanChangeService).updateDebtorSignatureOnly(V2_CONTRACT_ID, REQUESTER_SIGNATURE);
+        }
+
+        @Test
+        @DisplayName("요청자 서명이 없는 변경 요청은 승인할 수 없다")
+        void approveChangeFailsWhenRequesterHasNotSigned() {
+            MultipartFile signature = mock(MultipartFile.class);
+            LoanContractChangeRequest changeRequest = pendingChangeRequest();
+
+            given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
+                    .willReturn(pendingV2Contract());
+            given(contractChangeRepository.findByContractId(V1_CONTRACT_ID))
+                    .willReturn(List.of(changeRequest));
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
+                    .willReturn(Optional.of(changeRequest));
+
+            assertThatThrownBy(() ->
+                    contractChangeService.approveChange(V2_CONTRACT_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID))
+                    .isInstanceOfSatisfying(
+                            DomainException.class,
+                            exception -> assertThat(exception.getErrorCode())
+                                    .isEqualTo(ContractChangeErrorCode.REQUESTER_SIGNATURE_REQUIRED)
+                    );
+
+            verify(identityService, never()).consume(any(), any(), any());
+            verify(loanChangeService, never()).updateCreditorSignatureOnly(any(), any());
+            verify(loanChangeService, never()).updateDebtorSignatureOnly(any(), any());
+            verify(loanChangeService, never()).supersedeContract(any());
         }
 
         @Test
@@ -318,6 +452,7 @@ class ContractChangeServiceTest {
                     );
 
             verify(loanChangeService, never()).supersedeContract(any());
+            verify(contractAccountService, never()).copyActiveAccount(any(), any());
             verify(repaymentScheduleService, never()).generateChangedSchedule(any(), any());
             verify(contractChangeRepository, never()).save(any());
         }
@@ -486,285 +621,5 @@ class ContractChangeServiceTest {
                                     .isEqualTo(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND)
                     );
         }
-    }
-
-    @Nested
-    @DisplayName("변경 요청 전자서명 제출")
-    class SubmitRequesterSignature {
-
-        private static final Long CHANGE_REQUEST_ID = 200L;
-        private static final String SAVED_PATH = "uploads/signatures/change_200_signature.png";
-        private static final String IDENTITY_VERIFICATION_ID = "identity-verification-id";
-
-        private LoanContractChangeRequest pendingChangeRequest(Long ownerUserId, Long contractId) {
-            return entity(CHANGE_REQUEST_ID, contractId, ownerUserId, ChangeRequestStatus.PENDING, null);
-        }
-
-        private LoanContractChangeRequest changeRequestWithStatus(ChangeRequestStatus status, Long ownerUserId, Long contractId) {
-            return entity(CHANGE_REQUEST_ID, contractId, ownerUserId, status, null);
-        }
-
-        @Test
-        @DisplayName("채무자가 요청자면 서명 후 채권자에게 알림이 간다")
-        void submitRequesterSignatureSuccessWhenRequesterIsDebtor() {
-            MultipartFile signature = mock(MultipartFile.class);
-            LoanContractChangeRequest changeRequest = pendingChangeRequest(DEBTOR_ID, CONTRACT_ID);
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequest));
-            given(fileService.saveSignatureFile(CHANGE_REQUEST_ID, signature))
-                    .willReturn(SAVED_PATH);
-            given(loanContractService.findContract(CONTRACT_ID, DEBTOR_ID))
-                    .willReturn(createContract(ContractStatus.COMPLETED));
-            given(userService.getMyInfo(DEBTOR_ID))
-                    .willReturn(UserResponse.builder().name("채무자").build());
-
-            contractChangeService.submitRequesterSignature(CONTRACT_ID, CHANGE_REQUEST_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID);
-
-            assertThat(changeRequest.getRequesterSignature()).isEqualTo(SAVED_PATH);
-            verify(contractChangeRepository).save(changeRequest);
-            verify(notificationService).create(
-                    eq(USER_ID),
-                    eq(NotificationType.CONTRACT_CHANGE),
-                    any(), any(), eq(CONTRACT_ID), eq(CHANGE_REQUEST_ID)
-            );
-        }
-
-        @Test
-        @DisplayName("채권자가 요청자면 서명 후 채무자에게 알림이 간다")
-        void submitRequesterSignatureSuccessWhenRequesterIsCreditor() {
-            MultipartFile signature = mock(MultipartFile.class);
-            LoanContractChangeRequest changeRequest = pendingChangeRequest(USER_ID, CONTRACT_ID);
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequest));
-            given(fileService.saveSignatureFile(CHANGE_REQUEST_ID, signature))
-                    .willReturn(SAVED_PATH);
-            given(loanContractService.findContract(CONTRACT_ID, USER_ID))
-                    .willReturn(createContract(ContractStatus.COMPLETED));
-            given(userService.getMyInfo(USER_ID))
-                    .willReturn(UserResponse.builder().name("채권자").build());
-
-            contractChangeService.submitRequesterSignature(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID);
-
-            verify(notificationService).create(
-                    eq(DEBTOR_ID),
-                    eq(NotificationType.CONTRACT_CHANGE),
-                    any(), any(), eq(CONTRACT_ID), eq(CHANGE_REQUEST_ID)
-            );
-        }
-
-        @Test
-        @DisplayName("요청을 등록한 당사자가 아니면 예외가 발생한다")
-        void submitRequesterSignatureFailsWhenNotRequester() {
-            MultipartFile signature = mock(MultipartFile.class);
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(pendingChangeRequest(USER_ID, CONTRACT_ID)));
-
-            assertThatThrownBy(() ->
-                    contractChangeService.submitRequesterSignature(CONTRACT_ID, CHANGE_REQUEST_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.NOT_CONTRACT_PARTY)
-                    );
-
-            verify(fileService, never()).saveSignatureFile(any(), any());
-            verify(contractChangeRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("이미 처리된 요청이면 예외가 발생한다")
-        void submitRequesterSignatureFailsWhenAlreadyProcessed() {
-            MultipartFile signature = mock(MultipartFile.class);
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequestWithStatus(ChangeRequestStatus.APPROVED, USER_ID, CONTRACT_ID)));
-
-            assertThatThrownBy(() ->
-                    contractChangeService.submitRequesterSignature(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.ALREADY_BEING_REQUEST)
-                    );
-
-            verify(fileService, never()).saveSignatureFile(any(), any());
-            verify(contractChangeRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("변경 요청이 해당 계약의 것이 아니면 예외가 발생한다")
-        void submitRequesterSignatureFailsWhenContractIdMismatch() {
-            MultipartFile signature = mock(MultipartFile.class);
-            Long otherContractId = 999L;
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(pendingChangeRequest(USER_ID, otherContractId)));
-
-            assertThatThrownBy(() ->
-                    contractChangeService.submitRequesterSignature(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND)
-                    );
-
-            verify(fileService, never()).saveSignatureFile(any(), any());
-            verify(contractChangeRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 변경 요청이면 예외가 발생한다")
-        void submitRequesterSignatureFailsWhenChangeRequestNotFound() {
-            MultipartFile signature = mock(MultipartFile.class);
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.empty());
-
-            assertThatThrownBy(() ->
-                    contractChangeService.submitRequesterSignature(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND)
-                    );
-
-            verify(fileService, never()).saveSignatureFile(any(), any());
-        }
-    }
-
-    @Nested
-    @DisplayName("변경 요청 취소")
-    class CancelChangeRequest {
-
-        private static final Long CHANGE_REQUEST_ID = 300L;
-        private static final Long V2_CONTRACT_ID = 301L;
-
-        private LoanContractChangeRequest changeRequestEntity(
-                ChangeRequestStatus status, Long ownerUserId, Long contractId, String requesterSignature
-        ) {
-            return entity(CHANGE_REQUEST_ID, contractId, ownerUserId, status, requesterSignature);
-        }
-
-        private LoanContractResponse pendingV2() {
-            return LoanContractResponse.builder()
-                    .contractId(V2_CONTRACT_ID)
-                    .previousContractId(CONTRACT_ID)
-                    .status(ContractStatus.PENDING)
-                    .build();
-        }
-
-        @Test
-        @DisplayName("서명 전 요청은 요청자 본인이 취소할 수 있고, 임시 계약도 함께 무효화한다")
-        void cancelChangeRequestSuccess() {
-            LoanContractChangeRequest changeRequest =
-                    changeRequestEntity(ChangeRequestStatus.PENDING, USER_ID, CONTRACT_ID, null);
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequest));
-            given(loanChangeService.findPendingContractByPreviousId(CONTRACT_ID))
-                    .willReturn(Optional.of(pendingV2()));
-
-            contractChangeService.cancelChangeRequest(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID);
-
-            verify(contractChangeRepository).save(changeRequest);
-            assertThat(changeRequest.getStatus()).isEqualTo(ChangeRequestStatus.CANCELLED);
-            verify(loanChangeService).rejectChangedContract(V2_CONTRACT_ID);
-        }
-
-        @Test
-        @DisplayName("이미 서명을 제출한 요청은 취소할 수 없다")
-        void cancelChangeRequestFailsWhenAlreadySigned() {
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequestEntity(
-                            ChangeRequestStatus.PENDING, USER_ID, CONTRACT_ID, "uploads/signatures/change_300_signature.png"
-                    )));
-
-            assertThatThrownBy(() ->
-                    contractChangeService.cancelChangeRequest(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.ALREADY_SIGNED)
-                    );
-
-            verify(contractChangeRepository, never()).save(any());
-            verify(loanChangeService, never()).rejectChangedContract(any());
-        }
-
-        @Test
-        @DisplayName("요청을 등록한 당사자가 아니면 취소할 수 없다")
-        void cancelChangeRequestFailsWhenNotRequester() {
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequestEntity(ChangeRequestStatus.PENDING, USER_ID, CONTRACT_ID, null)));
-
-            assertThatThrownBy(() ->
-                    contractChangeService.cancelChangeRequest(CONTRACT_ID, CHANGE_REQUEST_ID, DEBTOR_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.NOT_CONTRACT_PARTY)
-                    );
-
-            verify(contractChangeRepository, never()).save(any());
-            verify(loanChangeService, never()).rejectChangedContract(any());
-        }
-
-        @Test
-        @DisplayName("이미 처리된(승인/반려/취소) 요청이면 취소할 수 없다")
-        void cancelChangeRequestFailsWhenAlreadyProcessed() {
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequestEntity(ChangeRequestStatus.APPROVED, USER_ID, CONTRACT_ID, null)));
-
-            assertThatThrownBy(() ->
-                    contractChangeService.cancelChangeRequest(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.ALREADY_BEING_REQUEST)
-                    );
-
-            verify(contractChangeRepository, never()).save(any());
-            verify(loanChangeService, never()).rejectChangedContract(any());
-        }
-
-        @Test
-        @DisplayName("변경 요청이 해당 계약의 것이 아니면 취소할 수 없다")
-        void cancelChangeRequestFailsWhenContractIdMismatch() {
-            Long otherContractId = 999L;
-
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.of(changeRequestEntity(ChangeRequestStatus.PENDING, USER_ID, otherContractId, null)));
-
-            assertThatThrownBy(() ->
-                    contractChangeService.cancelChangeRequest(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND)
-                    );
-
-            verify(contractChangeRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 변경 요청이면 취소할 수 없다")
-        void cancelChangeRequestFailsWhenChangeRequestNotFound() {
-            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
-                    .willReturn(Optional.empty());
-
-            assertThatThrownBy(() ->
-                    contractChangeService.cancelChangeRequest(CONTRACT_ID, CHANGE_REQUEST_ID, USER_ID))
-                    .isInstanceOfSatisfying(
-                            DomainException.class,
-                            exception -> assertThat(exception.getErrorCode())
-                                    .isEqualTo(ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND)
-                    );
-
-            verify(contractChangeRepository, never()).save(any());
-        }
-
     }
 }
