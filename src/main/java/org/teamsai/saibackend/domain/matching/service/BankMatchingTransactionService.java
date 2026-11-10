@@ -128,8 +128,15 @@ public class BankMatchingTransactionService {
         if (matchingResult.transactionResults().size() != 1) {
             throw MatchingErrorCode.INVALID_MATCHING_REQUEST.toException();
         }
-        return matchingResult.transactionResults().get(0);
-    }
+        AutoMatchingTransactionResult result = matchingResult.transactionResults().get(0);
+
+        // 계약 단위 동기화에서 안 맞은 입금은 다른 계약 것일 수 있어 PENDING으로 둔다.
+        if (targetType != null
+                && result.processStatus() == AutoMatchingProcessStatus.UNMATCHED) {
+            return null;
+        }
+
+        return result;    }
     private List<MatchingCandidate> findCandidates(
             Long linkedAccountId,
             MatchingTransaction transaction,

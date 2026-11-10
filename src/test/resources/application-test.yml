@@ -27,6 +27,7 @@ spring:
         - classpath:db/settlement_abandonment_alert.sql
         - classpath:db/notification.sql
         - classpath:db/shedlock.sql
+        - classpath:db/early_repayment.sql
   batch:
     job:
       enabled: false

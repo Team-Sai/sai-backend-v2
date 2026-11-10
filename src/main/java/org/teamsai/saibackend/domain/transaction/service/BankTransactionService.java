@@ -71,6 +71,14 @@ public class BankTransactionService {
         );
     }
 
+    public List<BankTransaction> findUnmatchedDepositsByLinkedAccountId(Long linkedAccountId) {
+        return bankTransactionRepository.findPendingDepositsByLinkedAccountId(
+                linkedAccountId,
+                BankTransactionProcessingStatus.UNMATCHED,
+                BankTransactionType.DEPOSIT
+        );
+    }
+
     @Transactional
     public BankTransaction findByIdAndLinkedAccountIdForUpdate(
             Long bankTransactionId,

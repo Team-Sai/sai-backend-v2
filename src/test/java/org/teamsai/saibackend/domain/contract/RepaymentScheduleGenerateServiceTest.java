@@ -220,6 +220,38 @@ class RepaymentScheduleGenerateServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("이자는 실제 날짜를 365로 나눠 계산한다")
+    void interestFollowsActualDays() {
+        List<RepaymentSchedule> rows = generator.generateWithDailyInterest(
+                1L, RepaymentMethod.BULLET_REPAYMENT, new BigDecimal("12000000"), new BigDecimal("5"),
+                LocalDate.of(2026, 12, 20), LocalDate.of(2027, 3, 20), 20, LocalDate.of(2026, 12, 20));
+
+        assertThat(rows.get(0).getInterestDue()).isEqualByComparingTo("50958");
+        assertThat(rows.get(2).getInterestDue()).isEqualByComparingTo("46027");
+    }
+
+    @Test
+    @DisplayName("원리금균등은 납입액을 유지하고 마지막 회차에서 원금을 정리한다")
+    void equalPaymentKeepsTotalWithDailyInterest() {
+        List<RepaymentSchedule> rows = generator.generateWithDailyInterest(
+                1L, RepaymentMethod.EQUAL_PRINCIPAL_AND_INTEREST, new BigDecimal("3000000"), new BigDecimal("5"),
+                LocalDate.of(2026, 12, 20), LocalDate.of(2027, 3, 20), 20, LocalDate.of(2026, 12, 20));
+
+        assertThat(rows.get(1).getTotalPaymentDue()).isEqualByComparingTo(rows.get(0).getTotalPaymentDue());
+        assertThat(rows.get(0).getInterestDue()).isEqualByComparingTo("12739");
+        assertThat(rows.get(2).getRemainingPrincipal()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("경과 이자는 지난 날짜만큼 계산한다")
+    void accruedInterest() {
+        BigDecimal interest = generator.calculateDailyInterest(new BigDecimal("12000000"), new BigDecimal("5"),
+                LocalDate.of(2026, 11, 20), LocalDate.of(2026, 12, 5));
+
+        assertThat(interest).isEqualByComparingTo("24657");
+    }
+
     @ParameterizedTest
     @EnumSource(RepaymentMethod.class)
     @DisplayName("모든 상환방식의 1회차는 지급 월의 다음 달 상환일이고 이후 매월 상환일이다")

@@ -104,6 +104,11 @@ class RepaymentDueReminderJobIntegrationTest {
         }
 
         @Bean
+        org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService earlyRepaymentService() {
+            return org.mockito.Mockito.mock(org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService.class);
+        }
+
+        @Bean
         SlackNotifier slackNotifier() {
             return org.mockito.Mockito.mock(SlackNotifier.class);
         }
