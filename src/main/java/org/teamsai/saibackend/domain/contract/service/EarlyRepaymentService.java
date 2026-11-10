@@ -196,6 +196,22 @@ public class EarlyRepaymentService {
 
     /** 오늘 한 번에 갚을 금액. 남은 회차가 없으면 null */
     public PayoffResponse calculateTodayPayoff(LoanContractResponse contract, List<RepaymentSchedule> all) {
+        return calculatePayoff(contract, all, LocalDate.now());
+    }
+
+    /** 이 회차가 속한 계약을 그날 한 번에 갚는 금액. 남은 회차가 없으면 null */
+    public BigDecimal payoffAmountOfSchedule(Long scheduleId, LocalDate on) {
+        return repaymentScheduleRepository.findById(scheduleId)
+                .map(RepaymentSchedule::getContractId)
+                .map(contractId -> calculatePayoff(
+                        loanContractService.getContractForInternalUse(contractId),
+                        repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(contractId),
+                        on))
+                .map(PayoffResponse::total)
+                .orElse(null);
+    }
+
+    private PayoffResponse calculatePayoff(LoanContractResponse contract, List<RepaymentSchedule> all, LocalDate on) {
         List<RepaymentSchedule> unresolved = unresolvedRows(all);
         Map<Long, BigDecimal> paid = confirmedAmounts(unresolved);
         List<RepaymentSchedule> shortfallRows = shortfallRows(unresolved, paid);
@@ -207,8 +223,7 @@ public class EarlyRepaymentService {
 
         RepaymentSchedule first = futureRows.get(0);
         BigDecimal principal = balanceOf(first);
-        BigDecimal interest = accruedInterest(contract, all, first, LocalDate.now());
-        BigDecimal shortfall = shortfallOf(shortfallRows, paid);
+        BigDecimal interest = accruedInterest(contract, all, first, on);        BigDecimal shortfall = shortfallOf(shortfallRows, paid);
         return new PayoffResponse(principal, interest, shortfall, principal.add(interest).add(shortfall));
     }
 
@@ -245,7 +260,7 @@ public class EarlyRepaymentService {
                 row.fullPayment(now);
                 remaining = remaining.subtract(owed);
             } else {
-            paymentRecordService.createConfirmedRecord(
+                paymentRecordService.createConfirmedRecord(
                         bankTransactionId, PaymentTargetType.LOAN, row.getScheduleId(), remaining, SourceType.MANUAL);
                 remaining = BigDecimal.ZERO;
             }
@@ -321,7 +336,8 @@ public class EarlyRepaymentService {
 
     private Long activeLinkedAccountId(Long contractId) {
         return contractAccountRepository.findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
-                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_ACCOUNT_MISSING::toException)                .getLinkedAccount()
+                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_ACCOUNT_MISSING::toException)
+                .getLinkedAccount()
                 .getLinkedAccountId();
     }
 
@@ -329,7 +345,8 @@ public class EarlyRepaymentService {
     private LoanContractResponse validateParty(Long contractId, Long userId) {
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         if (contract.getStatus() != ContractStatus.COMPLETED) {
-            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_CONTRACT_NOT_ACTIVE.toException();        }
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_CONTRACT_NOT_ACTIVE.toException();
+        }
         return contract;
     }
 

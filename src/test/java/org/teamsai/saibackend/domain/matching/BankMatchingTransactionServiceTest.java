@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService;
 import org.teamsai.saibackend.domain.matching.entity.BankTransactionMatchCandidate;
 import org.teamsai.saibackend.domain.matching.exception.MatchingErrorCode;
 import org.teamsai.saibackend.domain.matching.model.AutoMatchingExecutionResult;
@@ -63,6 +64,8 @@ class BankMatchingTransactionServiceTest {
     private BankTransactionMatchCandidateService candidateService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private EarlyRepaymentService earlyRepaymentService;
 
     @Mock
     private SettlementPaymentStatusChecker settlementPaymentStatusChecker;
@@ -82,7 +85,8 @@ class BankMatchingTransactionServiceTest {
                 matchingCandidateRepository,
                 autoMatchingService,
                 bankTransactionService,
-                reviewNotificationService
+                reviewNotificationService,
+                earlyRepaymentService
         );
     }
     @Test
