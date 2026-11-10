@@ -22,6 +22,10 @@ public enum RepaymentScheduleErrorCode implements BaseErrorCode<DomainException>
 
     EARLY_REPAYMENT_NOT_ALLOWED(HttpStatus.CONFLICT, "중도상환을 처리할 수 없는 계약입니다."),
 
+    EARLY_REPAYMENT_ACCOUNT_MISSING(HttpStatus.CONFLICT, "이 계약에 연결된 수취 계좌가 없어 입금을 확인할 수 없어요."),
+
+    EARLY_REPAYMENT_CONTRACT_NOT_ACTIVE(HttpStatus.CONFLICT, "진행 중인 계약에서만 입금을 확인하고 처리할 수 있어요."),
+
     EARLY_REPAYMENT_DEPOSIT_INVALID(HttpStatus.CONFLICT, "중도상환에 사용할 수 없는 입금입니다."),
 
     EARLY_REPAYMENT_AMOUNT_INVALID(HttpStatus.BAD_REQUEST, "입금액이 부족하거나 남은 원금보다 많습니다."),

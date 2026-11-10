@@ -315,8 +315,7 @@ public class EarlyRepaymentService {
 
     private Long activeLinkedAccountId(Long contractId) {
         return contractAccountRepository.findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
-                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED::toException)
-                .getLinkedAccount()
+                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_ACCOUNT_MISSING::toException)                .getLinkedAccount()
                 .getLinkedAccountId();
     }
 
@@ -324,8 +323,7 @@ public class EarlyRepaymentService {
     private LoanContractResponse validateParty(Long contractId, Long userId) {
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
         if (contract.getStatus() != ContractStatus.COMPLETED) {
-            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED.toException();
-        }
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_CONTRACT_NOT_ACTIVE.toException();        }
         return contract;
     }
 
@@ -336,7 +334,7 @@ public class EarlyRepaymentService {
             throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_FORBIDDEN.toException();
         }
         if (contract.getStatus() != ContractStatus.COMPLETED) {
-            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED.toException();
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_CONTRACT_NOT_ACTIVE.toException();
         }
         return contract;
     }

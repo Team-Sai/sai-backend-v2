@@ -23,8 +23,7 @@ public class RepaymentSyncService {
 
         Long linkedAccountId = contractAccountRepository
                 .findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
-                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED::toException)
-                .getLinkedAccount()
+                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_ACCOUNT_MISSING::toException)                .getLinkedAccount()
                 .getLinkedAccountId();
 
         // 수취 계좌 주인(채권자) 기준으로, 이 계약의 입금만 매칭한다.
