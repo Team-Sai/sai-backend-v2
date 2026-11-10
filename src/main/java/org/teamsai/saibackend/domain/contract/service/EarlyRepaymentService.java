@@ -216,11 +216,17 @@ public class EarlyRepaymentService {
         BankTransaction deposit = bankTransactionService.findByIdAndLinkedAccountIdForUpdate(
                 bankTransactionId, activeLinkedAccountId(contractId));
         if (deposit.getTransactionType() != BankTransactionType.DEPOSIT
-                || deposit.getProcessingStatus() != BankTransactionProcessingStatus.UNMATCHED
+                || !isOpenStatus(deposit.getProcessingStatus())
                 || !isEligibleDeposit(contract, deposit)) {
             throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_DEPOSIT_INVALID.toException();
         }
         return deposit;
+    }
+
+    // 대기(아직 분류 전)와 미매칭 입금만 처리할 수 있다. 검토 목록(NEEDS_CHECK)은 그쪽에서 고른다.
+    private boolean isOpenStatus(BankTransactionProcessingStatus status) {
+        return status == BankTransactionProcessingStatus.PENDING
+                || status == BankTransactionProcessingStatus.UNMATCHED;
     }
 
     /** 밀린 회차를 앞에서부터 채운다. 다 채운 회차는 완료, 덜 채운 마지막 회차 하나만 납부 기록을 남긴다. */

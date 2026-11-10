@@ -14,6 +14,8 @@ import org.teamsai.saibackend.domain.transaction.repository.BankTransactionQuery
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,12 +73,15 @@ public class BankTransactionService {
         );
     }
 
+    /** 아직 회차에 반영되지 않은 입금 (대기 + 미매칭). 오래된 순서 */
     public List<BankTransaction> findUnmatchedDepositsByLinkedAccountId(Long linkedAccountId) {
-        return bankTransactionRepository.findPendingDepositsByLinkedAccountId(
-                linkedAccountId,
-                BankTransactionProcessingStatus.UNMATCHED,
-                BankTransactionType.DEPOSIT
-        );
+        List<BankTransaction> deposits = new ArrayList<>(bankTransactionRepository.findPendingDepositsByLinkedAccountId(
+                linkedAccountId, BankTransactionProcessingStatus.PENDING, BankTransactionType.DEPOSIT));
+        deposits.addAll(bankTransactionRepository.findPendingDepositsByLinkedAccountId(
+                linkedAccountId, BankTransactionProcessingStatus.UNMATCHED, BankTransactionType.DEPOSIT));
+        deposits.sort(Comparator.comparing(BankTransaction::getTransactionAt)
+                .thenComparing(BankTransaction::getBankTransactionId));
+        return deposits;
     }
 
     @Transactional

@@ -75,7 +75,7 @@ class EarlyRepaymentServiceTest {
 
         when(bankTransactionService.findByIdAndLinkedAccountIdForUpdate(99L, 7L)).thenReturn(deposit);
         when(deposit.getTransactionType()).thenReturn(BankTransactionType.DEPOSIT);
-        when(deposit.getProcessingStatus()).thenReturn(BankTransactionProcessingStatus.UNMATCHED);
+        lenient().when(deposit.getProcessingStatus()).thenReturn(BankTransactionProcessingStatus.UNMATCHED);
         lenient().when(deposit.getTransactionAt()).thenReturn(LocalDateTime.of(2026, 12, 1, 10, 0));
         lenient().when(repaymentScheduleRepository.findByContractIdForUpdate(1L)).thenReturn(rows);
         lenient().when(deposit.getCounterpartyName()).thenReturn("홍길동");
@@ -176,6 +176,17 @@ class EarlyRepaymentServiceTest {
         verify(depositReturnRepository).save(any());
     }
 
+    @Test
+    @DisplayName("아직 분류 전(대기) 입금도 중도상환으로 처리할 수 있다")
+    void processesPendingDeposit() {
+        when(deposit.getProcessingStatus()).thenReturn(BankTransactionProcessingStatus.PENDING);
+        when(deposit.getAmount()).thenReturn(new BigDecimal("150000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L));
+
+        verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+    }
 
     private RepaymentSchedule row(int sequence, String remaining) {
         return new RepaymentSchedule(1L, sequence, LocalDate.of(2026, 12, 20).plusMonths(sequence - 1L),
