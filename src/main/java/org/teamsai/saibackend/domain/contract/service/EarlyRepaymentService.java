@@ -244,7 +244,7 @@ public class EarlyRepaymentService {
             if (remaining.compareTo(owed) >= 0) {
                 row.fullPayment(now);
                 remaining = remaining.subtract(owed);
-            } else {    /** 조회는 계약 당사자 모두 할 수 있다. */
+            } else {
             paymentRecordService.createConfirmedRecord(
                         bankTransactionId, PaymentTargetType.LOAN, row.getScheduleId(), remaining, SourceType.MANUAL);
                 remaining = BigDecimal.ZERO;
@@ -370,6 +370,9 @@ public class EarlyRepaymentService {
         }
 
         String mine = contract.getContractDisplayId();
+        if (mine == null) {
+            return null; // 차용증 번호를 모르면 메모로 판단하지 않는다
+        }
         return numbers.stream().anyMatch(number -> number.equals(mine) || mine.startsWith(number + "-"));
     }
 
