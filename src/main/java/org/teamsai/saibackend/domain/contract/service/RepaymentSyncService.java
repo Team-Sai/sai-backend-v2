@@ -23,7 +23,7 @@ public class RepaymentSyncService {
 
         Long linkedAccountId = contractAccountRepository
                 .findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
-                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED::toException)
+                .orElseThrow(RepaymentScheduleErrorCode.EARLY_REPAYMENT_ACCOUNT_MISSING::toException)
                 .getLinkedAccount()
                 .getLinkedAccountId();
 

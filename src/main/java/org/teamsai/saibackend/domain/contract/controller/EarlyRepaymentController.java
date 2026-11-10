@@ -39,4 +39,14 @@ public class EarlyRepaymentController {
     ) {
         return earlyRepaymentService.process(contractId, userId, request);
     }
+
+    @Operation(summary = "처리할 수 없는 입금을 반환했다고 표시")
+    @PostMapping("/deposits/{bankTransactionId}/return")
+    public void markReturned(
+            @PathVariable Long contractId,
+            @PathVariable Long bankTransactionId,
+            @AuthenticationPrincipal(expression = "userId") Long userId
+    ) {
+        earlyRepaymentService.markReturned(contractId, userId, bankTransactionId);
+    }
 }

@@ -14,6 +14,7 @@ import org.teamsai.saibackend.domain.contract.entity.ContractAccount;
 import org.teamsai.saibackend.domain.contract.entity.EarlyRepayment;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.repository.ContractAccountRepository;
+import org.teamsai.saibackend.domain.contract.repository.DepositReturnRepository;
 import org.teamsai.saibackend.domain.contract.repository.EarlyRepaymentRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService;
@@ -24,6 +25,7 @@ import org.teamsai.saibackend.domain.contract.type.ContractStatus;
 import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
+import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionProcessingStatus;
@@ -45,6 +47,7 @@ class EarlyRepaymentServiceTest {
 
     @Mock private RepaymentScheduleRepository repaymentScheduleRepository;
     @Mock private EarlyRepaymentRepository earlyRepaymentRepository;
+    @Mock private DepositReturnRepository depositReturnRepository;
     @Mock private LoanContractService loanContractService;
     @Spy private RepaymentScheduleGenerateService repaymentScheduleGenerateService = new RepaymentScheduleGenerateService();
     @Mock private ContractAccountRepository contractAccountRepository;
@@ -63,8 +66,8 @@ class EarlyRepaymentServiceTest {
         when(loanContractService.findContract(1L, 10L)).thenReturn(LoanContractResponse.builder()
                 .creditorId(10L).status(ContractStatus.COMPLETED)
                 .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL).interestRate(BigDecimal.ZERO)
-                .startDate(LocalDate.of(2026, 11, 20)).debtorName("홍길동").build());
-
+                .startDate(LocalDate.of(2026, 11, 20)).debtorName("홍길동")
+                .contractDisplayId("LC-1").build());
         ContractAccount account = mock(ContractAccount.class, RETURNS_DEEP_STUBS);
         when(account.getLinkedAccount().getLinkedAccountId()).thenReturn(7L);
         when(contractAccountRepository.findLatestByContractIdAndStatus(1L, ContractAccountStatus.ACTIVE))
@@ -72,7 +75,7 @@ class EarlyRepaymentServiceTest {
 
         when(bankTransactionService.findByIdAndLinkedAccountIdForUpdate(99L, 7L)).thenReturn(deposit);
         when(deposit.getTransactionType()).thenReturn(BankTransactionType.DEPOSIT);
-        when(deposit.getProcessingStatus()).thenReturn(BankTransactionProcessingStatus.UNMATCHED);
+        lenient().when(deposit.getProcessingStatus()).thenReturn(BankTransactionProcessingStatus.UNMATCHED);
         lenient().when(deposit.getTransactionAt()).thenReturn(LocalDateTime.of(2026, 12, 1, 10, 0));
         lenient().when(repaymentScheduleRepository.findByContractIdForUpdate(1L)).thenReturn(rows);
         lenient().when(deposit.getCounterpartyName()).thenReturn("홍길동");
@@ -118,7 +121,7 @@ class EarlyRepaymentServiceTest {
         EarlyRepayment last = mock(EarlyRepayment.class);
         when(last.getBankTransactionId()).thenReturn(50L);
         when(later.getTransactionAt()).thenReturn(LocalDateTime.of(2026, 12, 10, 10, 0));
-        when(earlyRepaymentRepository.findFirstByContractIdOrderByProcessedAtDesc(1L))
+        when(earlyRepaymentRepository.findFirstByContractIdAndPrincipalAmountGreaterThanOrderByProcessedAtDesc(1L, BigDecimal.ZERO))
                 .thenReturn(Optional.of(last));
         when(bankTransactionService.findById(50L)).thenReturn(Optional.of(later));
 
@@ -127,6 +130,63 @@ class EarlyRepaymentServiceTest {
         verify(deposit, never()).changeProcessingStatus(any());
     }
 
+    @Test
+    @DisplayName("다른 차용증 번호가 적힌 입금은 처리하지 않는다")
+    void rejectsOtherContractNumber() {
+        when(deposit.getMemo()).thenReturn("LC-99 상환");
+
+        assertThatThrownBy(() -> service.process(1L, 10L, new EarlyRepaymentRequest(99L)))
+                .isInstanceOf(DomainException.class);
+        verify(deposit, never()).changeProcessingStatus(any());
+    }
+
+    @Test
+    @DisplayName("반환 표시하면 다시 매칭되지 않게 처리 끝으로 두고 기록한다")
+    void marksDepositReturned() {
+        service.markReturned(1L, 10L, 99L);
+
+        verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+        verify(depositReturnRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("밀린 회차보다 적게 들어오면 밀린 회차에 부분 납부로 기록한다")
+    void fillsArrearsPartially() {
+        rows.get(0).overDue();
+        when(deposit.getAmount()).thenReturn(new BigDecimal("50000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L));
+
+        assertThat(rows.get(0).getStatus()).isEqualTo(RepaymentScheduleStatus.OVERDUE);
+        verify(paymentRecordService).createConfirmedRecord(
+                eq(99L), eq(PaymentTargetType.LOAN), any(), eq(new BigDecimal("50000")), any());
+        verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("차액 반환을 고르면 완납 처리하고 넘친 금액은 반환으로 기록한다")
+    void paysOffAndRecordsExcess() {
+        when(deposit.getAmount()).thenReturn(new BigDecimal("300100"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L, true));
+
+        assertThat(rows.get(0).getStatus()).isEqualTo(RepaymentScheduleStatus.PAID);
+        verify(depositReturnRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("아직 분류 전(대기) 입금도 중도상환으로 처리할 수 있다")
+    void processesPendingDeposit() {
+        when(deposit.getProcessingStatus()).thenReturn(BankTransactionProcessingStatus.PENDING);
+        when(deposit.getAmount()).thenReturn(new BigDecimal("150000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L));
+
+        verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+    }
 
     private RepaymentSchedule row(int sequence, String remaining) {
         return new RepaymentSchedule(1L, sequence, LocalDate.of(2026, 12, 20).plusMonths(sequence - 1L),

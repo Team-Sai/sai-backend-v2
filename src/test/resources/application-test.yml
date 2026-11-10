@@ -28,6 +28,7 @@ spring:
         - classpath:db/notification.sql
         - classpath:db/shedlock.sql
         - classpath:db/early_repayment.sql
+        - classpath:db/deposit_return.sql
   batch:
     job:
       enabled: false
