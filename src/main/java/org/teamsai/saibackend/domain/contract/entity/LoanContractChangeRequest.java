@@ -100,6 +100,12 @@ public class LoanContractChangeRequest {
         }
     }
 
+    public void validateSigned() {
+        if (this.requesterSignature == null) {
+            throw ContractChangeErrorCode.REQUESTER_SIGNATURE_REQUIRED.toException();
+        }
+    }
+
     public void validateNotSigned() {
         if (this.requesterSignature != null) {
             throw ContractChangeErrorCode.ALREADY_SIGNED.toException();

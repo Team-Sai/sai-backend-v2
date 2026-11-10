@@ -38,6 +38,7 @@ public class ContractChangeService {
 
     private final LoanContractService loanContractService;
     private final LoanChangeService loanChangeService;
+    private final ContractAccountService contractAccountService;
     private final RepaymentScheduleService repaymentScheduleService;
     private final NotificationService notificationService;
     private final UserService userService;
@@ -221,27 +222,36 @@ public class ContractChangeService {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
         }
 
+        changeRequest.validateSigned();
+
         identityService.consume(userId, identityVerificationId, IdentityPurpose.LOAN_CONTRACT);
 
         String savedPath = fileService.saveSignatureFile(contractId, signature);
 
-        if (isCreditor) {
-            loanChangeService.updateCreditorSignatureOnly(contractId, savedPath);
-        } else {
-            loanChangeService.updateDebtorSignatureOnly(contractId, savedPath);
-        }
+        // 요청자가 먼저 남긴 서명과 승인자 서명을 변경 계약서에 함께 기록한다.
+        String creditorSignature = isCreditor ? savedPath : changeRequest.getRequesterSignature();
+        String debtorSignature = isCreditor ? changeRequest.getRequesterSignature() : savedPath;
+
+        loanChangeService.updateCreditorSignatureOnly(contractId, creditorSignature);
+        loanChangeService.updateDebtorSignatureOnly(contractId, debtorSignature);
 
         changeRequest.approve();
         contractChangeRepository.save(changeRequest);
 
         loanChangeService.supersedeContract(v1ContractId);
 
+        contractAccountService.copyActiveAccount(v1ContractId, contractId);
+
         repaymentScheduleService.generateChangedSchedule(v1ContractId, contractId);
 
         log.info("계약 변경 승인 처리 완료: v1ContractId={}, v2ContractId={}, changeRequestId={}",
                 v1ContractId, contractId, changeRequest.getChangeRequestId());
 
-        LoanContractResponse completedContract = loanChangeService.buildCompletedSnapshot(contract, isCreditor, savedPath);
+        LoanContractResponse signedContract = contract.toBuilder()
+                .creditorSignature(creditorSignature)
+                .debtorSignature(debtorSignature)
+                .build();
+        LoanContractResponse completedContract = loanChangeService.buildCompletedSnapshot(signedContract, isCreditor, savedPath);
         eventPublisher.publishEvent(new ContractCompletedEvent(completedContract));
 
         notifyChange(changeRequest.getUserId(), userId, "계약 변경 승인 완료",

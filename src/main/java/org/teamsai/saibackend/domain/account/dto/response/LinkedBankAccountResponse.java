@@ -33,4 +33,15 @@ public record LinkedBankAccountResponse(
                 .connectionStatus(entity.getConnectionStatus().name())
                 .build();
     }
+
+    /** 계좌 소유자가 아닌 계약 상대방에게는 입금에 필요한 정보만 내려준다. */
+    public static LinkedBankAccountResponse forCounterparty(
+            LinkedBankAccount entity
+    ) {
+        return LinkedBankAccountResponse.builder()
+                .bankName(BankCodeResolveService.resolveBankName(entity.getBankCode()))
+                .maskedAccountNumber(maskAccountNumber(entity.getAccountNumber()))
+                .accountHolderName(entity.getAccountHolderName())
+                .build();
+    }
 }

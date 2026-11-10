@@ -19,7 +19,8 @@ public enum ContractChangeErrorCode implements BaseErrorCode<DomainException> {
     INVALID_MATURITY_DATE(HttpStatus.BAD_REQUEST, "변경 만기일은 계약 시작일 기준 최소 1개월 이후여야 합니다."),
     ALREADY_BEING_REQUEST(HttpStatus.CONFLICT, "이미 처리된 요청입니다."),
     ALREADY_SIGNED(HttpStatus.CONFLICT, "이미 서명을 제출하여 상대방에게 전송된 요청은 취소할 수 없습니다."),
-    SIGNATURE_REQUIRED(HttpStatus.BAD_REQUEST, "서명 이미지가 필요합니다.");
+    SIGNATURE_REQUIRED(HttpStatus.BAD_REQUEST, "서명 이미지가 필요합니다."),
+    REQUESTER_SIGNATURE_REQUIRED(HttpStatus.CONFLICT, "요청자의 전자서명이 완료되지 않은 변경 요청은 승인할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

@@ -23,6 +23,7 @@ import org.teamsai.saibackend.domain.contract.service.ContractAccountService;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.global.exception.DomainException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +40,7 @@ class ContractAccountServiceTest {
 
     private static final Long CONTRACT_ID = 1L;
     private static final Long CREDITOR_ID = 1L;
+    private static final Long DEBTOR_ID = 2L;
     private static final Long OTHER_USER_ID = 999L;
     private static final Long LINKED_ACCOUNT_ID = 10L;
     private static final Long OTHER_LINKED_ACCOUNT_ID = 20L;
@@ -160,6 +162,43 @@ class ContractAccountServiceTest {
     }
 
     @Nested
+    class CopyActiveAccount {
+
+        private static final Long NEW_CONTRACT_ID = 2L;
+
+        @Test
+        void copiesActiveAccountToNewContract() {
+            LinkedBankAccount linkedAccount =
+                    LinkedBankAccount.builder().linkedAccountId(LINKED_ACCOUNT_ID).build();
+            given(contractAccountRepository.findLatestByContractIdAndStatus(CONTRACT_ID, ContractAccountStatus.ACTIVE))
+                    .willReturn(Optional.of(ContractAccount.builder()
+                            .linkedAccount(linkedAccount)
+                            .accountStatus(ContractAccountStatus.ACTIVE)
+                            .build()));
+            LoanContract newContract = createContract(ContractStatus.PENDING);
+            given(loanContractRepository.getReferenceById(NEW_CONTRACT_ID)).willReturn(newContract);
+
+            contractAccountService.copyActiveAccount(CONTRACT_ID, NEW_CONTRACT_ID);
+
+            ArgumentCaptor<ContractAccount> captor = ArgumentCaptor.forClass(ContractAccount.class);
+            verify(contractAccountRepository).save(captor.capture());
+            assertThat(captor.getValue().getLinkedAccount()).isSameAs(linkedAccount);
+            assertThat(captor.getValue().getLoanContract()).isSameAs(newContract);
+            assertThat(captor.getValue().getAccountStatus()).isEqualTo(ContractAccountStatus.ACTIVE);
+        }
+
+        @Test
+        void doesNothingWhenNoActiveAccount() {
+            given(contractAccountRepository.findLatestByContractIdAndStatus(CONTRACT_ID, ContractAccountStatus.ACTIVE))
+                    .willReturn(Optional.empty());
+
+            contractAccountService.copyActiveAccount(CONTRACT_ID, NEW_CONTRACT_ID);
+
+            verify(contractAccountRepository, never()).save(any());
+        }
+    }
+
+    @Nested
     class GetCurrentContractAccount {
 
         @Test
@@ -188,9 +227,40 @@ class ContractAccountServiceTest {
         }
 
         @Test
-        void rejectsNonCreditor() {
+        void returnsOnlyDepositInfoForDebtor() {
             given(loanContractRepository.findById(CONTRACT_ID))
-                    .willReturn(Optional.of(createContract(ContractStatus.PENDING)));
+                    .willReturn(Optional.of(createContractWithDebtor()));
+            ContractAccount activeAccount = ContractAccount.builder()
+                    .linkedAccount(LinkedBankAccount.builder()
+                            .linkedAccountId(LINKED_ACCOUNT_ID)
+                            .bankCode("088")
+                            .accountNumber("110123456789")
+                            .accountAlias("생활비 통장")
+                            .accountHolderName("김채권")
+                            .balance(BigDecimal.valueOf(1_000_000))
+                            .connectionStatus(ConnectionStatus.AVAILABLE)
+                            .build())
+                    .accountStatus(ContractAccountStatus.ACTIVE)
+                    .build();
+            given(contractAccountRepository.findLatestByContractIdAndStatus(CONTRACT_ID, ContractAccountStatus.ACTIVE))
+                    .willReturn(Optional.of(activeAccount));
+
+            LinkedBankAccountResponse result =
+                    contractAccountService.getCurrentAccount(CONTRACT_ID, DEBTOR_ID);
+
+            assertThat(result.bankName()).isNotBlank();
+            assertThat(result.maskedAccountNumber()).isNotBlank().doesNotContain("110123456789");
+            assertThat(result.accountHolderName()).isEqualTo("김채권");
+            assertThat(result.balance()).isNull();
+            assertThat(result.accountAlias()).isNull();
+            assertThat(result.linkedAccountId()).isNull();
+            verify(linkedBankAccountService, never()).getLinkedAccounts(any());
+        }
+
+        @Test
+        void rejectsNonParty() {
+            given(loanContractRepository.findById(CONTRACT_ID))
+                    .willReturn(Optional.of(createContractWithDebtor()));
 
             assertThatThrownBy(() -> contractAccountService.getCurrentAccount(
                     CONTRACT_ID,
@@ -239,6 +309,14 @@ class ContractAccountServiceTest {
         return LoanContract.builder()
                 .creditor(User.builder().userId(CREDITOR_ID).build())
                 .status(status)
+                .build();
+    }
+
+    private LoanContract createContractWithDebtor() {
+        return LoanContract.builder()
+                .creditor(User.builder().userId(CREDITOR_ID).build())
+                .debtor(User.builder().userId(DEBTOR_ID).build())
+                .status(ContractStatus.COMPLETED)
                 .build();
     }
 

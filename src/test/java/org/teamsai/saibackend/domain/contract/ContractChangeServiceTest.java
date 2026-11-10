@@ -58,6 +58,9 @@ class ContractChangeServiceTest {
     private LoanChangeService loanChangeService;
 
     @Mock
+    private ContractAccountService contractAccountService;
+
+    @Mock
     private NotificationService notificationService;
 
     @Mock
@@ -244,6 +247,7 @@ class ContractChangeServiceTest {
         private static final Long CHANGE_REQUEST_ID = 5L;
         private static final String IDENTITY_VERIFICATION_ID = "identity-verification-id";
         private static final String SAVED_PATH = "uploads/signatures/change_2_signature.png";
+        private static final String REQUESTER_SIGNATURE = "uploads/signatures/change_5_signature.png";
 
         private LoanContractResponse pendingV2Contract() {
             return LoanContractResponse.builder()
@@ -265,6 +269,7 @@ class ContractChangeServiceTest {
         void approveChangeSupersedesV1Contract() {
             MultipartFile signature = mock(MultipartFile.class);
             LoanContractChangeRequest changeRequest = pendingChangeRequest();
+            changeRequest.attachRequesterSignature(REQUESTER_SIGNATURE);
 
             given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
                     .willReturn(pendingV2Contract());
@@ -284,10 +289,71 @@ class ContractChangeServiceTest {
             contractChangeService.approveChange(V2_CONTRACT_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID);
 
             verify(loanChangeService).updateDebtorSignatureOnly(V2_CONTRACT_ID, SAVED_PATH);
+            verify(loanChangeService).updateCreditorSignatureOnly(V2_CONTRACT_ID, REQUESTER_SIGNATURE);
+            verify(loanChangeService).buildCompletedSnapshot(
+                    argThat(contract -> REQUESTER_SIGNATURE.equals(contract.getCreditorSignature())
+                            && SAVED_PATH.equals(contract.getDebtorSignature())),
+                    eq(false),
+                    eq(SAVED_PATH));
             verify(contractChangeRepository).save(changeRequest);
             assertThat(changeRequest.getStatus()).isEqualTo(ChangeRequestStatus.APPROVED);
             verify(loanChangeService).supersedeContract(V1_CONTRACT_ID);
+            verify(contractAccountService).copyActiveAccount(V1_CONTRACT_ID, V2_CONTRACT_ID);
             verify(repaymentScheduleService).generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+        }
+
+        @Test
+        @DisplayName("채무자가 요청하고 채권자가 승인해도 양쪽 서명을 변경 계약서에 기록한다")
+        void approveChangeRecordsBothSignaturesWhenCreditorApproves() {
+            MultipartFile signature = mock(MultipartFile.class);
+            LoanContractChangeRequest changeRequest =
+                    entity(CHANGE_REQUEST_ID, V1_CONTRACT_ID, DEBTOR_ID, ChangeRequestStatus.PENDING, null);
+            changeRequest.attachRequesterSignature(REQUESTER_SIGNATURE);
+
+            given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
+                    .willReturn(pendingV2Contract());
+            given(contractChangeRepository.findByContractId(V1_CONTRACT_ID))
+                    .willReturn(List.of(changeRequest));
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
+                    .willReturn(Optional.of(changeRequest));
+            given(fileService.saveSignatureFile(V2_CONTRACT_ID, signature))
+                    .willReturn(SAVED_PATH);
+            given(loanChangeService.buildCompletedSnapshot(any(), eq(true), eq(SAVED_PATH)))
+                    .willReturn(pendingV2Contract());
+            given(userService.getMyInfo(USER_ID))
+                    .willReturn(UserResponse.builder().name("채권자").build());
+
+            contractChangeService.approveChange(V2_CONTRACT_ID, USER_ID, signature, IDENTITY_VERIFICATION_ID);
+
+            verify(loanChangeService).updateCreditorSignatureOnly(V2_CONTRACT_ID, SAVED_PATH);
+            verify(loanChangeService).updateDebtorSignatureOnly(V2_CONTRACT_ID, REQUESTER_SIGNATURE);
+        }
+
+        @Test
+        @DisplayName("요청자 서명이 없는 변경 요청은 승인할 수 없다")
+        void approveChangeFailsWhenRequesterHasNotSigned() {
+            MultipartFile signature = mock(MultipartFile.class);
+            LoanContractChangeRequest changeRequest = pendingChangeRequest();
+
+            given(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
+                    .willReturn(pendingV2Contract());
+            given(contractChangeRepository.findByContractId(V1_CONTRACT_ID))
+                    .willReturn(List.of(changeRequest));
+            given(contractChangeRepository.findByIdForUpdate(CHANGE_REQUEST_ID))
+                    .willReturn(Optional.of(changeRequest));
+
+            assertThatThrownBy(() ->
+                    contractChangeService.approveChange(V2_CONTRACT_ID, DEBTOR_ID, signature, IDENTITY_VERIFICATION_ID))
+                    .isInstanceOfSatisfying(
+                            DomainException.class,
+                            exception -> assertThat(exception.getErrorCode())
+                                    .isEqualTo(ContractChangeErrorCode.REQUESTER_SIGNATURE_REQUIRED)
+                    );
+
+            verify(identityService, never()).consume(any(), any(), any());
+            verify(loanChangeService, never()).updateCreditorSignatureOnly(any(), any());
+            verify(loanChangeService, never()).updateDebtorSignatureOnly(any(), any());
+            verify(loanChangeService, never()).supersedeContract(any());
         }
 
         @Test
@@ -318,6 +384,7 @@ class ContractChangeServiceTest {
                     );
 
             verify(loanChangeService, never()).supersedeContract(any());
+            verify(contractAccountService, never()).copyActiveAccount(any(), any());
             verify(repaymentScheduleService, never()).generateChangedSchedule(any(), any());
             verify(contractChangeRepository, never()).save(any());
         }
