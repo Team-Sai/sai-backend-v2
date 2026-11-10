@@ -12,15 +12,16 @@ public record EarlyRepaymentDepositResponse(
         String counterpartyName,
         BigDecimal shortfallAmount,
         BigDecimal accruedInterest,
-        BigDecimal balance
+        BigDecimal balance,
+        boolean memoConfirmed
 ) {
     public static EarlyRepaymentDepositResponse of(
             BankTransaction transaction, BigDecimal shortfallAmount,
-            BigDecimal accruedInterest, BigDecimal balance
+            BigDecimal accruedInterest, BigDecimal balance, boolean memoConfirmed
     ) {
         return new EarlyRepaymentDepositResponse(
                 transaction.getBankTransactionId(), transaction.getAmount(),
                 transaction.getTransactionAt(), transaction.getCounterpartyName(),
-                shortfallAmount, accruedInterest, balance);
+                shortfallAmount, accruedInterest, balance, memoConfirmed);
     }
 }

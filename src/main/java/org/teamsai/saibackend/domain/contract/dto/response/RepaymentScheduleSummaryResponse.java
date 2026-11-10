@@ -21,4 +21,7 @@ public class RepaymentScheduleSummaryResponse {
     private Integer totalCount;
     private List<RepaymentScheduleResponse> schedules;
     private List<EarlyRepaymentResponse> earlyRepayments;
+    private String contractDisplayId;
+    private PayoffResponse todayPayoff;
+    private List<DepositReturnResponse> returnedDeposits;
 }

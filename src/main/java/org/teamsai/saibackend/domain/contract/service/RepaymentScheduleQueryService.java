@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.contract.assembler.RepaymentScheduleAssembler;
+import org.teamsai.saibackend.domain.contract.dto.response.DepositReturnResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.EarlyRepaymentResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
+import org.teamsai.saibackend.domain.contract.repository.DepositReturnRepository;
 import org.teamsai.saibackend.domain.contract.repository.EarlyRepaymentRepository;
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
@@ -30,6 +32,8 @@ public class RepaymentScheduleQueryService {
     private final LoanContractService loanContractService;
     private final PaymentRecordService paymentRecordService;
     private final EarlyRepaymentRepository earlyRepaymentRepository;
+    private final DepositReturnRepository depositReturnRepository;
+    private final EarlyRepaymentService earlyRepaymentService;
 
     public RepaymentScheduleSummaryResponse getScheduleSummary(Long contractId, Long userId) {
         LoanContractResponse contract = loanContractService.findContract(contractId, userId);
@@ -58,7 +62,14 @@ public class RepaymentScheduleQueryService {
                 .toList();
 
 
+        List<DepositReturnResponse> returnedDeposits = depositReturnRepository
+                .findByContractIdOrderByReturnedAtDesc(contractId)
+                .stream()
+                .map(DepositReturnResponse::from)
+                .toList();
+
         return RepaymentScheduleAssembler.toSummary(
-                contract, schedules, nextDueDate, paidByScheduleId, earlyRepayments);
+                contract, schedules, nextDueDate, paidByScheduleId, earlyRepayments,
+                earlyRepaymentService.calculateTodayPayoff(contract, schedules), returnedDeposits);
     }
 }

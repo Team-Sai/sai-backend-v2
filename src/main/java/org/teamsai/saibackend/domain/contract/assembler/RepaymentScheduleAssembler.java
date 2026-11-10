@@ -1,9 +1,6 @@
 package org.teamsai.saibackend.domain.contract.assembler;
 
-import org.teamsai.saibackend.domain.contract.dto.response.EarlyRepaymentResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleResponse;
-import org.teamsai.saibackend.domain.contract.dto.response.RepaymentScheduleSummaryResponse;
+import org.teamsai.saibackend.domain.contract.dto.response.*;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 
@@ -22,7 +19,9 @@ public final class RepaymentScheduleAssembler {
             List<RepaymentSchedule> schedules,
             LocalDate nextDueDate,
             Map<Long, BigDecimal> paidByScheduleId,
-            List<EarlyRepaymentResponse> earlyRepayments
+            List<EarlyRepaymentResponse> earlyRepayments,
+            PayoffResponse todayPayoff,
+            List<DepositReturnResponse> returnedDeposits
     ) {
         // 회차에 안 담긴 중도상환 원금·경과 이자 (수수료는 상환액이 아니라 제외)
         BigDecimal earlyPaid = earlyRepayments.stream()
@@ -46,7 +45,9 @@ public final class RepaymentScheduleAssembler {
         int totalCount = schedules.size();
 
         List<RepaymentScheduleResponse> scheduleResponses = schedules.stream()
-                .map(s -> RepaymentScheduleResponse.from(s, paidAmountOf(s, paidByScheduleId)))
+                .map(s -> RepaymentScheduleResponse.from(
+                        s, paidAmountOf(s, paidByScheduleId),
+                        earlyRepayments.stream().anyMatch(early -> isPayoff(s, early))))
                 .toList();
 
         return RepaymentScheduleSummaryResponse.builder()
@@ -60,14 +61,22 @@ public final class RepaymentScheduleAssembler {
                 .schedules(scheduleResponses)
                 .nextDueDate(nextDueDate)
                 .earlyRepayments(earlyRepayments)
+                .contractDisplayId(contract.getContractDisplayId())
+                .todayPayoff(todayPayoff)
+                .returnedDeposits(returnedDeposits)
                 .build();
     }
 
     private static boolean isPayoffRow(EarlyRepaymentResponse early, List<RepaymentSchedule> schedules) {
-        return schedules.stream().anyMatch(s -> s.getStatus() == RepaymentScheduleStatus.PAID
+        return schedules.stream().anyMatch(s -> isPayoff(s, early));
+    }
+
+    // 전액 중도상환이 기록된 회차인지 (같은 시각에 남은 원금 0으로 완료됨)
+    private static boolean isPayoff(RepaymentSchedule s, EarlyRepaymentResponse early) {
+        return s.getStatus() == RepaymentScheduleStatus.PAID
                 && s.getRemainingPrincipal().signum() == 0
                 && s.getPrincipalDue().compareTo(early.principalAmount()) == 0
-                && early.processedAt().equals(s.getPaidAt()));
+                && early.processedAt().equals(s.getPaidAt());
     }
 
 
