@@ -27,7 +27,7 @@ public class ContractAccountQueryController {
 
     @Operation(
             summary = "차용증 현재 연동계좌 조회",
-            description = "로그인한 채권자가 차용증에 연결한 활성 연동계좌를 조회합니다."
+            description = "차용증에 연결된 채권자의 활성 연동계좌를 조회합니다. 채무자에게는 은행명, 마스킹된 계좌번호, 예금주만 제공합니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),

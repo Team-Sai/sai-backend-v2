@@ -16,6 +16,7 @@ import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class RepaymentScheduleService {
 
+    private final EarlyRepaymentService earlyRepaymentService;
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final LoanContractService loanContractService;
     private final RepaymentScheduleGenerateService repaymentScheduleGenerateService;
@@ -41,9 +43,10 @@ public class RepaymentScheduleService {
     public void generateSchedule(Long contractId) {
         LoanContractResponse contract = loanContractService.getContractForInternalUse(contractId);
 
-        List<RepaymentSchedule> schedules = repaymentScheduleGenerateService.generate(
+        List<RepaymentSchedule> schedules = repaymentScheduleGenerateService.generateWithDailyInterest(
                 contractId, contract.getRepaymentType(), contract.getPrincipalAmount(),
-                contract.getInterestRate(), contract.getStartDate(), contract.getMaturityDate());
+                contract.getInterestRate(), contract.getStartDate(), contract.getMaturityDate(),
+                contract.getRepaymentDay(), contract.getStartDate());
 
         repaymentScheduleRepository.saveAll(schedules);
     }
@@ -82,18 +85,36 @@ public class RepaymentScheduleService {
         LoanContractResponse v1 = loanContractService.getContractForInternalUse(v1ContractId);
         LoanContractResponse v2 = loanContractService.getContractForInternalUse(v2ContractId);
 
-        BigDecimal openingPrincipal = lastPaid.map(RepaymentSchedule::getRemainingPrincipal)
-                .orElse(v1.getPrincipalAmount());
-        LocalDate baseDate = lastPaid.map(RepaymentSchedule::getDueDate)
+        // 남은 첫 회차 기준으로 잡아야 중도상환으로 줄어든 원금이 유지된다.
+        BigDecimal openingPrincipal = v1Schedules.stream()
+                .filter(s -> s.getStatus().isUnresolved())
+                .min(Comparator.comparing(RepaymentSchedule::getSequence))
+                .map(s -> s.getRemainingPrincipal().add(s.getPrincipalDue()))
+                .orElseGet(() -> lastPaid.map(RepaymentSchedule::getRemainingPrincipal)
+                        .orElse(v1.getPrincipalAmount()));
+        LocalDate baseDate = lastPaid
+                .map(paid -> alignToStartDay(paid.getDueDate(), v1.getStartDate()))
                 .orElse(v1.getStartDate());
+
+        LocalDate lastDue = lastPaid.map(RepaymentSchedule::getDueDate).orElse(v1.getStartDate());
+        LocalDate interestFrom = earlyRepaymentService.findLatestPaidOn(v1ContractId)
+                .filter(lastDue::isBefore)
+                .orElse(lastDue);
 
         repaymentScheduleRepository.deleteByContractIdAndStatus(v1ContractId, RepaymentScheduleStatus.PENDING);
 
-        List<RepaymentSchedule> newSchedules = repaymentScheduleGenerateService.generate(
+        List<RepaymentSchedule> newSchedules = repaymentScheduleGenerateService.generateWithDailyInterest(
                 v2ContractId, v2.getRepaymentType(), openingPrincipal,
-                v2.getInterestRate(), baseDate, v2.getMaturityDate());
+                v2.getInterestRate(), baseDate, v2.getMaturityDate(), v2.getRepaymentDay(),
+                interestFrom);
 
         repaymentScheduleRepository.saveAll(newSchedules);
+    }
+
+    // 회차 수는 납부 예정일이 아니라 지급일의 일자를 기준으로 세야 남은 회차가 줄지 않는다.
+    private static LocalDate alignToStartDay(LocalDate dueDate, LocalDate startDate) {
+        YearMonth month = YearMonth.from(dueDate);
+        return month.atDay(Math.min(startDate.getDayOfMonth(), month.lengthOfMonth()));
     }
 
     public RepaymentScheduleDTO getScheduleByScheduleId(Long scheduleId) {

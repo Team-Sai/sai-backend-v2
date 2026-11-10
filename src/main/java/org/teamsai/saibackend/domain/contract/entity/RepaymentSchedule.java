@@ -65,6 +65,13 @@ public class RepaymentSchedule {
         this.status = RepaymentScheduleStatus.WRITTEN_OFF;
     }
 
+    public void reschedule(BigDecimal principalDue, BigDecimal interestDue, BigDecimal remainingPrincipal) {
+        this.principalDue = principalDue;
+        this.interestDue = interestDue;
+        this.totalPaymentDue = principalDue.add(interestDue);
+        this.remainingPrincipal = remainingPrincipal;
+    }
+
     public RepaymentSchedule(
             Long contractId,
             Integer sequence,

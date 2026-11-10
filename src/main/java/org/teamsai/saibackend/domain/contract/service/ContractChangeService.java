@@ -38,6 +38,7 @@ public class ContractChangeService {
 
     private final LoanContractService loanContractService;
     private final LoanChangeService loanChangeService;
+    private final ContractAccountService contractAccountService;
     private final RepaymentScheduleService repaymentScheduleService;
     private final NotificationService notificationService;
     private final UserService userService;
@@ -86,6 +87,8 @@ public class ContractChangeService {
     public ContractChangeRequestResponse requestChange(
             Long contractId,
             ContractChangeRequest request,
+            MultipartFile signature,
+            String identityVerificationId,
             Long userId
             ) {
 
@@ -124,6 +127,8 @@ public class ContractChangeService {
             throw ContractChangeErrorCode.CONTRACT_ALREADY_SUPERSEDED.toException();
         }
 
+        identityService.consume(userId, identityVerificationId, IdentityPurpose.LOAN_CONTRACT);
+
         LocalDateTime now = LocalDateTime.now();
 
         LoanContractChangeRequest changeEntity = new LoanContractChangeRequest(
@@ -150,6 +155,15 @@ public class ContractChangeService {
         ChangedLoanContractDTO newContractDTO = ContractChangeAssembler.toChangedContract(contract, request, contractId, now);
 
         loanChangeService.insertChangedContract(newContractDTO);
+
+        // 서명 저장까지 한 트랜잭션으로 처리해 서명 없는 변경 요청이 남지 않게 한다.
+        String savedPath = fileService.saveSignatureFile(savedEntity.getChangeRequestId(), signature);
+        savedEntity.attachRequesterSignature(savedPath);
+        contractChangeRepository.save(savedEntity);
+
+        Long recipientId = isCreditor ? contract.getDebtorId() : contract.getCreditorId();
+        notifyChange(recipientId, userId, "계약 변경 요청",
+                "님으로부터 계약 내용 변경 요청이 도착했습니다.", contractId, savedEntity.getChangeRequestId());
 
         log.info("계약 변경 요청 생성 및 차용증 재저장 완료: contractId={}, userId={}",
                 contractId, userId);
@@ -221,85 +235,41 @@ public class ContractChangeService {
             throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
         }
 
+        changeRequest.validateSigned();
+
         identityService.consume(userId, identityVerificationId, IdentityPurpose.LOAN_CONTRACT);
 
         String savedPath = fileService.saveSignatureFile(contractId, signature);
 
-        if (isCreditor) {
-            loanChangeService.updateCreditorSignatureOnly(contractId, savedPath);
-        } else {
-            loanChangeService.updateDebtorSignatureOnly(contractId, savedPath);
-        }
+        // 요청자가 먼저 남긴 서명과 승인자 서명을 변경 계약서에 함께 기록한다.
+        String creditorSignature = isCreditor ? savedPath : changeRequest.getRequesterSignature();
+        String debtorSignature = isCreditor ? changeRequest.getRequesterSignature() : savedPath;
+
+        loanChangeService.updateCreditorSignatureOnly(contractId, creditorSignature);
+        loanChangeService.updateDebtorSignatureOnly(contractId, debtorSignature);
 
         changeRequest.approve();
         contractChangeRepository.save(changeRequest);
 
         loanChangeService.supersedeContract(v1ContractId);
 
+        contractAccountService.copyActiveAccount(v1ContractId, contractId);
+
         repaymentScheduleService.generateChangedSchedule(v1ContractId, contractId);
 
         log.info("계약 변경 승인 처리 완료: v1ContractId={}, v2ContractId={}, changeRequestId={}",
                 v1ContractId, contractId, changeRequest.getChangeRequestId());
 
-        LoanContractResponse completedContract = loanChangeService.buildCompletedSnapshot(contract, isCreditor, savedPath);
+        LoanContractResponse signedContract = contract.toBuilder()
+                .creditorSignature(creditorSignature)
+                .debtorSignature(debtorSignature)
+                .build();
+        LoanContractResponse completedContract = loanChangeService.buildCompletedSnapshot(signedContract, isCreditor, savedPath);
         eventPublisher.publishEvent(new ContractCompletedEvent(completedContract));
 
         notifyChange(changeRequest.getUserId(), userId, "계약 변경 승인 완료",
                 "님이 신청하신 계약 변경 요청을 승인했습니다.", contractId, null);
 
         return ContractStatus.COMPLETED;
-    }
-
-    @Transactional
-    public void cancelChangeRequest(Long contractId, Long changeRequestId, Long userId) {
-        LoanContractChangeRequest changeRequest = getChangeRequestForUpdate(changeRequestId);
-
-        changeRequest.validateBelongsTo(contractId);
-        changeRequest.validateRequestedBy(userId);
-        changeRequest.validatePending();
-        changeRequest.validateNotSigned();
-
-        changeRequest.cancel();
-        contractChangeRepository.save(changeRequest);
-
-        LoanContractResponse v2 = getPendingChangedContract(contractId);
-        loanChangeService.rejectChangedContract(v2.getContractId());
-
-        log.info("계약 변경 요청 취소 처리 완료: contractId={}, changeRequestId={}, userId={}",
-                contractId, changeRequestId, userId);
-    }
-
-    @Transactional
-    public ContractChangeRequestResponse submitRequesterSignature(
-            Long contractId,
-            Long changeRequestId,
-            Long userId,
-            MultipartFile signature,
-            String identityVerificationId
-
-    ) {
-
-
-        identityService.consume(userId, identityVerificationId, IdentityPurpose.LOAN_CONTRACT);
-
-        LoanContractChangeRequest changeRequest = getChangeRequestForUpdate(changeRequestId);
-
-        changeRequest.validateBelongsTo(contractId);
-        changeRequest.validateRequestedBy(userId);
-        changeRequest.validatePending();
-        changeRequest.validateNotSigned();
-
-        String savedPath = fileService.saveSignatureFile(changeRequestId, signature);
-
-        changeRequest.attachRequesterSignature(savedPath);
-        contractChangeRepository.save(changeRequest);
-
-        LoanContractResponse contract = loanContractService.findContract(contractId, userId);
-        Long recipientId = contract.isCreditor(userId) ? contract.getDebtorId() : contract.getCreditorId();
-
-        notifyChange(recipientId, userId, "계약 변경 요청",
-                "님으로부터 계약 내용 변경 요청이 도착했습니다.", contractId, changeRequestId);
-
-        return ContractChangeRequestResponse.from(changeRequest);
     }
 }

@@ -1,0 +1,16 @@
+package org.teamsai.saibackend.domain.contract.dto.request;
+
+import jakarta.validation.constraints.NotNull;
+
+public record EarlyRepaymentRequest(
+
+        @NotNull(message = "입금 내역을 선택해 주세요.")
+        Long bankTransactionId,
+
+        // true면 갚을 금액을 넘는 만큼은 반환으로 기록한다.
+        boolean returnExcess
+) {
+        public EarlyRepaymentRequest(Long bankTransactionId) {
+                this(bankTransactionId, false);
+        }
+}

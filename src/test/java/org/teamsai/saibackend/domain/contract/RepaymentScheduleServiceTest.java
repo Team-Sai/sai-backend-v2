@@ -3,11 +3,14 @@ package org.teamsai.saibackend.domain.contract;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService;
 import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
 import org.teamsai.saibackend.domain.contract.dto.response.LoanContractResponse;
 import org.teamsai.saibackend.domain.contract.entity.RepaymentSchedule;
@@ -35,17 +38,26 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class RepaymentScheduleServiceTest {
 
+    private static final Long V1_CONTRACT_ID = 1L;
+    private static final Long V2_CONTRACT_ID = 2L;
+
     @Mock
     private RepaymentScheduleRepository repaymentScheduleRepository;
 
     @Mock
     private LoanContractService loanContractService;
 
+    @Mock
+    private EarlyRepaymentService earlyRepaymentService;
+
     @Spy
     private RepaymentScheduleGenerateService repaymentScheduleGenerateService = new RepaymentScheduleGenerateService();
 
     @InjectMocks
     private RepaymentScheduleService repaymentScheduleService;
+
+    @Captor
+    private ArgumentCaptor<List<RepaymentSchedule>> schedulesCaptor;
 
     private RepaymentSchedule buildRow(int sequence, RepaymentScheduleStatus status, String totalPaymentDue) {
         RepaymentSchedule entity = new RepaymentSchedule(
@@ -74,6 +86,7 @@ class RepaymentScheduleServiceTest {
                 .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL_AND_INTEREST)
                 .startDate(LocalDate.of(2026, 1, 1))
                 .maturityDate(LocalDate.of(2027, 1, 1))
+                .repaymentDay(1)
                 .build();
 
         when(loanContractService.getContractForInternalUse(contractId)).thenReturn(contract);
@@ -109,6 +122,7 @@ class RepaymentScheduleServiceTest {
                 .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL_AND_INTEREST)
                 .startDate(LocalDate.of(2026, 1, 1))
                 .maturityDate(LocalDate.of(2026, 1, 15))
+                .repaymentDay(1)
                 .build();
 
         when(loanContractService.getContractForInternalUse(contractId)).thenReturn(contract);
@@ -117,6 +131,110 @@ class RepaymentScheduleServiceTest {
                 .isInstanceOf(DomainException.class);
 
         verify(repaymentScheduleRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("계약 생성 시 계약의 상환일로 회차 날짜를 만든다")
+    void generateSchedule_usesContractRepaymentDay() {
+        Long contractId = 1L;
+        when(loanContractService.getContractForInternalUse(contractId))
+                .thenReturn(buildContract(contractId, 12));
+
+        repaymentScheduleService.generateSchedule(contractId);
+
+        verify(repaymentScheduleRepository).saveAll(schedulesCaptor.capture());
+        assertThat(schedulesCaptor.getValue().get(0).getDueDate()).isEqualTo(LocalDate.of(2026, 12, 12));
+    }
+
+    @Test
+    @DisplayName("계약 변경 시 납부 회차 이후 남은 회차 수가 줄지 않는다")
+    void generateChangedSchedule_keepsRemainingRoundCount() {
+        givenChangedContract(12, List.of(buildPaidRow(1, LocalDate.of(2026, 12, 12), "9000000")));
+
+        repaymentScheduleService.generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+
+        verify(repaymentScheduleRepository).saveAll(schedulesCaptor.capture());
+        List<RepaymentSchedule> saved = schedulesCaptor.getValue();
+        assertThat(saved).hasSize(11);
+        assertThat(saved.get(0).getDueDate()).isEqualTo(LocalDate.of(2027, 1, 12));
+        assertThat(saved.get(10).getDueDate()).isEqualTo(LocalDate.of(2027, 11, 11));
+    }
+
+    @Test
+    @DisplayName("계약 변경 시 변경된 계약의 상환일로 회차 날짜를 만든다")
+    void generateChangedSchedule_usesChangedRepaymentDay() {
+        givenChangedContract(20, List.of(buildPaidRow(1, LocalDate.of(2026, 12, 12), "9000000")));
+
+        repaymentScheduleService.generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+
+        verify(repaymentScheduleRepository).saveAll(schedulesCaptor.capture());
+        assertThat(schedulesCaptor.getValue().get(0).getDueDate()).isEqualTo(LocalDate.of(2027, 1, 20));
+    }
+
+    @Test
+    @DisplayName("납부 회차 없이 계약을 변경하면 지급 월의 다음 달부터 전체 회차를 만든다")
+    void generateChangedSchedule_withoutPaidRoundStartsFromStartDate() {
+        givenChangedContract(12, List.of());
+
+        repaymentScheduleService.generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+
+        verify(repaymentScheduleRepository).saveAll(schedulesCaptor.capture());
+        List<RepaymentSchedule> saved = schedulesCaptor.getValue();
+        assertThat(saved).hasSize(12);
+        assertThat(saved.get(0).getDueDate()).isEqualTo(LocalDate.of(2026, 12, 12));
+    }
+
+    @Test
+    @DisplayName("계약 변경 시 중도상환으로 줄어든 원금을 시작 원금으로 쓴다")
+    void generateChangedSchedule_keepsEarlyRepaidPrincipal() {
+        RepaymentSchedule pending = new RepaymentSchedule(
+                V1_CONTRACT_ID, 1, LocalDate.of(2026, 12, 12),
+                new BigDecimal("200000"), BigDecimal.ZERO, new BigDecimal("200000"),
+                new BigDecimal("1800000"), RepaymentScheduleStatus.PENDING, LocalDateTime.now());
+        givenChangedContract(12, List.of(pending));
+
+        repaymentScheduleService.generateChangedSchedule(V1_CONTRACT_ID, V2_CONTRACT_ID);
+
+        verify(repaymentScheduleRepository).saveAll(schedulesCaptor.capture());
+        BigDecimal principalSum = schedulesCaptor.getValue().stream()
+                .map(RepaymentSchedule::getPrincipalDue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertThat(principalSum).isEqualByComparingTo("2000000");
+    }
+
+
+    private void givenChangedContract(int v2RepaymentDay, List<RepaymentSchedule> v1Schedules) {
+        when(repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(V1_CONTRACT_ID)).thenReturn(v1Schedules);
+        when(loanContractService.getContractForInternalUse(V1_CONTRACT_ID))
+                .thenReturn(buildContract(V1_CONTRACT_ID, 12));
+        when(loanContractService.getContractForInternalUse(V2_CONTRACT_ID))
+                .thenReturn(buildContract(V2_CONTRACT_ID, v2RepaymentDay));
+    }
+
+    private LoanContractResponse buildContract(Long contractId, int repaymentDay) {
+        return LoanContractResponse.builder()
+                .contractId(contractId)
+                .principalAmount(BigDecimal.valueOf(10_000_000))
+                .interestRate(BigDecimal.valueOf(12))
+                .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL_AND_INTEREST)
+                .startDate(LocalDate.of(2026, 11, 11))
+                .maturityDate(LocalDate.of(2027, 11, 11))
+                .repaymentDay(repaymentDay)
+                .build();
+    }
+
+    private RepaymentSchedule buildPaidRow(int sequence, LocalDate dueDate, String remainingPrincipal) {
+        return new RepaymentSchedule(
+                V1_CONTRACT_ID,
+                sequence,
+                dueDate,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                new BigDecimal(remainingPrincipal),
+                RepaymentScheduleStatus.PAID,
+                LocalDateTime.now()
+        );
     }
 
     @Test

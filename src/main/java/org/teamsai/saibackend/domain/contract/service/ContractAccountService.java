@@ -38,11 +38,19 @@ public class ContractAccountService {
             Long userId
     ) {
         LoanContract contract = findContract(contractId);
-        validateCreditor(contract, userId);
+        boolean isCreditor = isCreditor(contract, userId);
+
+        if (!isCreditor && !isDebtor(contract, userId)) {
+            throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
+        }
 
         ContractAccount activeAccount = contractAccountRepository
                 .findLatestByContractIdAndStatus(contractId, ContractAccountStatus.ACTIVE)
                 .orElseThrow(LoanContractErrorCode.CONTRACT_ACCOUNT_NOT_FOUND::toException);
+
+        if (!isCreditor) {
+            return LinkedBankAccountResponse.forCounterparty(activeAccount.getLinkedAccount());
+        }
 
         Long activeLinkedAccountId = activeAccount.getLinkedAccount().getLinkedAccountId();
 
@@ -66,18 +74,30 @@ public class ContractAccountService {
         insertActiveAccount(contractId, linkedAccountId);
     }
 
+
+    @Transactional
+    public void copyActiveAccount(Long fromContractId, Long toContractId) {
+        contractAccountRepository
+                .findLatestByContractIdAndStatus(fromContractId, ContractAccountStatus.ACTIVE)
+                .ifPresent(active -> contractAccountRepository.save(ContractAccount.builder()
+                        .linkedAccount(active.getLinkedAccount())
+                        .loanContract(loanContractRepository.getReferenceById(toContractId))
+                        .accountStatus(ContractAccountStatus.ACTIVE)
+                        .build()));
+    }
+
     private LoanContract findContract(Long contractId) {
         return loanContractRepository.findById(contractId)
                 .orElseThrow(LoanContractErrorCode.CONTRACT_NOT_FOUND::toException);
     }
 
-    private void validateCreditor(
-            LoanContract contract,
-            Long userId
-    ) {
-        if (!Objects.equals(contract.getCreditor().getUserId(), userId)) {
-            throw LoanContractErrorCode.CONTRACT_ACCESS_DENIED.toException();
-        }
+    private boolean isCreditor(LoanContract contract, Long userId) {
+        return Objects.equals(contract.getCreditor().getUserId(), userId);
+    }
+
+    private boolean isDebtor(LoanContract contract, Long userId) {
+        return contract.getDebtor() != null
+                && Objects.equals(contract.getDebtor().getUserId(), userId);
     }
 
     private void validateSelectable(Long userId, Long linkedAccountId) {

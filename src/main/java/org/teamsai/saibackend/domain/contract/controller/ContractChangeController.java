@@ -46,13 +46,20 @@ public class ContractChangeController {
             @ApiResponse(responseCode = "409", description = "이미 처리 대기 중인 변경 요청이 있음")
     })
     @ResponseStatus(HttpStatus.CREATED)
-    @PostMapping("/api/contracts/{contractId}/change-requests")
+    @PostMapping(value = "/api/contracts/{contractId}/change-requests",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ContractChangeRequestResponse requestChange(
             @PathVariable Long contractId,
-            @Valid @RequestBody ContractChangeRequest request,
+            @Valid @RequestPart("request") ContractChangeRequest request,
+            @Parameter(description = "전자서명 이미지 파일") @RequestParam("signature") MultipartFile signature,
+            @Parameter(description = "본인인증 요청 식별값", example = "identity-verification-a1b2c3d4")
+            @RequestParam String identityVerificationId,
             @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
-        return contractChangeService.requestChange(contractId, request, userId);
+        if (signature == null || signature.isEmpty()) {
+            throw ContractChangeErrorCode.SIGNATURE_REQUIRED.toException();
+        }
+        return contractChangeService.requestChange(contractId, request, signature, identityVerificationId, userId);
     }
 
     @Operation(
@@ -75,54 +82,6 @@ public class ContractChangeController {
             @AuthenticationPrincipal(expression = "userId") Long userId
     ) {
         return contractChangeService.rejectChange(contractId, changeRequestId, request.getReturnReason(), userId);
-    }
-
-    @Operation(
-            summary = "계약 변경 요청 전자서명 제출",
-            description = "변경 요청을 등록한 당사자가 전자서명을 제출하면, 상대방에게 알림이 발송됩니다."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "서명 제출 성공"),
-            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자"),
-            @ApiResponse(responseCode = "403", description = "요청 등록 당사자가 아님"),
-            @ApiResponse(responseCode = "404", description = "변경 요청을 찾을 수 없음"),
-            @ApiResponse(responseCode = "409", description = "이미 처리된 요청임")
-    })
-    @PatchMapping(value = "/api/contracts/{contractId}/change-requests/{changeRequestId}/signature",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ContractChangeRequestResponse submitRequesterSignature(
-            @PathVariable Long contractId,
-            @PathVariable Long changeRequestId,
-            @RequestParam("signature") MultipartFile signature,
-            @RequestParam String identityVerificationId,
-            @AuthenticationPrincipal(expression = "userId") Long userId
-    ) {
-        if (signature == null || signature.isEmpty()) {
-            throw ContractChangeErrorCode.SIGNATURE_REQUIRED.toException();
-        }
-        return contractChangeService.submitRequesterSignature(contractId, changeRequestId, userId, signature, identityVerificationId);
-    }
-
-    @Operation(
-            summary = "계약 변경 요청 취소",
-            description = "요청 등록 당사자가 아직 서명을 제출하지 않은 자신의 변경 요청을 취소합니다. " +
-                    "이미 서명을 제출해 상대방에게 전송된 요청은 취소할 수 없습니다."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "취소 성공"),
-            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자"),
-            @ApiResponse(responseCode = "403", description = "요청 등록 당사자가 아님"),
-            @ApiResponse(responseCode = "404", description = "변경 요청을 찾을 수 없음"),
-            @ApiResponse(responseCode = "409", description = "이미 서명이 제출됐거나 처리된 요청임")
-    })
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/api/contracts/{contractId}/change-requests/{changeRequestId}")
-    public void cancelChangeRequest(
-            @PathVariable Long contractId,
-            @PathVariable Long changeRequestId,
-            @AuthenticationPrincipal(expression = "userId") Long userId
-    ) {
-        contractChangeService.cancelChangeRequest(contractId, changeRequestId, userId);
     }
 
     @Operation(
