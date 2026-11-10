@@ -121,7 +121,7 @@ class EarlyRepaymentServiceTest {
         EarlyRepayment last = mock(EarlyRepayment.class);
         when(last.getBankTransactionId()).thenReturn(50L);
         when(later.getTransactionAt()).thenReturn(LocalDateTime.of(2026, 12, 10, 10, 0));
-        when(earlyRepaymentRepository.findFirstByContractIdOrderByProcessedAtDesc(1L))
+        when(earlyRepaymentRepository.findFirstByContractIdAndPrincipalAmountGreaterThanOrderByProcessedAtDesc(1L, BigDecimal.ZERO))
                 .thenReturn(Optional.of(last));
         when(bankTransactionService.findById(50L)).thenReturn(Optional.of(later));
 

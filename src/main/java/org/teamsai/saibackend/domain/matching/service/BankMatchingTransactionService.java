@@ -154,8 +154,9 @@ public class BankMatchingTransactionService {
 
         return candidates.stream()
                 .filter(candidate -> candidate.targetType() != MatchingTargetType.LOAN
-                        || candidate.remainingAmount().compareTo(amount) == 0
-                        || !isPayoffOrMore(candidate.targetId(), amount, paidOn))
+                        || (earlyRepaymentService.memoAllowsSchedule(candidate.targetId(), bankTransaction.getMemo())
+                        && (candidate.remainingAmount().compareTo(amount) == 0
+                        || !isPayoffOrMore(candidate.targetId(), amount, paidOn))))
                 .toList();
     }
 

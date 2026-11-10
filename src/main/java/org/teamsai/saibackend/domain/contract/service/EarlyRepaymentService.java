@@ -56,9 +56,27 @@ public class EarlyRepaymentService {
     private final BankTransactionService bankTransactionService;
     private final PaymentRecordService paymentRecordService;
 
+    /** 자동 매칭용: 메모에 다른 차용증 번호가 적혀 있으면 false. 번호가 없거나 이 차용증이면 true */
+    public boolean memoAllowsSchedule(Long scheduleId, String memo) {
+        if (memo == null) {
+            return true;
+        }
+        return repaymentScheduleRepository.findById(scheduleId)
+                .map(RepaymentSchedule::getContractId)
+                .map(contractId -> {
+                    Long creditorId = loanContractService.getContractForInternalUse(contractId).getCreditorId();
+                    // 차용증 번호(LC-…)는 당사자 조회에서만 붙어서, 채권자 기준으로 다시 읽는다.
+                    LoanContractResponse contract = loanContractService.findContract(contractId, creditorId);
+                    return !Boolean.FALSE.equals(memoMatchesText(contract, memo));
+                })
+                .orElse(true);
+    }
+
+
     public Optional<LocalDate> findLatestPaidOn(Long contractId) {
-        return earlyRepaymentRepository.findFirstByContractIdOrderByProcessedAtDesc(contractId)
-                .flatMap(early -> bankTransactionService.findById(early.getBankTransactionId()))
+        // 원금을 실제로 갚은 기록만 이자 시작일로 쓴다. (밀린 회차만 낸 기록은 제외)
+        return earlyRepaymentRepository
+                .findFirstByContractIdAndPrincipalAmountGreaterThanOrderByProcessedAtDesc(contractId, BigDecimal.ZERO)                .flatMap(early -> bankTransactionService.findById(early.getBankTransactionId()))
                 .map(tx -> tx.getTransactionAt().toLocalDate());
     }
 
@@ -218,7 +236,11 @@ public class EarlyRepaymentService {
         List<RepaymentSchedule> futureRows = futureRows(unresolved, shortfallRows);
 
         if (futureRows.isEmpty()) {
-            return null;
+            // 앞으로 낼 회차가 없으면 밀린 금액만 남는다. 그것도 없으면 다 갚은 것이다.
+            BigDecimal shortfall = shortfallOf(shortfallRows, paid);
+            return shortfall.signum() > 0
+                    ? new PayoffResponse(BigDecimal.ZERO, BigDecimal.ZERO, shortfall, shortfall)
+                    : null;
         }
 
         RepaymentSchedule first = futureRows.get(0);
@@ -373,7 +395,10 @@ public class EarlyRepaymentService {
      * true: 이 차용증 번호 / false: 다른 차용증 번호 / null: 번호 없음(알 수 없음)
      */
     private Boolean memoMatches(LoanContractResponse contract, BankTransaction deposit) {
-        String memo = deposit.getMemo();
+        return memoMatchesText(contract, deposit.getMemo());
+    }
+
+    private Boolean memoMatchesText(LoanContractResponse contract, String memo) {
         if (memo == null) {
             return null;
         }
