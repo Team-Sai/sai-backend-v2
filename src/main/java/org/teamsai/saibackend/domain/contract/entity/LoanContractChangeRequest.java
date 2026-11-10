@@ -72,11 +72,6 @@ public class LoanContractChangeRequest {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void cancel() {
-        this.status = ChangeRequestStatus.CANCELLED;
-        this.updatedAt = LocalDateTime.now();
-    }
-
     public void attachRequesterSignature(String requesterSignature) {
         this.requesterSignature = requesterSignature;
         this.updatedAt = LocalDateTime.now();
@@ -85,12 +80,6 @@ public class LoanContractChangeRequest {
     public void validateBelongsTo(Long contractId) {
         if (!this.contractId.equals(contractId)) {
             throw ContractChangeErrorCode.CHANGE_REQUEST_NOT_FOUND.toException();
-        }
-    }
-
-    public void validateRequestedBy(Long userId) {
-        if (!this.userId.equals(userId)) {
-            throw ContractChangeErrorCode.NOT_CONTRACT_PARTY.toException();
         }
     }
 
@@ -103,12 +92,6 @@ public class LoanContractChangeRequest {
     public void validateSigned() {
         if (this.requesterSignature == null) {
             throw ContractChangeErrorCode.REQUESTER_SIGNATURE_REQUIRED.toException();
-        }
-    }
-
-    public void validateNotSigned() {
-        if (this.requesterSignature != null) {
-            throw ContractChangeErrorCode.ALREADY_SIGNED.toException();
         }
     }
 
