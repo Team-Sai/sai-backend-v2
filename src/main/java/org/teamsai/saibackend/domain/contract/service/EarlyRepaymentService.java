@@ -47,6 +47,11 @@ public class EarlyRepaymentService {
     // 차용증 번호: LC-12, 계약 변경본은 LC-12-15
     private static final Pattern CONTRACT_NUMBER_PATTERN = Pattern.compile("LC-\\d+(?:-\\d+)?");
 
+    /** 메모에 차용증 번호(LC-…)가 적혀 있는지. 적혀 있으면 차용증 입금으로 본다. */
+    public static boolean hasContractNumber(String memo) {
+        return memo != null
+                && CONTRACT_NUMBER_PATTERN.matcher(memo.toUpperCase().replaceAll("\\s+", "")).find();
+    }
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final EarlyRepaymentRepository earlyRepaymentRepository;
     private final DepositReturnRepository depositReturnRepository;

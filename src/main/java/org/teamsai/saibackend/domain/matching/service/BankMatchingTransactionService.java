@@ -144,6 +144,7 @@ public class BankMatchingTransactionService {
      * 입금일 기준 완납 금액 이상 들어온 차용증 입금은 회차 일부 납부가 아니라 완납 의도로 본다.
      * 그 차용증 후보를 빼서 입금 카드에서 완납 처리하게 한다.
      * 회차 금액과 딱 같은 입금은 정상 납부라 후보로 남긴다.
+     * 메모에 차용증 번호가 있으면 정산 후보도 제외한다.
      */
     private List<MatchingCandidate> excludeLoanPayoffCandidates(
             BankTransaction bankTransaction,
@@ -152,11 +153,14 @@ public class BankMatchingTransactionService {
         BigDecimal amount = bankTransaction.getAmount();
         LocalDate paidOn = bankTransaction.getTransactionAt().toLocalDate();
 
+        boolean memoNamesContract = EarlyRepaymentService.hasContractNumber(bankTransaction.getMemo());
+
         return candidates.stream()
-                .filter(candidate -> candidate.targetType() != MatchingTargetType.LOAN
-                        || (earlyRepaymentService.memoAllowsSchedule(candidate.targetId(), bankTransaction.getMemo())
-                        && (candidate.remainingAmount().compareTo(amount) == 0
-                        || !isPayoffOrMore(candidate.targetId(), amount, paidOn))))
+                .filter(candidate -> candidate.targetType() == MatchingTargetType.LOAN
+                        ? earlyRepaymentService.memoAllowsSchedule(candidate.targetId(), bankTransaction.getMemo())
+                          && (candidate.remainingAmount().compareTo(amount) == 0
+                              || !isPayoffOrMore(candidate.targetId(), amount, paidOn))
+                        : !memoNamesContract) // 차용증 번호가 적힌 입금은 정산에 반영하지 않는다
                 .toList();
     }
 

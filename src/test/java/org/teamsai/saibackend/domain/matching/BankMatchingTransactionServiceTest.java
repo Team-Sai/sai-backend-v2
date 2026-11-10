@@ -42,6 +42,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -485,6 +486,34 @@ class BankMatchingTransactionServiceTest {
                 any(), any(), any()
         );
     }
+    @Test
+    @DisplayName("메모에 차용증 번호가 있으면 이름과 금액이 맞는 정산 후보에도 반영하지 않는다")
+    void excludesSettlementCandidateWhenMemoHasContractNumber() {
+        BankTransaction transaction = new BankTransaction(
+                LINKED_ACCOUNT_ID,
+                "external-101",
+                new BigDecimal("10000.00"),
+                BankTransactionType.DEPOSIT,
+                LocalDateTime.of(2026, 8, 5, 10, 0),
+                "Hong Gil Dong",
+                "LC-1 상환",
+                LocalDateTime.of(2026, 8, 5, 10, 5)
+        );
+        ReflectionTestUtils.setField(transaction, "bankTransactionId", 101L);
+        givenLockedTransaction(transaction);
+        given(matchingCandidateRepository.findMatchCandidatesByLinkedAccountId(
+                LINKED_ACCOUNT_ID,
+                transaction.getTransactionAt()
+        )).willReturn(List.of(candidate()));
+        given(autoMatchingService.execute(any(), any()))
+                .willReturn(executionResult(result(101L, AutoMatchingProcessStatus.UNMATCHED)));
+
+        transactionService.process(USER_ID, LINKED_ACCOUNT_ID, transaction, false);
+
+        // 정산 후보가 빠진 빈 목록으로 판정해야 한다.
+        verify(autoMatchingService).execute(any(), argThat(List::isEmpty));
+    }
+
     private BankTransaction bankTransaction(
             Long bankTransactionId,
             String counterpartyName
