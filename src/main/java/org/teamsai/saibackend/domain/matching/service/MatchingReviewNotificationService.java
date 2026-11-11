@@ -87,14 +87,22 @@ public class MatchingReviewNotificationService {
     private String createBothFoundContent(BankTransaction bankTransaction) {
         return resolveCounterpartyName(bankTransaction)
                 + "님의 "
-                + bankTransaction.getAmount().toPlainString()
+                + String.format(
+                    java.util.Locale.KOREA,
+                    "%,.0f",
+                    bankTransaction.getAmount()
+                )
                 + "원 입금에 정산과 차용증 후보가 모두 발견되었습니다.";
     }
 
     private String createUnresolvedSettlementContent(BankTransaction bankTransaction) {
         return resolveCounterpartyName(bankTransaction)
                 + "님의 "
-                + bankTransaction.getAmount().toPlainString()
+                + String.format(
+                    java.util.Locale.KOREA,
+                    "%,.0f",
+                    bankTransaction.getAmount()
+                    )
                 + "원 입금이 정산 금액과 일치하지 않아 확인이 필요합니다.";
     }
 

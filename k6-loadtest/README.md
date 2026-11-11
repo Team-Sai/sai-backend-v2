@@ -43,4 +43,26 @@ docker compose -f .\docker-compose.loadtest.yml up -d influxdb prometheus grafan
 
 Grafana는 `http://localhost:3000`에서 열고, Prometheus 대상 상태는 `http://localhost:9090/targets`에서 확인합니다. `sai-backend` 대상이 `UP`으로 표시되어야 합니다.
 
+## DB 커넥션 대기 지표 수집
+
+모니터링 도구를 실행한 상태에서 저장소 루트에서 실제 백엔드 관리 주소를 등록합니다.
+
+```powershell
+.\k6-loadtest\register-backend.ps1 -ManagementUrl http://YOUR_SAIWONJANG_SERVER_LAN_IP:8082
+```
+
+스크립트는 Git에서 제외된 `prometheus/targets/sai-backend.json`을 생성하고, Prometheus에서 필수 HikariCP 지표를 확인합니다. 파일 탐색에는 최대 30초, 이후 수집에는 약 5초가 걸립니다. 확인에 실패해도 대상 설정은 남으므로 `/targets`에서 연결 오류를 확인하세요. 로컬 백엔드는 `http://localhost:8082`를 전달하면 Docker용 `host.docker.internal`로 등록합니다.
+
+Grafana의 **SAI DB Connections** 대시보드 (`http://localhost:3000/d/sai-db-connections`)에서 다음을 확인할 수 있습니다.
+
+| 지표 | 의미 |
+| --- | --- |
+| `hikaricp_connections_pending` | 커넥션을 기다리는 스레드 수 |
+| `hikaricp_connections_active / idle / max` | 사용 중 / 유휴 / 최대 커넥션 수 |
+| `hikaricp_connections_acquire_seconds_count / sum` | 획득 횟수 및 누적 획득 시간, 1분 rate 비율로 평균 계산 |
+| `hikaricp_connections_acquire_seconds_max` | 라이브러리가 제공하는 시간 창 내 최대 획득 시간 |
+| `hikaricp_connections_timeout_total` | 커넥션 획득 타임아웃 누적 횟수 |
+
+`account-sync-load.js` 실행 전 수집 성공을 확인하세요. k6의 `sync_failed`와 같은 시간대를 대시보드에서 선택하면 실패 시점의 풀 상태를 비교할 수 있습니다. 평균 획득 시간은 획득이 없는 구간에서 표시되지 않을 수 있습니다. 5초보다 짧은 대기 급증은 샘플 사이에서 누락될 수 있고, 타임아웃 증가는 커넥션 획득 실패를 보여주지만 HTTP 실패와 일대일로 대응하지는 않습니다. 수집 시작 이전의 과거 지표는 복구되지 않습니다.
+
 실제 요청 부하는 실행할 시나리오를 정한 뒤 k6로 발생시킵니다. 기존 시나리오는 테스트 데이터를 만들거나 변경할 수 있으므로, 실행 전에 준비 절차와 데이터 요구 사항을 확인하세요.

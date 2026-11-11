@@ -1,0 +1,532 @@
+<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SAI 배치 아키텍처 · 팀 설명자료</title><style>:root{--bg:#f2f5fb;--paper:#fff;--ink:#192843;--muted:#5c6d85;--line:#dce4ef;--accent:#245bdd;--soft:#edf3ff}*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:35px}body{margin:0;color:var(--ink);background:var(--bg);font:16px/1.75 "Segoe UI","Malgun Gothic",sans-serif}header{background:#132b50;color:white;padding:65px max(7vw,24px) 52px}header p{max-width:780px;color:#c9d7ed}h1{font-size:clamp(30px,4vw,52px);line-height:1.25;margin:16px 0}h2{font-size:30px;line-height:1.4;margin:7px 0 12px}h3{font-size:19px;margin:26px 0 12px}p{margin:12px 0}.eyebrow{letter-spacing:.12em;font-size:12px;font-weight:700;color:#91b6ff}.layout{display:grid;grid-template-columns:235px minmax(0,1fr);max-width:1560px;margin:auto}nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 18px;border-right:1px solid var(--line)}nav a{display:block;color:var(--muted);text-decoration:none;font-size:13px;padding:8px 10px;border-radius:7px;line-height:1.5}nav a:hover,nav a.active{background:#dfeaff;color:#194fb9}main{min-width:0;padding:30px 38px 60px}section{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:34px;margin-bottom:26px;scroll-margin-top:25px}.kicker{font-size:12px;letter-spacing:.1em;font-weight:700;color:var(--accent)}.lead{font-size:18px;color:var(--muted);margin-bottom:24px}.cards{display:grid;gap:14px;margin:20px 0}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.node{background:var(--soft);border:1px solid #cfdcf7;border-radius:11px;padding:17px;min-width:0;text-align:center;overflow-wrap:anywhere}.node strong{display:block;font-size:15px}.node small{display:block;font-size:13px;color:var(--muted);line-height:1.6;margin-top:7px}.accent{background:#245bdd;color:white}.accent small{color:#e0eaff}.flow{display:flex;align-items:stretch;gap:8px;margin:20px 0;flex-wrap:wrap}.flow .node{flex:1 1 135px}.arrow{align-self:center;color:var(--accent);font-size:23px;font-weight:700}.down{text-align:center;color:var(--muted);font-size:13px;padding:9px}.hierarchy{max-width:700px;margin:20px auto}.architecture{padding:20px;border:1px dashed #b9c9e5;border-radius:12px}.architecture>.cards{margin:15px 0}.panel{border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}.panel h3{margin-top:0}.panel .flow{display:block}.panel .arrow{display:block;text-align:center;transform:rotate(90deg)}aside{border-left:4px solid var(--accent);background:#f0f5ff;padding:17px 20px;margin:23px 0;border-radius:0 9px 9px 0}aside p{font-size:14px;margin-bottom:0}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:14px;margin:15px 0}th{text-align:left;background:#f0f4fa;color:#334e73}th,td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}td:first-child{font-weight:600}details{margin:16px 0;border:1px solid var(--line);border-radius:9px;overflow:hidden}summary{cursor:pointer;padding:13px 16px;font-size:13px;font-weight:600;background:#f5f7fb}.filepath{font-size:11px;color:var(--muted);padding:0 15px;overflow-wrap:anywhere}pre .explain{color:#9ee2c6;white-space:pre-wrap}pre{background:#14233a;color:#e1ebff;margin:0;padding:18px;overflow:auto;font-size:12px;line-height:1.7;tab-size:4}.ln{display:inline-block;width:35px;color:#8299bb;user-select:none}.closing{text-align:center;font-size:23px;margin:35px 0 10px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:25px}button,.toolbar a{border:1px solid #6a87b2;background:transparent;color:white;border-radius:8px;padding:9px 16px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none}footer{text-align:center;font-size:12px;color:var(--muted);padding:0 25px 30px}body.presentation nav{display:none}body.presentation .layout{display:block;max-width:1300px}body.presentation section{min-height:80vh}a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #ffbc42;outline-offset:3px}@media(max-width:1000px){.layout{grid-template-columns:190px minmax(0,1fr)}main{padding:20px}section{padding:24px}.three{grid-template-columns:1fr}.two{grid-template-columns:1fr}}@media(max-width:700px){.layout{display:block}nav{position:relative;height:auto;display:flex;overflow:auto;padding:12px;gap:8px}nav a{flex:0 0 155px}main{padding:12px}section{padding:22px 16px}h2{font-size:25px}.flow{flex-direction:column}.flow .node{flex-basis:auto}.arrow{transform:rotate(90deg)}header{padding:36px 24px}.architecture{padding:12px}}@media print{@page{size:A4 landscape;margin:12mm}body{background:white;font-size:11px}header{background:white;color:#192843;padding:15px;break-after:page}header p{color:#5c6d85}nav,.toolbar,footer{display:none!important}.layout{display:block}main{padding:0}section{border:none;break-before:page;padding:8px;margin:0;min-height:0!important}h2{font-size:24px}.lead{font-size:14px}.node{padding:10px}details:not([open]){display:none}pre{white-space:pre-wrap;font-size:9px}aside{padding:10px}.three{grid-template-columns:repeat(3,1fr)}.two{grid-template-columns:repeat(2,1fr)}}</style></head><body><header><div class="eyebrow">SAI ENGINEERING / BATCH WALKTHROUGH</div><h1>매일의 거래와 기한을<br>10개의 배치로 관리하기</h1><p>Job·Step의 기본 개념부터 6개 업무 흐름, 코드 연결, 실패 처리까지.<br>팀원이 전체 구조를 먼저 이해하고 필요한 코드를 찾아갈 수 있는 설명자료입니다.</p><div class="toolbar"><button id="presentation" type="button" aria-pressed="false">발표 모드</button><button id="sources" type="button" aria-expanded="true">코드 모두 접기</button><button id="print" type="button">인쇄 / PDF 저장</button><a href="presenter-guide.html">발표자 상세 가이드 ↗</a></div><p style="font-size:12px">2026-10-27 로컬 코드 기준 · 10 Jobs / 6 Groups / 2 Chunk + 8 Tasklet<br>외부 라이브러리·폰트·네트워크 요청 없이 열리는 독립 HTML</p></header><div class="layout"><nav aria-label="자료 목차"><a href="#why">01 왜 배치가 필요한가</a><a href="#concepts">02 Job · Step · 실행 이력</a><a href="#architecture">03 전체 아키텍처</a><a href="#modes">04 Chunk와 Tasklet의 차이</a><a href="#choices">05 10개 Job은 왜 이 방식을 쓰는가</a><a href="#transactions">06 거래 동기화 + 매칭 재시도</a><a href="#recurring">07 정기정산 회차 생성</a><a href="#overdue">08 상환 연체 + 정산 연체</a><a href="#reminders">09 상환 리마인드 + 정산 리마인드</a><a href="#abandonment">10 정산 장기방치 감지</a><a href="#writeoff">11 정산 상각 + 상환 상각</a><a href="#infra">12 JobConfig · Listener · 공통 인프라</a><a href="#operations">13 팀이 꼭 기억할 운영 포인트</a></nav><main><section id="why"><div class="kicker">01 / WHY</div><h2>왜 배치가 필요한가</h2><p class="lead">사용자가 화면을 열지 않아도, 시간이 지나면 해야 할 일이 생깁니다.</p>
+<div class="cards three"><div class="node "><strong>새 거래가 들어왔다</strong><small>은행 내역을 가져와 상환·정산에 반영</small></div><div class="node "><strong>납부일이 다가왔다</strong><small>D-3 · D-1 · 당일에 사용자 알림 생성</small></div><div class="node "><strong>기한이 지났다</strong><small>연체를 표시하고 장기 미납을 정리</small></div></div>
+<div class="flow" role="group" aria-label="요청 처리와 배치의 역할"><div class="node "><strong>사용자 요청</strong><small>계약·정산을 생성한다</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>업무 DB</strong><small>기한·상태·계좌를 보관한다</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>정기 배치</strong><small>대상을 찾아 시간에 따른 후속 처리를 한다</small></div></div>
+<p>배치는 정해진 범위의 데이터를 반복 처리하는 작업입니다. 스케줄은 실행 시점을 정하고, Spring Batch는 실행 단위·이력·처리 정책을 제공합니다. 현재 프로젝트는 @Scheduled로 자정 실행을 예약하고, Chunk Step에 계좌별 반복 처리를 설정합니다.</p>
+<aside><strong>이 프로젝트에서의 가치</strong><p>기한 처리를 사용자 접속에 의존하지 않고, 계좌별 동기화와 실패 재처리를 일정한 정책으로 수행합니다. 재기동 후 정기정산 생성은 누락 회차를 따라잡고, 리마인드는 실행 기준일의 D-3·D-1·당일 대상만 조회합니다.</p></aside></section><section id="concepts"><div class="kicker">02 / CONCEPTS</div><h2>Job · Step · 실행 이력</h2><p class="lead">Job은 업무 하나의 이름이고, Step은 그 업무를 수행하는 처리 단계입니다.</p>
+<div class="hierarchy"><div class="node "><strong>Job · transactionSyncJob</strong><small>은행거래 동기화라는 업무</small></div><div class="down">↓ 이 프로젝트는 10개 Job 모두 Step 1개</div><div class="node "><strong>Step · transactionSyncStep</strong><small>Reader / Processor / Writer와 처리 정책</small></div><div class="down">↓ 실제 로직 위임</div><div class="node "><strong>도메인 서비스</strong><small>동기화 · 매칭 · 저장 · 상태 변경</small></div></div>
+<div class="tablewrap"><table><thead><tr><th>용어</th><th>쉽게 설명하면</th><th>현재 코드에서</th></tr></thead><tbody><tr><td>Job</td><td>실행할 업무의 설계도</td><td>은행거래 동기화, 정산 연체 등 10개</td></tr><tr><td>Step</td><td>Job 안의 처리 단계</td><td>현재 각 Job에 1개씩 연결</td></tr><tr><td>JobInstance</td><td>Job 이름과 식별 파라미터로 구분하는 논리적 작업</td><td>baseDate와 매번 바뀌는 runId를 전달</td></tr><tr><td>JobExecution / StepExecution</td><td>실제로 실행한 이력과 결과</td><td>상태, 시작·종료 시각, read/write/skip 집계</td></tr><tr><td>JobParameters</td><td>이번 실행에 넣는 입력값</td><td>baseDate: 업무 기준일 / runId: 실행 구분</td></tr><tr><td>JobRepository</td><td>배치 실행 기록을 저장하는 곳</td><td>JDBC 기반 저장소. 업무 데이터 저장소와 역할이 다름</td></tr></tbody></table></div>
+<h3>현재는 왜 Step을 하나씩 연결했을까?</h3><p>각 JobConfig는 .start(해당 Step) 뒤에 .build()를 호출합니다. 거래 Job의 Step은 계좌 조회·동기화·매칭을 하나의 반복으로 묶고, Tasklet Job의 Step은 업무 서비스 한 절차를 호출합니다. 현재 코드의 실행 상태와 집계 경계가 이 한 단계에 모입니다.</p>
+<div class="flow" role="group" aria-label="현재 Job의 구성"><div class="node "><strong>Job</strong><small>transactionSyncJob</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Step 1개</strong><small>transactionSyncStep</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Step 내부 반복</strong><small>계좌 조회 → 동기화·매칭 → 로그</small></div></div>
+<h3>여러 Step은 언제 사용하는가?</h3><p>독립적인 입력·출력, 단계별 실행 결과, 실패 후 재시작 경계가 필요한 업무라면 하나의 Job 안에 여러 Step을 연결할 수 있습니다. 예를 들어 파일 검증 → 데이터 적재 → 결과 보고를 단계별로 나누면 실패한 단계를 실행 이력에서 구분하기 쉽습니다. 재시작 시 실행 여부는 Step 설정과 이전 실행 상태로 결정합니다.</p>
+<div class="flow" role="group" aria-label="다중 Step 설계 예시"><div class="node "><strong>Job</strong><small>파일 처리 · 설계 예시</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>검증 Step</strong><small>파일 형식·필수값 검사</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>적재 Step</strong><small>유효 데이터 저장</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>보고 Step</strong><small>처리 결과 작성</small></div></div>
+<p class="filepath">다중 Step 그림은 설계 개념을 설명하는 예시입니다. 현재 프로젝트의 각 Job은 단일 Step으로 구성되어 있습니다.</p></section><section id="architecture"><div class="kicker">03 / ARCHITECTURE</div><h2>전체 아키텍처</h2><p class="lead">같은 백엔드 안에서 실행 시점, 실행 관리, 업무 처리를 분리합니다.</p>
+<div class="architecture">
+<div class="node accent"><strong>Spring Scheduler · 매일 00:00 Asia/Seoul</strong><small>@Scheduled가 실행 시점 결정</small></div>
+<div class="down">↓ Scheduler 진입 시 DB 락 획득</div>
+<div class="node "><strong>ShedLock · JDBC / DB 시간</strong><small>같은 락 이름의 스케줄이 여러 Pod에서 중복 실행되는 것을 억제</small></div>
+<div class="cards two"><div class="node "><strong>DailyBatchPipelineScheduler</strong><small>거래 동기화 → 매칭 재시도 → 정기 생성 → 상환 연체 → 정산 연체 → 정산 상각 → 상환 상각</small></div><div class="node "><strong>개별 Scheduler 3개</strong><small>상환 리마인드 / 정산 리마인드 / 정산 방치 감지<br>각각 별도 락 이름과 실행 진입점</small></div></div>
+<div class="down">↓ baseDate + runId → JobOperator.start(job, params)</div>
+<div class="node accent"><strong>Job → Step</strong><small>Chunk 2개 / Tasklet 8개</small></div>
+<div class="cards three"><div class="node "><strong>업무 서비스 → 업무 DB</strong><small>JPA · 벌크 UPDATE · 잠금 · 트랜잭션</small></div><div class="node "><strong>거래 조회 → MockBankClient</strong><small>외부 은행 모사 API 연동</small></div><div class="node "><strong>알림 저장 / Slack</strong><small>사용자 Notification / 운영자 메시지</small></div></div>
+<div class="cards two"><div class="node "><strong>JobRepository</strong><small>Job·Step 실행 이력 저장</small></div><div class="node "><strong>LoggingJobExecutionListener</strong><small>시작 로그 / 종료 결과·건수·소요시간 Slack</small></div></div></div>
+<aside><strong>선후 관계를 정확히 읽기</strong><p>7개는 코드의 start() 호출 순서입니다. 나머지 3개와의 선후 관계는 명시되어 있지 않습니다. 파이프라인은 앞 Job의 성공을 조건으로 다음 Job을 실행하지 않으며, 실행 요청의 예외도 잡고 다음 호출을 계속합니다. 실제 완료 순서·동시성은 실행기 설정까지 보아야 합니다.</p></aside>
+<details class="source" open><summary>주석을 붙인 실제 코드 · DailyBatchPipelineScheduler.java:39</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/orchestration/DailyBatchPipelineScheduler.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="explain">     // [설명] 한국시간 자정에 스케줄 진입점을 호출한다.</span>
+<span class="ln">39</span>    @Scheduled(cron = &quot;0 0 0 * * *&quot;, zone = &quot;Asia/Seoul&quot;)
+<span class="explain">     // [설명] 여러 인스턴스 중 같은 이름의 스케줄 락을 획득한 실행이 진입한다.</span>
+<span class="ln">40</span>    @SchedulerLock(name = &quot;dailyBatchPipeline&quot;, lockAtLeastFor = &quot;5m&quot;, lockAtMostFor = &quot;2h&quot;)
+<span class="ln">41</span>    public void runPipeline() {
+<span class="explain">     // [설명] 이번 실행의 업무 기준일을 JVM 기본 시간대로 계산한다.</span>
+<span class="ln">42</span>        LocalDate baseDate = LocalDate.now();
+<span class="explain">     // [설명] 이 Job을 실행 요청한다. 다음 줄의 Job도 별개의 실행 이력을 가진다.</span>
+<span class="ln">43</span>        runStep(&quot;transactionSync&quot;, transactionSyncJob, baseDate);
+<span class="explain">     // [설명] 이 Job을 실행 요청한다. 다음 줄의 Job도 별개의 실행 이력을 가진다.</span>
+<span class="ln">44</span>        runStep(&quot;bankTransactionRetry&quot;, bankTransactionRetryJob, baseDate);
+<span class="explain">     // [설명] 이 Job을 실행 요청한다. 다음 줄의 Job도 별개의 실행 이력을 가진다.</span>
+<span class="ln">45</span>        runStep(&quot;recurringSettlementGeneration&quot;, recurringSettlementGenerationJob, baseDate);
+<span class="explain">     // [설명] 이 Job을 실행 요청한다. 다음 줄의 Job도 별개의 실행 이력을 가진다.</span>
+<span class="ln">46</span>        runStep(&quot;repaymentScheduleOverdue&quot;, repaymentScheduleOverdueJob, baseDate);
+<span class="explain">     // [설명] 이 Job을 실행 요청한다. 다음 줄의 Job도 별개의 실행 이력을 가진다.</span>
+<span class="ln">47</span>        runStep(&quot;settlementOverdue&quot;, settlementOverdueJob, baseDate);
+<span class="explain">     // [설명] 이 Job을 실행 요청한다. 다음 줄의 Job도 별개의 실행 이력을 가진다.</span>
+<span class="ln">48</span>        runStep(&quot;settlementWriteOff&quot;, settlementWriteOffJob, baseDate);
+<span class="explain">     // [설명] 이 Job을 실행 요청한다. 다음 줄의 Job도 별개의 실행 이력을 가진다.</span>
+<span class="ln">49</span>        runStep(&quot;repaymentWriteOff&quot;, repaymentWriteOffJob, baseDate);
+<span class="ln">50</span>    }
+<span class="ln">51</span>
+<span class="explain">     // [설명] 이번 실행의 업무 기준일을 JVM 기본 시간대로 계산한다.</span>
+<span class="ln">52</span>    private void runStep(String label, Job job, LocalDate baseDate) {
+<span class="ln">53</span>        JobParameters params = new JobParametersBuilder()
+<span class="explain">     // [설명] 기한 판단에 사용할 날짜를 JobParameters로 전달한다.</span>
+<span class="ln">54</span>                .addString(&quot;baseDate&quot;, baseDate.toString())
+<span class="explain">     // [설명] 호출 시각을 식별 파라미터에 넣어 실행을 구별한다.</span>
+<span class="ln">55</span>                .addLong(&quot;runId&quot;, System.currentTimeMillis())
+<span class="ln">56</span>                .toJobParameters();
+<span class="ln">57</span>        log.info(&quot;[daily.pipeline] {} 시작 - baseDate={}&quot;, label, baseDate);
+<span class="ln">58</span>        try {
+<span class="explain">     // [설명] JobConfig에 정의한 Job을 실행한다.</span>
+<span class="ln">59</span>            jobOperator.start(job, params);
+<span class="explain">     // [설명] 실행 요청의 예외를 기록한 뒤 메서드를 끝내 다음 Job 호출로 진행한다.</span>
+<span class="ln">60</span>        } catch (Exception e) {
+<span class="ln">61</span>            log.error(&quot;[daily.pipeline] {} 실패, 다음 단계 계속 진행&quot;, label, e);
+<span class="ln">62</span>        }
+<span class="ln">63</span>    }</code></pre></details></section><section id="modes"><div class="kicker">04 / PROCESSING</div><h2>Chunk와 Tasklet의 차이</h2><p class="lead">선택 기준은 데이터 처리 단위, 반복 주체, 실패 제어 방식입니다.</p>
+<div class="cards two"><article class="panel"><h3>Chunk · 항목 중심 반복</h3><div class="flow" role="group" aria-label="Chunk 처리"><div class="node "><strong>Reader</strong><small>계좌 1개씩 읽기</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Processor</strong><small>계좌별 업무 수행</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Writer</strong><small>최대 50개 결과 전달</small></div></div><p>프레임워크가 읽기·처리·쓰기 반복과 chunk 경계를 관리합니다. 이 프로젝트는 계좌 50개로 설정합니다. chunk(50)은 Writer에 전달할 계좌 DTO 묶음의 크기와 Step의 처리 경계를 정합니다.</p></article><article class="panel"><h3>Tasklet · 업무 절차 호출</h3><div class="flow" role="group" aria-label="Tasklet 처리"><div class="node "><strong>Tasklet</strong><small>기준일 해석</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Service</strong><small>조회·반복·상태 갱신</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>FINISHED</strong><small>Step 종료</small></div></div><p>개발자가 서비스 내부의 반복·페이징·예외 집계를 구성합니다. 한 번 호출해 수천 건을 처리할 수도 있습니다. Tasklet도 CONTINUABLE을 반환해 반복할 수 있지만, 현재 8개는 FINISHED로 끝납니다.</p></article></div>
+<div class="tablewrap"><table><thead><tr><th>비교</th><th>Chunk</th><th>현재 Tasklet</th></tr></thead><tbody><tr><td>반복 주체</td><td>Spring Batch의 항목 처리 루프</td><td>업무 서비스의 반복문·벌크 쿼리</td></tr><tr><td>오류 정책</td><td>Step의 retry / skip 설정</td><td>서비스별 catch·집계·임계값</td></tr><tr><td>이력 집계</td><td>항목 read/write/skip 중심</td><td>contribution으로 처리 건수를 직접 반영</td></tr><tr><td>트랜잭션</td><td>기본적으로 chunk 경계. 내부 서비스 전파 설정은 별도</td><td>Step 트랜잭션 + 내부 서비스의 REQUIRES_NEW 등</td></tr><tr><td>이 프로젝트의 용도</td><td>계좌별 동일 작업 2개</td><td>벌크 갱신·회차 생성·알림·상각 8개</td></tr></tbody></table></div>
+<h3>Reader · Processor · Writer에 각각 무엇을 넣는가?</h3>
+<div class="tablewrap"><table><thead><tr><th>구성</th><th>일반적인 책임</th><th>현재 거래 동기화 Step의 실제 내용</th><th>입출력</th></tr></thead><tbody><tr><td>Reader</td><td>처리할 입력 항목을 하나씩 공급. SQL·조회 조건·정렬·페이지 크기 설정</td><td>LinkedAccountSyncTargetReaderFactory가 AVAILABLE 계좌를 linkedAccountId 순으로 조회</td><td>DB → LinkedAccountSyncTargetDTO(계좌 ID, 사용자 ID)</td></tr><tr><td>Processor</td><td>항목별 변환·검증·업무 서비스 호출. 반환값을 Writer에 전달</td><td>syncAndMatch(userId, linkedAccountId, true)를 호출해 거래 저장과 자동 매칭 후 같은 DTO 반환</td><td>계좌 DTO → 계좌 DTO</td></tr><tr><td>Writer</td><td>처리된 항목 묶음의 저장·전송 등 최종 출력 처리</td><td>noOpWriter가 묶음의 계좌 수와 ID를 로그에 기록. 업무 저장은 Processor가 호출한 서비스에서 실행</td><td>계좌 DTO 묶음 → 완료 로그</td></tr></tbody></table></div>
+<div class="flow" role="group" aria-label="계좌 DTO가 이동하는 경로"><div class="node "><strong>Reader</strong><small>계좌 A의 ID + 사용자 ID</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Processor</strong><small>A의 거래 동기화·매칭 후 A 반환</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Writer</strong><small>최대 50개 계좌 DTO를 받아 로그</small></div></div>
+<details class="source" open><summary>주석을 붙인 실제 코드 · LinkedAccountSyncTargetReaderFactory.java:22</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/transaction/reader/LinkedAccountSyncTargetReaderFactory.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="explain">     // [설명] 두 거래 Job이 재사용하는 계좌 Reader를 만든다.</span>
+<span class="ln">22</span>    public JpaPagingItemReader&lt;LinkedAccountSyncTargetDTO&gt; create(String readerName) {
+<span class="ln">23</span>        return new JpaPagingItemReaderBuilder&lt;LinkedAccountSyncTargetDTO&gt;()
+<span class="ln">24</span>                .name(readerName)
+<span class="ln">25</span>                .entityManagerFactory(entityManagerFactory)
+<span class="explain">     // [설명] 조회 항목은 연결 계좌 ID와 사용자 ID이며 DTO로 반환한다.</span>
+<span class="ln">26</span>                .queryString(&quot;&quot;&quot;
+<span class="ln">27</span>                        select new org.teamsai.saibackend.domain.account.dto.LinkedAccountSyncTargetDTO(
+<span class="ln">28</span>                            a.linkedAccountId,
+<span class="ln">29</span>                            a.userId
+<span class="ln">30</span>                        )
+<span class="ln">31</span>                        from LinkedBankAccount a
+<span class="ln">32</span>                        where a.connectionStatus = :status
+<span class="ln">33</span>                        order by a.linkedAccountId
+<span class="ln">34</span>                        &quot;&quot;&quot;)
+<span class="explain">     // [설명] 위 쿼리의 status 파라미터에 AVAILABLE을 전달한다.</span>
+<span class="ln">35</span>                .parameterValues(Map.of(
+<span class="ln">36</span>                        &quot;status&quot;, AVAILABLE
+<span class="ln">37</span>                ))
+<span class="explain">     // [설명] DB 조회 페이지 크기는 PAGE_SIZE=50이다.</span>
+<span class="ln">38</span>                .pageSize(PAGE_SIZE)
+<span class="ln">39</span>                .build();</code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · TransactionSyncJobConfig.java:69</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/transaction/sync/TransactionSyncJobConfig.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">69</span>    private ItemProcessor&lt;LinkedAccountSyncTargetDTO, LinkedAccountSyncTargetDTO&gt; processor(
+<span class="ln">70</span>            TransactionSyncMatchService transactionSyncMatchService) {
+<span class="ln">71</span>
+<span class="explain">     // [설명] 처리한 동일 계좌 DTO를 Writer로 전달한다.</span>
+<span class="ln">72</span>        return target -&gt; {
+<span class="explain">     // [설명] 계좌의 거래를 동기화한 다음 자동 매칭한다. 실제 업무 저장도 서비스에서 수행한다.</span>
+<span class="ln">73</span>            transactionSyncMatchService.syncAndMatch(
+<span class="ln">74</span>                    target.userId(),
+<span class="ln">75</span>                    target.linkedAccountId(),
+<span class="ln">76</span>                    true
+<span class="ln">77</span>            );
+<span class="ln">78</span>
+<span class="explain">     // [설명] 처리한 동일 계좌 DTO를 Writer로 전달한다.</span>
+<span class="ln">79</span>            return target;
+<span class="ln">80</span>        };
+<span class="ln">81</span>    }
+<span class="ln">82</span>
+<span class="explain">     // [설명] Writer는 처리 결과 묶음을 받으며 이 구현은 완료 로그를 출력한다.</span>
+<span class="ln">83</span>    private ItemWriter&lt;LinkedAccountSyncTargetDTO&gt; noOpWriter() {
+<span class="explain">     // [설명] chunk.size()는 이 Writer가 받은 계좌 수다.</span>
+<span class="ln">84</span>        return chunk -&gt; log.info(
+<span class="ln">85</span>                &quot;[transactionSync] 동기화 완료 계좌 {}건: {}&quot;,
+<span class="ln">86</span>                chunk.size(),
+<span class="ln">87</span>                chunk.getItems()
+<span class="ln">88</span>                        .stream()
+<span class="ln">89</span>                        .map(LinkedAccountSyncTargetDTO::linkedAccountId)
+<span class="ln">90</span>                        .toList()
+<span class="ln">91</span>        );
+<span class="ln">92</span>    }</code></pre></details>
+<h3>Tasklet Step은 어떻게 실행되는가?</h3><p>현재 Tasklet Step은 기준일 해석 → 서비스 호출 → 처리·실패 집계 → FINISHED 반환 순서로 실행됩니다. 대상 조회와 반복은 해당 서비스에서 담당합니다.</p>
+<details class="source" open><summary>주석을 붙인 실제 코드 · RecurringSettlementGenerationJobConfig.java:34</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/settlement/recurring/RecurringSettlementGenerationJobConfig.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">34</span>
+<span class="ln">35</span>    @Bean
+<span class="ln">36</span>    public Step recurringSettlementGenerationStep(
+<span class="ln">37</span>            RecurringSettlementGenerationService recurringSettlementGenerationService) {
+<span class="ln">38</span>
+<span class="explain">     // [설명] 정기정산 생성 Step을 실행 이력 저장소에 연결한다.</span>
+<span class="ln">39</span>        return new StepBuilder(&quot;recurringSettlementGenerationStep&quot;, jobRepository)
+<span class="explain">     // [설명] 업무 절차를 실행할 Tasklet과 Step 트랜잭션 관리자를 연결한다.</span>
+<span class="ln">40</span>                .tasklet(recurringSettlementGenerationTasklet(recurringSettlementGenerationService), transactionManager)
+<span class="ln">41</span>                .build();
+<span class="ln">42</span>    }
+<span class="ln">43</span>
+<span class="ln">44</span>    private Tasklet recurringSettlementGenerationTasklet(
+<span class="ln">45</span>            RecurringSettlementGenerationService recurringSettlementGenerationService) {
+<span class="ln">46</span>
+<span class="ln">47</span>        return (contribution, chunkContext) -&gt; {
+<span class="ln">48</span>            String baseDateParam = (String) chunkContext.getStepContext()
+<span class="ln">49</span>                    .getJobParameters().get(&quot;baseDate&quot;);
+<span class="explain">     // [설명] JobParameters의 문자열 기준일을 날짜로 바꾼다.</span>
+<span class="ln">50</span>            LocalDate baseDate = LocalDate.parse(baseDateParam);
+<span class="ln">51</span>
+<span class="ln">52</span>            RecurringSettlementBatchResult result =
+<span class="explain">     // [설명] 설정 조회와 누락 회차 생성 반복을 업무 서비스에 위임한다.</span>
+<span class="ln">53</span>                    recurringSettlementGenerationService.generateTodaySettlements(baseDate);
+<span class="ln">54</span>
+<span class="explain">     // [설명] 성공 처리한 정기설정 수를 Step 집계에 반영한다.</span>
+<span class="ln">55</span>            contribution.incrementWriteCount(result.succeeded());
+<span class="ln">56</span>            for (int i = 0; i &lt; result.failed(); i++) {
+<span class="explain">     // [설명] 실패한 정기설정 수를 Step 스킵 집계에 반영한다.</span>
+<span class="ln">57</span>                contribution.incrementWriteSkipCount();
+<span class="ln">58</span>            }
+<span class="ln">59</span>
+<span class="explain">     // [설명] 이 Tasklet 호출을 끝내 Step을 종료한다.</span>
+<span class="ln">60</span>            return RepeatStatus.FINISHED;
+<span class="ln">61</span>        };
+<span class="ln">62</span>    }
+<span class="ln">63</span>}</code></pre></details>
+<aside><strong>꼭 구분할 세 숫자</strong><p>Reader pageSize 50 = DB에서 가져오는 페이지 크기 / chunk(50) = 프레임워크의 묶음 처리 경계 / 상각의 500개 분할 = 서비스 내부 쿼리 묶음. 각 값은 조회·프레임워크 처리·쿼리 분할의 경계를 각각 설정합니다. REQUIRES_NEW에서 이미 커밋한 변경은 바깥 트랜잭션이 롤백되어도 유지되고, 외부 전송 결과는 수신 시스템에 남습니다.</p></aside></section><section id="choices"><div class="kicker">05 / DESIGN CHOICES</div><h2>10개 Job은 왜 이 방식을 쓰는가</h2><p class="lead">방식은 코드에서 확인한 사실입니다. 아래 선택 이유는 구현 구조에 근거한 해석이며, 개발 당시 의사결정을 단정하지 않습니다.</p><div class="tablewrap"><table><thead><tr><th>Job</th><th>방식</th><th>이 구조에 맞는 이유</th></tr></thead><tbody><tr><td>transactionSyncJob</td><td>Chunk 50</td><td>AVAILABLE 계좌마다 동일한 동기화·매칭을 수행하고 특정 은행 조회 예외를 재시도·스킵하기 적합</td></tr><tr><td>bankTransactionRetryJob</td><td>Chunk 50</td><td>동일 계좌 Reader를 재사용하고 계좌별 재매칭 실패를 격리하기 적합</td></tr><tr><td>recurringSettlementGenerationJob</td><td>Tasklet</td><td>정기설정 → 누락 회차 반복 → 회차별 생성이라는 중첩 절차를 서비스가 관리</td></tr><tr><td>repaymentScheduleOverdueJob</td><td>Tasklet</td><td>조건에 맞는 스케줄을 벌크 UPDATE 한 번으로 갱신</td></tr><tr><td>settlementOverdueJob</td><td>Tasklet</td><td>정산별 기준일 판정 후 참여자 결제의무를 정산 단위 트랜잭션으로 변경</td></tr><tr><td>repaymentDueReminderJob</td><td>Tasklet</td><td>D-3·D-1·당일 조회, 채무자 확인, 개별 알림·실패 임계값을 한 절차로 관리</td></tr><tr><td>settlementDueReminderJob</td><td>Tasklet</td><td>정산 → 참여자 → 최신 미납 의무를 탐색해 알림을 생성하는 다단계 절차</td></tr><tr><td>settlementAbandonmentJob</td><td>Tasklet</td><td>감지·중복 기록·미전송 Slack 재전송이라는 두 단계 절차</td></tr><tr><td>settlementWriteOffJob</td><td>Tasklet</td><td>상각 후보 조회·상각·관련 정산 자동종결을 연결</td></tr><tr><td>repaymentWriteOffJob</td><td>Tasklet</td><td>후보 ID 조회 후 조건부 벌크 UPDATE를 수행</td></tr></tbody></table></div><aside><strong>Tasklet은 서비스의 업무 절차를 실행합니다</strong><p>오히려 복합 업무 절차를 기존 서비스에 위임할 때 간결합니다. 데이터가 커져 대상별 체크포인트·재시작 제어가 필요해지면 일부 Tasklet을 Chunk로 바꾸는 선택도 가능합니다.</p></aside></section><section id="transactions"><div class="kicker">06 / FLOW 1</div><h2>거래 동기화 + 매칭 재시도</h2><p class="lead">신규 거래를 반영하고, 이전에 해결하지 못한 거래를 다시 검사합니다.</p>
+<h3>① transactionSyncJob · Chunk</h3><div class="flow" role="group" aria-label="거래 동기화 흐름"><div class="node "><strong>AVAILABLE 계좌</strong><small>ID 순 · page 50</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>syncTransactions</strong><small>마지막 동기화 거래 ID 이후 조회</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>거래 저장 + 커서 전진</strong><small>BankTransactionPersistenceService</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>자동 매칭</strong><small>BankMatchingService.execute</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>완료 로그</strong><small>Writer는 no-op</small></div></div>
+<h3>② bankTransactionRetryJob · Chunk</h3><div class="flow" role="group" aria-label="매칭 재시도 흐름"><div class="node "><strong>같은 계좌 Reader</strong><small>공통 Factory 재사용</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>재시도 거래 조회</strong><small>상태·횟수 정책</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>후보 삭제 + PENDING</strong><small>이전 결과 초기화</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>자동 매칭 재실행</strong><small>새 은행 조회는 하지 않음</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>소진 시 Slack</strong><small>FAILED 5 / UNMATCHED·NEEDS_CHECK 14</small></div></div>
+<div class="cards two"><div class="node "><strong>핵심 1 · 두 종류의 재시도</strong><small>동기화의 일시적 은행 조회 오류: retryLimit(2), 해당 예외 skipLimit(50).<br>매칭 업무 재시도: 거래 상태별 누적 횟수 정책. 서로 별개입니다.</small></div><div class="node "><strong>핵심 2 · 실제 업무는 Processor</strong><small>두 Job 모두 Processor에서 서비스가 저장·매칭을 수행합니다. Writer는 완료 로그만 남깁니다. writeCount는 Writer로 전달된 처리 계좌 수를 집계합니다.</small></div></div>
+<details class="source" open><summary>주석을 붙인 실제 코드 · TransactionSyncJobConfig.java:49</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/transaction/sync/TransactionSyncJobConfig.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">49</span>        return new StepBuilder(&quot;transactionSyncStep&quot;, jobRepository)
+<span class="explain">     // [설명] 계좌 DTO 최대 50개를 한 chunk 처리 경계로 묶는다.</span>
+<span class="ln">50</span>                .&lt;LinkedAccountSyncTargetDTO, LinkedAccountSyncTargetDTO&gt;chunk(50)
+<span class="ln">51</span>                .transactionManager(transactionManager)
+<span class="explain">     // [설명] AVAILABLE 계좌 DTO를 공급하는 Reader를 연결한다.</span>
+<span class="ln">52</span>                .reader(transactionSyncReader())
+<span class="explain">     // [설명] 계좌마다 동기화·매칭 서비스를 실행하는 Processor를 연결한다.</span>
+<span class="ln">53</span>                .processor(processor(transactionSyncMatchService))
+<span class="explain">     // [설명] 처리된 계좌 묶음을 로그로 남기는 Writer를 연결한다.</span>
+<span class="ln">54</span>                .writer(noOpWriter())
+<span class="ln">55</span>                .faultTolerant()
+<span class="explain">     // [설명] 이 타입의 일시적 은행 조회 예외를 재시도 대상으로 지정한다.</span>
+<span class="ln">56</span>                .retry(RetryableBankTransactionFetchException.class)
+<span class="explain">     // [설명] 이 Step에 설정된 재시도 한도 값은 2다.</span>
+<span class="ln">57</span>                .retryLimit(2)
+<span class="ln">58</span>                .skip(RetryableBankTransactionFetchException.class)
+<span class="explain">     // [설명] 허용 스킵 한도를 넘으면 Step이 실패한다.</span>
+<span class="ln">59</span>                .skipLimit(50)
+<span class="ln">60</span>                .skipListener(skipListener)
+<span class="ln">61</span>                .build();
+<span class="ln">62</span>    }</code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · TransactionSyncJobConfig.java:69</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/transaction/sync/TransactionSyncJobConfig.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">69</span>    private ItemProcessor&lt;LinkedAccountSyncTargetDTO, LinkedAccountSyncTargetDTO&gt; processor(
+<span class="ln">70</span>            TransactionSyncMatchService transactionSyncMatchService) {
+<span class="ln">71</span>
+<span class="explain">     // [설명] 처리한 동일 계좌 DTO를 Writer로 전달한다.</span>
+<span class="ln">72</span>        return target -&gt; {
+<span class="explain">     // [설명] 계좌의 거래를 동기화한 다음 자동 매칭한다. 실제 업무 저장도 서비스에서 수행한다.</span>
+<span class="ln">73</span>            transactionSyncMatchService.syncAndMatch(
+<span class="ln">74</span>                    target.userId(),
+<span class="ln">75</span>                    target.linkedAccountId(),
+<span class="ln">76</span>                    true
+<span class="ln">77</span>            );
+<span class="ln">78</span>
+<span class="explain">     // [설명] 처리한 동일 계좌 DTO를 Writer로 전달한다.</span>
+<span class="ln">79</span>            return target;
+<span class="ln">80</span>        };</code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · BankTransactionRetryService.java:25</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/matching/service/BankTransactionRetryService.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">25</span>    public void retryForAccount(Long userId, Long linkedAccountId) {
+<span class="ln">26</span>        List&lt;BankTransaction&gt; candidates =
+<span class="explain">     // [설명] 저장된 거래 중 재시도 정책에 맞는 후보를 조회한다.</span>
+<span class="ln">27</span>                bankTransactionService.findRetryCandidates(linkedAccountId);
+<span class="ln">28</span>
+<span class="ln">29</span>        if (candidates.isEmpty()) {
+<span class="ln">30</span>            return;
+<span class="ln">31</span>        }
+<span class="ln">32</span>
+<span class="ln">33</span>        for (BankTransaction tx : candidates) {
+<span class="explain">     // [설명] 해당 거래의 이전 매칭 후보를 제거한다.</span>
+<span class="ln">34</span>            candidateService.deleteAllByBankTransactionId(tx.getBankTransactionId());
+<span class="explain">     // [설명] 기존 처리 상태를 확인하며 다시 매칭할 PENDING 상태로 전환한다.</span>
+<span class="ln">35</span>            bankTransactionService.resetToPendingForRetry(
+<span class="ln">36</span>                    tx.getBankTransactionId(), tx.getProcessingStatus());
+<span class="ln">37</span>        }
+<span class="ln">38</span>
+<span class="ln">39</span>        AutoMatchingExecutionResult result =
+<span class="explain">     // [설명] 초기화된 거래에 대해 자동 매칭을 다시 수행한다.</span>
+<span class="ln">40</span>                bankMatchingService.execute(userId, linkedAccountId, true);
+<span class="ln">41</span>
+<span class="ln">42</span>        log.info(&quot;[bankTransactionRetry] linkedAccountId={}, 재시도 {}건 중 성공 {}건&quot;,
+<span class="ln">43</span>                linkedAccountId, candidates.size(), result.appliedCount());
+<span class="ln">44</span>
+<span class="explain">     // [설명] 재시도 후에도 해결되지 않고 한도에 도달한 거래를 운영자에게 알린다.</span>
+<span class="ln">45</span>        checkAndNotifyExhausted(candidates);
+<span class="ln">46</span>    }
+<span class="ln">47</span>
+<span class="explain">     // [설명] 재시도 후에도 해결되지 않고 한도에 도달한 거래를 운영자에게 알린다.</span>
+<span class="ln">48</span>    private void checkAndNotifyExhausted(List&lt;BankTransaction&gt; retriedTransactions) {
+<span class="ln">49</span>        for (BankTransaction original : retriedTransactions) {
+<span class="ln">50</span>            BankTransaction current = bankTransactionService.findById(
+<span class="ln">51</span>                    original.getBankTransactionId()
+<span class="ln">52</span>            ).orElse(null);
+<span class="ln">53</span></code></pre></details></section><section id="recurring"><div class="kicker">07 / FLOW 2</div><h2>정기정산 회차 생성</h2><p class="lead">반복 설정을 실제 정산·참여자·결제의무 데이터로 바꿉니다.</p>
+<div class="flow" role="group" aria-label="정기정산 생성 흐름"><div class="node "><strong>활성 설정 조회</strong><small>기준일 유효 범위</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>최근 회차·회차 수</strong><small>시작일 + 반복 규칙</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>생성 가능일 검사</strong><small>오늘 이하 / 종료일 이내</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>최근 회차 잠금</strong><small>동시 생성 방어</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>회차 생성</strong><small>정산 + 참여자 + 의무 + 계좌</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>다음 회차 반복</strong><small>설정당 최대 31개</small></div></div>
+<div class="cards three"><div class="node "><strong>날짜 계산</strong><small>DAILY / WEEKLY / MONTHLY / YEARLY<br>월·년의 없는 날짜는 말일로 조정</small></div><div class="node "><strong>금액 구성</strong><small>균등 분배면 다시 계산<br>개별 분배면 기존 금액 승계</small></div><div class="node "><strong>회차별 독립 커밋</strong><small>generateOneCycle의 REQUIRES_NEW<br>뒤 회차 실패가 이전 회차를 지우지 않음</small></div></div>
+<aside><strong>예시</strong><p>매일 생성해야 하는 정산이 며칠간 누락되었다면 오늘 회차 하나만 만들지 않고 누락된 회차를 순서대로 따라잡습니다. 기존 회차나 ACTIVE 참여자가 없으면 생성하지 않습니다. 처리 건수는 성공 처리한 정기설정 수를 집계합니다.</p></aside>
+<details class="source" open><summary>주석을 붙인 실제 코드 · RecurringSettlementGenerationService.java:79</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/settlement/recurring/RecurringSettlementGenerationService.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">79</span>        while (true) {
+<span class="ln">80</span>            LocalDate theoreticalNextDate =
+<span class="explain">     // [설명] 시작일·반복 규칙·누적 회차 수로 다음 날짜를 계산한다.</span>
+<span class="ln">81</span>                    cycleGenerator.calculateNthCycleDate(recurring.getStartDate(), recurring.getCycleRule(), cycleCount);
+<span class="ln">82</span>
+<span class="explain">     // [설명] 다음 날짜가 기준일보다 미래이면 생성을 종료한다.</span>
+<span class="ln">83</span>            if (baseDate.isBefore(theoreticalNextDate)) {
+<span class="ln">84</span>                return true; // 정상 종료
+<span class="ln">85</span>            }
+<span class="explain">     // [설명] 반복 설정의 종료일을 초과하는 회차는 생성을 종료한다.</span>
+<span class="ln">86</span>            if (recurring.getEndDate() != null &amp;&amp; theoreticalNextDate.isAfter(recurring.getEndDate())) {
+<span class="ln">87</span>                return true; // 종료일 도달, 정상 종료
+<span class="ln">88</span>            }
+<span class="explain">     // [설명] 설정 하나당 이번 실행의 생성 상한은 31회차다.</span>
+<span class="ln">89</span>            if (generatedThisRun &gt;= MAX_CATCHUP_CYCLES_PER_SETTLEMENT) {
+<span class="ln">90</span>                log.warn(&quot;정기정산 캐치업 상한 도달, 다음 배치에서 이어서 처리 예정 recurringId={}, 생성={}건&quot;,
+<span class="ln">91</span>                        recurring.getRecurringSettlementId(), generatedThisRun);
+<span class="ln">92</span>                return true; // 상한 도달은 실패가 아니라 다음 배치로 이어지는 정상 흐름
+<span class="ln">93</span>            }
+<span class="ln">94</span>
+<span class="ln">95</span>            try {
+<span class="ln">96</span>                CycleGenerationResult outcome =
+<span class="explain">     // [설명] 회차 하나를 독립 트랜잭션으로 생성한다.</span>
+<span class="ln">97</span>                        cycleGenerator.generateOneCycle(recurring, cursorSettlement, theoreticalNextDate);
+<span class="ln">98</span>
+<span class="ln">99</span>                switch (outcome.result()) {
+<span class="explain">     // [설명] 새 회차를 다음 반복의 기준으로 삼고 회차 수를 증가시킨다.</span>
+<span class="ln">100</span>                    case CREATED -&gt; {
+<span class="ln">101</span>                        cursorSettlement = outcome.settlement();
+<span class="ln">102</span>                        cycleCount++;
+<span class="ln">103</span>                        generatedThisRun++;
+<span class="ln">104</span>                    }
+<span class="explain">     // [설명] 다른 실행의 회차 생성이 확인되면 이번 설정 처리를 종료한다.</span>
+<span class="ln">105</span>                    case CONCURRENTLY_SKIPPED -&gt; {
+<span class="ln">106</span>                        return true; // 다른 트랜잭션이 이미 처리 중, 정상
+<span class="ln">107</span>                    }
+<span class="ln">108</span>                    case NO_ACTIVE_PARTICIPANT -&gt; {
+<span class="ln">109</span>                        log.warn(&quot;데이터 확인 필요: ACTIVE 참여자 없음 recurringId={}&quot;, recurring.getRecurringSettlementId());
+<span class="ln">110</span>                        return true; // 실패는 아니지만 확인이 필요한 상태로 로그만 강조
+<span class="ln">111</span>                    }
+<span class="ln">112</span>                }
+<span class="explain">     // [설명] 해당 설정의 실패를 반환하며 바깥 반복은 다른 설정을 계속 처리한다.</span>
+<span class="ln">113</span>            } catch (Exception e) {
+<span class="ln">114</span>                log.error(&quot;정산 회차 생성 실패 recurringId={}, targetDate={}&quot;,
+<span class="ln">115</span>                        recurring.getRecurringSettlementId(), theoreticalNextDate, e);
+<span class="ln">116</span>                return false; // 진짜 실패 -&gt; 집계에 반영됨
+<span class="ln">117</span>            }</code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · RecurringSettlementCycleService.java:42</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/settlement/service/RecurringSettlementCycleService.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">42</span>    private final SettlementAccountRepository settlementAccountRepository;
+<span class="ln">43</span>    private final SlackNotifier slackNotifier;
+<span class="ln">44</span>
+<span class="explain">     // [설명] 회차 하나의 생성 결과를 독립 트랜잭션으로 커밋·롤백한다.</span>
+<span class="ln">45</span>    @Transactional(propagation = Propagation.REQUIRES_NEW)
+<span class="ln">46</span>    public CycleGenerationResult generateOneCycle(RecurringSettlement recurring, Settlement previousSettlement, LocalDate cycleDate) {
+<span class="explain">     // [설명] 최신 회차를 잠금 조회해 동시 생성 여부를 확인한다.</span>
+<span class="ln">47</span>        Settlement lockedLatest =
+<span class="ln">48</span>                settlementRepository.findLatestByRecurringIdForUpdate(
+<span class="ln">49</span>                                recurring.getRecurringSettlementId(),
+<span class="ln">50</span>                                PageRequest.of(0, 1)
+<span class="ln">51</span>                        )
+<span class="ln">52</span>                        .stream()
+<span class="ln">53</span>                        .findFirst()
+<span class="ln">54</span>                        .orElse(null);
+<span class="explain">     // [설명] 현재 최신 회차와 호출 시점에 알던 직전 회차를 비교한다.</span>
+<span class="ln">55</span>        if (lockedLatest == null || !lockedLatest.getSettlementId().equals(previousSettlement.getSettlementId())) {
+<span class="ln">56</span>            log.warn(&quot;동시 생성 감지, 스킵 recurringId={}&quot;, recurring.getRecurringSettlementId());
+<span class="ln">57</span>            return CycleGenerationResult.concurrentlySkipped();
+<span class="ln">58</span>        }
+<span class="ln">59</span>
+<span class="explain">     // [설명] 기존 회차에서 ACTIVE 참여자만 승계 대상으로 조회한다.</span>
+<span class="ln">60</span>        List&lt;SettlementParticipant&gt; activeParticipants =
+<span class="ln">61</span>                settlementParticipantRepository.findBySettlementIdAndStatus(
+<span class="ln">62</span>                        previousSettlement.getSettlementId(),
+<span class="ln">63</span>                        SettlementParticipantStatus.ACTIVE
+<span class="ln">64</span>                );</code></pre></details></section><section id="overdue"><div class="kicker">08 / FLOW 3</div><h2>상환 연체 + 정산 연체</h2><p class="lead">기한 경과라는 조건은 같지만, 연체를 저장하는 필드가 다릅니다.</p>
+<h3>④ 상환 · Tasklet</h3><div class="flow" role="group" aria-label="상환 연체 흐름"><div class="node "><strong>PENDING 스케줄</strong><small>dueDate < baseDate</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>벌크 UPDATE</strong><small>기존 상태 조건 포함</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>OVERDUE</strong><small>스케줄 상태 변경</small></div></div>
+<h3>⑤ 정산 · Tasklet</h3><div class="flow" role="group" aria-label="정산 연체 흐름"><div class="node "><strong>IN_PROGRESS 정산</strong><small>100개씩 페이지 조회</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>기준일 판정</strong><small>SHARED: dueDate / RECURRING: cycleDate</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>ACTIVE 참여자</strong><small>활성 미납·부분납부 의무</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>overdueSince 기록</strong><small>기준일 다음 날 00:00</small></div></div>
+<aside><strong>정산 자체가 OVERDUE가 되지는 않습니다</strong><p>정산은 IN_PROGRESS로 남고 PaymentObligation에 연체 시작일을 기록합니다. 정산별 REQUIRES_NEW로 갱신하며 개별 실패는 집계하고 계속합니다. 당일은 연체가 아니며 다음 날부터 대상입니다.</p></aside>
+<details class="source" open><summary>주석을 붙인 실제 코드 · RepaymentScheduleService.java:115</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/contract/service/RepaymentScheduleService.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">115</span>    public List&lt;Long&gt; findWriteOffCandidateScheduleIds(LocalDate cutoffDate) {
+<span class="explain">     // [설명] OVERDUE이면서 납부일이 cutoffDate 이하인 스케줄 ID를 찾는다.</span>
+<span class="ln">116</span>        return repaymentScheduleRepository.findScheduleIdsByStatusAndDueDateLessThanEqual(
+<span class="ln">117</span>                RepaymentScheduleStatus.OVERDUE, cutoffDate);
+<span class="ln">118</span>    }
+<span class="ln">119</span>
+<span class="ln">120</span>    @Transactional
+<span class="ln">121</span>    public int writeOffSchedules(List&lt;Long&gt; scheduleIds) {
+<span class="explain">     // [설명] 현재 상태가 OVERDUE인 ID만 WRITTEN_OFF로 벌크 갱신한다.</span>
+<span class="ln">122</span>        return repaymentScheduleRepository.updateStatusBulk(
+<span class="ln">123</span>                scheduleIds, RepaymentScheduleStatus.WRITTEN_OFF, RepaymentScheduleStatus.OVERDUE);
+<span class="ln">124</span>    }
+<span class="ln">125</span>
+<span class="ln">126</span>    @Transactional
+<span class="ln">127</span>    public int markSchedulesOverdue(LocalDate baseDate) {
+<span class="explain">     // [설명] PENDING이면서 dueDate가 baseDate 이전인 스케줄을 OVERDUE로 갱신한다.</span>
+<span class="ln">128</span>        return repaymentScheduleRepository.markOverdueBulk(
+<span class="ln">129</span>                RepaymentScheduleStatus.OVERDUE, RepaymentScheduleStatus.PENDING, baseDate);
+<span class="ln">130</span>    }
+<span class="ln">131</span>}</code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · OverdueSettlementUpdateService.java:24</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/settlement/service/OverdueSettlementUpdateService.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="explain">     // [설명] 정산 하나의 연체 갱신을 독립 트랜잭션에서 실행한다.</span>
+<span class="ln">24</span>    @Transactional(propagation = Propagation.REQUIRES_NEW)
+<span class="ln">25</span>    public void updateOverdueForSettlement(Settlement settlement, LocalDate referenceDate) {
+<span class="explain">     // [설명] 현재 ACTIVE 참여자의 ID를 조회한다.</span>
+<span class="ln">26</span>        List&lt;Long&gt; activeParticipantIds = participantRepository.
+<span class="ln">27</span>                findBySettlementIdAndStatus(
+<span class="ln">28</span>                        settlement.getSettlementId(),
+<span class="ln">29</span>                        SettlementParticipantStatus.ACTIVE
+<span class="ln">30</span>                )
+<span class="ln">31</span>                .stream()
+<span class="ln">32</span>                .map(SettlementParticipant::getParticipantId)
+<span class="ln">33</span>                .toList();
+<span class="ln">34</span>
+<span class="ln">35</span>        if (activeParticipantIds.isEmpty()) {
+<span class="ln">36</span>            return;
+<span class="ln">37</span>        }
+<span class="ln">38</span>
+<span class="explain">     // [설명] 연체 시작일을 정산 기준일 다음 날 00:00으로 정한다.</span>
+<span class="ln">39</span>        LocalDateTime overdueSince = referenceDate.plusDays(1).atStartOfDay();
+<span class="explain">     // [설명] 활성 미납·부분납부 의무 중 overdueSince가 없는 대상에 기록한다.</span>
+<span class="ln">40</span>        settlementPaymentService.markOverdueByParticipantIds(activeParticipantIds, overdueSince);
+<span class="ln">41</span>    }</code></pre></details></section><section id="reminders"><div class="kicker">09 / FLOW 4</div><h2>상환 리마인드 + 정산 리마인드</h2><p class="lead">D-3 · D-1 · 당일의 미해결 대상에게 사용자 알림을 저장합니다.</p>
+<h3>⑥ 상환 · Tasklet</h3><div class="flow" role="group" aria-label="상환 알림 흐름"><div class="node "><strong>날짜 3개 계산</strong><small>baseDate + 3 / + 1 / 당일</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>PENDING 스케줄</strong><small>상환 예정일로 조회</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>계약의 채무자</strong><small>없으면 skipped</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>알림 생성</strong><small>스케줄 ID 참조 / 중복 확인</small></div></div>
+<h3>⑦ 정산 · Tasklet</h3><div class="flow" role="group" aria-label="정산 알림 흐름"><div class="node "><strong>IN_PROGRESS 정산</strong><small>dueDate / cycleDate</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>D-3·D-1·당일 판정</strong><small>ACTIVE 참여자 조회</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>최신 활성 의무</strong><small>미해결 결제의무만 선별</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>알림 생성</strong><small>의무 ID 참조 / 중복 확인</small></div></div>
+<div class="cards two"><div class="node "><strong>개별 알림 트랜잭션</strong><small>알림 하나씩 독립 트랜잭션으로 저장합니다. 일부 실패가 이미 저장한 다른 알림을 모두 취소하지 않도록 합니다.</small></div><div class="node "><strong>실패 정책의 차이</strong><small>상환은 실패 10건 초과 시 예외.<br>정산은 정산 실패·알림 실패를 집계하고 다음 대상 처리.</small></div></div>
+<aside><strong>알림 저장과 외부 발송을 구분</strong><p>이 흐름이 직접 하는 일은 Notification 저장입니다. 여기서 이메일·문자 발송까지 완료했다고 설명하지 않습니다. createIfAbsent 계열이 중복 생성을 방어하므로 처리 집계가 신규 알림 수와 항상 같지는 않습니다.</p></aside>
+<details class="source" open><summary>주석을 붙인 실제 코드 · ReminderNotificationSender.java:24</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/repaymentschedule/reminder/ReminderNotificationSender.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="explain">     // [설명] 상환 알림 하나의 저장을 독립 트랜잭션으로 처리한다.</span>
+<span class="ln">24</span>    @Transactional(propagation = Propagation.REQUIRES_NEW)
+<span class="ln">25</span>    public Outcome sendOne(
+<span class="ln">26</span>            Long contractId,
+<span class="ln">27</span>            Long scheduleId,
+<span class="ln">28</span>            NotificationType type,
+<span class="ln">29</span>            String title,
+<span class="ln">30</span>            String content
+<span class="ln">31</span>    ) {
+<span class="explain">     // [설명] 계약에 연결된 채무자 사용자를 찾는다.</span>
+<span class="ln">32</span>        Long debtorUserId = loanContractService.findDebtorUserId(contractId);
+<span class="ln">33</span>
+<span class="explain">     // [설명] 수신자를 찾지 못한 스케줄은 SKIPPED 결과로 반환한다.</span>
+<span class="ln">34</span>        if (debtorUserId == null) {
+<span class="ln">35</span>            return Outcome.SKIPPED;
+<span class="ln">36</span>        }
+<span class="ln">37</span>
+<span class="explain">     // [설명] 알림 종류와 참조 ID 등을 사용해 중복을 확인하고 저장한다.</span>
+<span class="ln">38</span>        notificationService.createIfAbsent(
+<span class="ln">39</span>                debtorUserId,
+<span class="ln">40</span>                type,
+<span class="ln">41</span>                title,
+<span class="ln">42</span>                content,
+<span class="ln">43</span>                scheduleId,
+<span class="ln">44</span>                null
+<span class="ln">45</span>        );
+<span class="ln">46</span>
+<span class="explain">     // [설명] 알림 서비스 호출이 정상 종료된 스케줄로 집계한다.</span>
+<span class="ln">47</span>        return Outcome.PROCESSED;
+<span class="ln">48</span>    }
+<span class="ln">49</span>}
+<span class="ln">50</span></code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · SettlementReminderSender.java:75</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/settlement/support/SettlementReminderSender.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">75</span>    private void sendOneReminder(Long userId, PaymentObligationView obligation, Settlement settlement, ReminderStage stage) {
+<span class="explain">     // [설명] 결제의무별 알림을 독립 트랜잭션에서 중복 확인 후 저장한다.</span>
+<span class="ln">76</span>        notificationService.createIfAbsentInNewTransaction(
+<span class="ln">77</span>                userId,
+<span class="ln">78</span>                stage.type(),
+<span class="ln">79</span>                stage.title(),
+<span class="ln">80</span>                stage.contentFor(settlement, obligation),
+<span class="explain">     // [설명] 알림 중복 확인의 참조 대상은 결제의무 ID다.</span>
+<span class="ln">81</span>                obligation.paymentObligationId(),  // referenceId — obligation 단위로 dedup
+<span class="explain">     // [설명] 정산 ID를 추가 참조 정보로 저장한다.</span>
+<span class="ln">82</span>                settlement.getSettlementId()           // secondaryReferenceId — 참고용
+<span class="ln">83</span>        );
+<span class="ln">84</span>    }</code></pre></details></section><section id="abandonment"><div class="kicker">10 / FLOW 5</div><h2>정산 장기방치 감지</h2><p class="lead">진행 중 정산이 기준일에서 3일 이상 지났는지 확인하고 운영자에게 알립니다.</p>
+<div class="flow" role="group" aria-label="방치 감지 흐름"><div class="node "><strong>IN_PROGRESS 정산</strong><small>100개씩 조회</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>기준일 + 3 ≤ baseDate</strong><small>dueDate / cycleDate</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>감지 기록 생성</strong><small>정산 ID + 기준일로 중복 방어</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>PENDING 전송</strong><small>새 감지 + 이전 미전송</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Slack 성공 → SENT</strong><small>실패 → PENDING 유지</small></div></div>
+<div class="cards two"><div class="node "><strong>상태 변경 대신 운영 감시</strong><small>정산 취소·종결·상각을 하지 않습니다.<br>최근 접속이나 수정 시각도 판정에 사용하지 않습니다.</small></div><div class="node "><strong>기록과 전달을 분리</strong><small>전송 실패를 DB에 남겨 다음 실행에서 다시 보낼 수 있습니다. 감지에 실패해도 기존 PENDING 전달을 시도하는 구조입니다.</small></div></div>
+<aside><strong>정확히 한 번 전송을 보장하지는 않음</strong><p>Slack이 메시지를 받은 직후 DB 커밋 전에 장애가 나면 다음 실행에서 중복 메시지가 갈 수 있습니다. 코드도 at-least-once 전달임을 명시합니다.</p></aside>
+<details class="source" open><summary>주석을 붙인 실제 코드 · SettlementAbandonmentNotifier.java:20</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/settlement/abandonment/SettlementAbandonmentNotifier.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="explain">     // [설명] 방치 알림 한 건의 전달 상태 변경을 독립 트랜잭션에서 수행한다.</span>
+<span class="ln">20</span>    @Transactional(propagation = Propagation.REQUIRES_NEW)
+<span class="ln">21</span>    public boolean sendPending(Long settlementId, LocalDate referenceDate) {
+<span class="ln">22</span>        // Serialize competing workers until delivery and the SENT transition finish.
+<span class="explain">     // [설명] 전달 기록을 잠금 조회해 경쟁 실행을 직렬화한다.</span>
+<span class="ln">23</span>        var alert = alertRepository.findForDelivery(settlementId, referenceDate).orElse(null);
+<span class="explain">     // [설명] PENDING 기록에 대해서만 전송을 진행한다.</span>
+<span class="ln">24</span>        if (alert == null || alert.getDeliveryStatus() != AbandonmentDeliveryStatus.PENDING) {
+<span class="ln">25</span>            return false;
+<span class="ln">26</span>        }
+<span class="explain">     // [설명] 전송 실패 시 false로 끝나며 DB 기록은 PENDING으로 남는다.</span>
+<span class="ln">27</span>        if (!slackNotifier.trySend(alert.getMessage())) {
+<span class="ln">28</span>            return false;
+<span class="ln">29</span>        }
+<span class="ln">30</span>        // At-least-once delivery: a crash after Slack accepts but before commit can replay the message.
+<span class="explain">     // [설명] Slack 전송 성공 후 SENT와 전송 시각을 저장한다.</span>
+<span class="ln">31</span>        alert.markSent(LocalDateTime.now());
+<span class="ln">32</span>        return true;
+<span class="ln">33</span>    }
+<span class="ln">34</span>}
+<span class="ln">35</span></code></pre></details></section><section id="writeoff"><div class="kicker">11 / FLOW 6</div><h2>정산 상각 + 상환 상각</h2><p class="lead">장기 연체 대상을 WRITTEN_OFF로 전환하며, 납부 완료와는 구별합니다.</p>
+<h3>⑨ 정산 · Tasklet</h3><div class="flow" role="group" aria-label="정산 상각 흐름"><div class="node "><strong>ACTIVE 미납·부분납부</strong><small>overdueSince ≤ 30일 전 00:00</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>잠금 + 상태 재확인</strong><small>의무를 500개씩 조회</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>WRITTEN_OFF</strong><small>별도 트랜잭션으로 처리</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>관련 정산 검사</strong><small>모든 의무 해결 시 CLOSED</small></div></div>
+<h3>⑩ 상환 · Tasklet</h3><div class="flow" role="group" aria-label="상환 상각 흐름"><div class="node "><strong>OVERDUE 스케줄</strong><small>dueDate ≤ baseDate - 30일</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>후보 ID 분할</strong><small>500개씩 조건부 UPDATE</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>WRITTEN_OFF</strong><small>이 Job의 계약 종결 호출 없음</small></div></div>
+<aside><strong>30일의 출발점이 다릅니다</strong><p>정산은 overdueSince, 상환은 dueDate를 기준으로 합니다. 예를 들어 기준일·상환일이 10/1이면 상환은 10/31에 대상이 될 수 있고, 정산의 overdueSince가 10/2라면 11/1에 대상이 됩니다.</p></aside>
+<aside><strong>500개 분할 ≠ 500개마다 커밋</strong><p>두 상각 경로 모두 서비스 내부에서 목록을 500개씩 나눕니다. 반복 전체를 감싼 REQUIRES_NEW 메서드이므로 전체 목록 처리가 이 메서드의 트랜잭션 안에서 진행됩니다. 정산 자동종결은 정산별 별도 트랜잭션입니다.</p></aside>
+<details class="source" open><summary>주석을 붙인 실제 코드 · SettlementWriteOffBatchService.java:28</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/writeoff/SettlementWriteOffBatchService.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">28</span>    @Transactional
+<span class="ln">29</span>    public WriteOffResult writeOffSettlementObligations(LocalDate baseDate) {
+<span class="explain">     // [설명] 연체 시작일 기준 30일 경과 여부를 비교할 경계 시각이다.</span>
+<span class="ln">30</span>        LocalDateTime cutoff = baseDate.minusDays(WRITE_OFF_DAYS_AFTER_OVERDUE).atStartOfDay();
+<span class="explain">     // [설명] 활성·미납/부분납부·연체 시작일 조건에 맞는 후보를 찾는다.</span>
+<span class="ln">31</span>        List&lt;Long&gt; candidateIds = paymentObligationQueryService.findWriteOffCandidateIds(
+<span class="ln">32</span>                ObligationStatus.ACTIVE,
+<span class="ln">33</span>                List.of(
+<span class="ln">34</span>                        PaymentStatus.UNPAID,
+<span class="ln">35</span>                        PaymentStatus.PARTIALLY_PAID
+<span class="ln">36</span>                ),
+<span class="ln">37</span>                cutoff
+<span class="ln">38</span>        );
+<span class="ln">39</span>        if (candidateIds.isEmpty()) {
+<span class="ln">40</span>            return new WriteOffResult(0, 0);
+<span class="ln">41</span>        }
+<span class="ln">42</span>
+<span class="explain">     // [설명] 잠금 후 현재 상태를 재검사하고 실제 상각 변경을 독립 커밋한다.</span>
+<span class="ln">43</span>        int actuallyWrittenOff = writeOffTransactionExecutor.writeOffOneBatch(candidateIds);
+<span class="ln">44</span>        log.info(&quot;정산 결제의무 상각 처리, 후보 {}건 중 {}건 실제 처리&quot;, candidateIds.size(), actuallyWrittenOff);
+<span class="ln">45</span>
+<span class="ln">46</span>        if (actuallyWrittenOff == 0) {
+<span class="ln">47</span>            return new WriteOffResult(0, 0);
+<span class="ln">48</span>        }
+<span class="ln">49</span>
+<span class="explain">     // [설명] 후보 의무가 속한 정산 ID를 조회한다.</span>
+<span class="ln">50</span>        List&lt;Long&gt; affectedSettlementIds = paymentObligationQueryService.findSettlementIdsByObligationIds(candidateIds);
+<span class="ln">51</span>        int closedCount = 0;
+<span class="ln">52</span>        for (Long settlementId : affectedSettlementIds) {
+<span class="ln">53</span>            try {
+<span class="explain">     // [설명] 정산의 모든 의무가 해결됐으면 CLOSED로 바꾼다.</span>
+<span class="ln">54</span>                boolean closed = settlementCloseService.autoCloseIfAllResolved(settlementId);
+<span class="ln">55</span>                log.info(&quot;자동종결 결과 settlementId={}, closed={}&quot;, settlementId, closed);
+<span class="ln">56</span>                if (closed) {
+<span class="ln">57</span>                    closedCount++;
+<span class="ln">58</span>                }
+<span class="explain">     // [설명] 자동종결 실패를 기록하고 다음 정산 검사를 계속한다.</span>
+<span class="ln">59</span>            } catch (Exception e) {</code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · RepaymentWriteOffTransactionExecutor.java:22</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/writeoff/RepaymentWriteOffTransactionExecutor.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="explain">     // [설명] 전체 스케줄 상각 반복을 하나의 독립 트랜잭션으로 실행한다.</span>
+<span class="ln">22</span>    @Transactional(propagation = Propagation.REQUIRES_NEW)
+<span class="ln">23</span>    public int writeOffSchedulesInNewTransaction(List&lt;Long&gt; scheduleIds) {
+<span class="ln">24</span>        int total = 0;
+<span class="explain">     // [설명] ID를 500개씩 나눠 UPDATE하며 커밋은 이 메서드 경계에서 수행한다.</span>
+<span class="ln">25</span>        for (List&lt;Long&gt; chunk : partition(scheduleIds, CHUNK_SIZE)) {
+<span class="explain">     // [설명] 현재 OVERDUE인 스케줄만 상각하고 실제 UPDATE 건수를 합산한다.</span>
+<span class="ln">26</span>            total += repaymentScheduleService.writeOffSchedules(chunk);
+<span class="ln">27</span>        }
+<span class="ln">28</span>        log.info(&quot;상환 스케줄 상각 처리, {}건&quot;, total);
+<span class="ln">29</span>        return total;
+<span class="ln">30</span>    }</code></pre></details></section><section id="infra"><div class="kicker">12 / INFRASTRUCTURE</div><h2>JobConfig · Listener · 공통 인프라</h2><p class="lead">업무마다 달라야 하는 규칙과, 모든 Job에 일관되어야 하는 운영 규칙을 분리합니다.</p>
+<div class="flow" role="group" aria-label="설정과 실행 관계"><div class="node "><strong>JobConfig</strong><small>Job·Step Bean 조립</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Step</strong><small>처리 방식·오류 정책</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Service</strong><small>업무 규칙 실행</small></div><span class="arrow" aria-hidden="true">→</span><div class="node "><strong>Listener</strong><small>시작·종료 관찰</small></div></div>
+<div class="tablewrap"><table><thead><tr><th>구성요소</th><th>무엇을 하는가</th><th>왜 필요한가</th></tr></thead><tbody><tr><td>JobConfig / @Configuration + @Bean</td><td>Job 이름, Step 연결, Listener, 트랜잭션·재시도·스킵을 조립</td><td>업무 로직과 실행 정책을 분리하고 Spring이 실행 객체를 관리</td></tr><tr><td>LoggingJobExecutionListener</td><td>beforeJob 로그 / afterJob 결과·소요시간·집계 Slack</td><td>10개 Job의 관측 기준을 통일. 업무 로직에 알림 코드를 반복하지 않음</td></tr><tr><td>BaseSkipListener</td><td>read/process/write 스킵 원인 로그</td><td>어떤 대상을 왜 건너뛰었는지 추적</td></tr><tr><td>BatchInfraConfig</td><td>@EnableJdbcJobRepository</td><td>프로세스 메모리 외부에 실행 상태와 이력 보관</td></tr><tr><td>SchedulerLockConfig / ShedLock</td><td>DB 시간으로 스케줄 락 관리</td><td>여러 Pod가 같은 스케줄을 동시에 시작하는 것을 억제</td></tr><tr><td>AbstractDailyBatchScheduler + DailyJobParameters</td><td>개별 3개 스케줄의 실행·파라미터 공통화</td><td>실행 규칙의 중복을 줄임. 7개 파이프라인은 별도 생성 코드 사용</td></tr><tr><td>JobDisplayNames</td><td>Job 이름 → 한글 표시명</td><td>운영 메시지 가독성 통일</td></tr><tr><td>LinkedAccountSyncTargetReaderFactory</td><td>두 거래 Job의 AVAILABLE 계좌 조회 재사용</td><td>대상 조건·정렬·페이지 크기 일치</td></tr></tbody></table></div>
+<details class="source" open><summary>주석을 붙인 실제 코드 · TransactionSyncJobConfig.java:30</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/transaction/sync/TransactionSyncJobConfig.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="ln">30</span>    private final LoggingJobExecutionListener loggingJobExecutionListener;
+<span class="ln">31</span>    private final LinkedAccountSyncTargetReaderFactory linkedAccountReaderFactory;
+<span class="ln">32</span>
+<span class="ln">33</span>    @Bean
+<span class="ln">34</span>    public Job transactionSyncJob(Step transactionSyncStep) {
+<span class="explain">     // [설명] Job 이름과 실행 이력 저장소를 연결한다.</span>
+<span class="ln">35</span>        return new JobBuilder(&quot;transactionSyncJob&quot;, jobRepository)
+<span class="explain">     // [설명] 이 Job의 시작 단계로 거래 동기화 Step 하나를 연결한다.</span>
+<span class="ln">36</span>                .start(transactionSyncStep)
+<span class="explain">     // [설명] Job 시작·종료 공통 로그 및 Slack 결과 전송을 연결한다.</span>
+<span class="ln">37</span>                .listener(loggingJobExecutionListener)</code></pre></details>
+<details class="source" open><summary>주석을 붙인 실제 코드 · LoggingJobExecutionListener.java:23</summary><p class="filepath">src/main/java/org/teamsai/saibackend/domain/batch/common/listener/LoggingJobExecutionListener.java<br>줄 번호는 원본 위치입니다. [설명] 주석은 교육자료에만 추가했습니다.</p><pre><code><span class="explain">     // [설명] Job 시작 시 실행 이름과 파라미터를 기록한다.</span>
+<span class="ln">23</span>    public void beforeJob(JobExecution jobExecution) {
+<span class="ln">24</span>        log.info(&quot;[BATCH START] job={}, params={}&quot;,
+<span class="ln">25</span>                jobExecution.getJobInstance().getJobName(),
+<span class="ln">26</span>                jobExecution.getJobParameters());
+<span class="ln">27</span>    }
+<span class="ln">28</span>
+<span class="ln">29</span>    @Override
+<span class="explain">     // [설명] Job 종료 후 최종 상태와 Step 집계를 읽는다.</span>
+<span class="ln">30</span>    public void afterJob(JobExecution jobExecution) {
+<span class="ln">31</span>        String jobName = jobExecution.getJobInstance().getJobName();
+<span class="ln">32</span>        BatchStatus status = jobExecution.getStatus();
+<span class="ln">33</span>        long durationMs = calculateDuration(jobExecution);
+<span class="ln">34</span>
+<span class="explain">     // [설명] 프레임워크의 최종 상태를 기준으로 로그의 성공·실패를 표시한다.</span>
+<span class="ln">35</span>        if (status == BatchStatus.COMPLETED) {
+<span class="ln">36</span>            log.info(&quot;[BATCH SUCCESS] job={}, duration={}ms&quot;, jobName, durationMs);
+<span class="ln">37</span>        } else {
+<span class="ln">38</span>            log.error(&quot;[BATCH FAILED] job={}, status={}, exitStatus={}&quot;,
+<span class="ln">39</span>                    jobName, status, jobExecution.getExitStatus());
+<span class="ln">40</span>        }
+<span class="ln">41</span>
+<span class="explain">     // [설명] 실행 결과·소요시간·read/write/skip 집계를 Slack에 전달한다.</span>
+<span class="ln">42</span>        slackNotifier.send(buildSummaryMessage(jobExecution, durationMs));
+<span class="ln">43</span>    }
+<span class="ln">44</span>
+<span class="ln">45</span>    private String buildSummaryMessage(JobExecution jobExecution, long durationMs) {
+<span class="ln">46</span>        String jobName = jobExecution.getJobInstance().getJobName();
+<span class="ln">47</span>        String displayName = JobDisplayNames.resolve(jobName);</code></pre></details>
+<aside><strong>공통화의 경계</strong><p>두 거래 JobConfig는 chunk(50)을 직접 지정합니다. Reader Factory는 PAGE_SIZE=50을 사용하고 상각 서비스는 목록을 500개씩 나눕니다. 공통 클래스를 만들었다는 사실보다 실제 연결 지점을 확인해야 합니다.</p></aside></section><section id="operations"><div class="kicker">13 / TAKEAWAYS</div><h2>팀이 꼭 기억할 운영 포인트</h2><p class="lead">성공 상태, 처리 건수, 중복 실행 방어의 범위를 함께 읽습니다.</p>
+<div class="tablewrap"><table><thead><tr><th>오해하기 쉬운 말</th><th>정확한 설명</th></tr></thead><tbody><tr><td>COMPLETED니까 모두 성공했다</td><td>일부 Tasklet은 실패를 집계한 뒤 FINISHED. 상태와 skip·failed 집계를 함께 확인</td></tr><tr><td>처리 100건이면 납부 100건이다</td><td>거래 Job은 계좌 수, 정기 생성은 성공한 정기설정 수, 상각은 의무·스케줄 수</td></tr><tr><td>ShedLock이면 모든 중복이 없다</td><td>같은 락 이름의 스케줄 진입을 억제. 수동 실행·락 만료·외부 전송 중복은 별도 고려</td></tr><tr><td>같은 날짜 실행은 자동 차단된다</td><td>runId가 매번 바뀌므로 새 실행 가능. 업무 상태 조건·알림 중복 확인·잠금 필요</td></tr><tr><td>리마인드는 생성 이후에 실행된다</td><td>별도 스케줄 3개와 파이프라인 사이 선후 관계가 없음</td></tr><tr><td>커서·DB 롤백이면 API 호출도 취소된다</td><td>외부 호출은 DB 트랜잭션으로 되돌릴 수 없음</td></tr><tr><td>baseDate가 모든 거래 조회 범위다</td><td>두 거래 Job은 baseDate로 과거 거래를 재현하지 않음. 계좌 커서와 재시도 정책 사용</td></tr></tbody></table></div>
+<div class="cards three"><div class="node "><strong>시간대</strong><small>cron은 Asia/Seoul 지정.<br>baseDate는 LocalDate.now()이므로 JVM 기본 시간대도 확인</small></div><div class="node "><strong>생성 순서</strong><small>동기화·재매칭 이후 정기 회차 생성.<br>같은 실행에서 뒤늦게 생성된 회차는 앞선 매칭에서 다룰 수 없음</small></div><div class="node "><strong>개발용 실행</strong><small>dev 프로필 /dev/batch<br>baseDate 지정 가능. 운영 스케줄 락 경로와 다름</small></div></div>
+<aside><strong>현재 코드 분석의 범위</strong><p>2026-10-27 로컬 소스 기준입니다. 방식 선택 이유는 구조에 기반한 설명입니다. 실행 환경의 실제 스레드 수·배포 시간대·처리량은 배포 설정과 운영 지표에서 확인해야 합니다. 업무 코드는 수정하지 않았습니다.</p></aside>
+<p class="closing">시간이 만드는 업무를 자동 처리하고,<br><b>실행 정책·업무 규칙·운영 관측을 분리한다.</b></p></section></main></div><footer>SAI · 소스 기반 교육 자료 / 선택 이유는 구조상 해석 / 업무 코드 변경 없음</footer><script>
+document.getElementById('presentation').onclick=function(){const on=document.body.classList.toggle('presentation');this.setAttribute('aria-pressed',on);this.textContent=on?'일반 모드':'발표 모드'};
+document.getElementById('sources').onclick=function(){const on=this.getAttribute('aria-expanded')!=='true';document.querySelectorAll('details.source').forEach(d=>d.open=on);this.setAttribute('aria-expanded',on);this.textContent=on?'코드 모두 접기':'코드 모두 펼치기'};
+document.getElementById('print').onclick=()=>window.print();
+const links=[...document.querySelectorAll('nav a')];const observer=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){links.forEach(a=>a.classList.toggle('active',a.hash==='#'+e.target.id));}},{rootMargin:'-10% 0px -65% 0px'});document.querySelectorAll('section').forEach(s=>observer.observe(s));
+</script></body></html>
