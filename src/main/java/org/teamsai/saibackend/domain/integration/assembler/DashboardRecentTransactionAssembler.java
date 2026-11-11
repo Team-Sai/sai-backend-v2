@@ -29,12 +29,10 @@ public final class DashboardRecentTransactionAssembler {
         List<DashboardRecentTransactionResponse> transactions = new ArrayList<>();
         recentLoanTransactions(contractDashboard).stream()
                 .sorted(newestFirst)
-                .limit(5)
                 .forEach(transactions::add);
         settlements.stream()
                 .map(DashboardRecentTransactionAssembler::toRecentSettlementTransaction)
                 .sorted(newestFirst)
-                .limit(5)
                 .forEach(transactions::add);
         return transactions.stream()
                 .sorted(newestFirst)
@@ -63,7 +61,7 @@ public final class DashboardRecentTransactionAssembler {
                 .title(contract.getContractAlias())
                 .status(status)
                 .amount(zeroIfNull(contract.getPrincipalAmount()))
-                .detailUrl("/contracts/" + contract.getContractId() + "/contract-detail")
+                .detailUrl("/contracts/" + contract.getContractId() + "/schedule")
                 .createdAt(contract.getCreatedAt())
                 .build();
     }

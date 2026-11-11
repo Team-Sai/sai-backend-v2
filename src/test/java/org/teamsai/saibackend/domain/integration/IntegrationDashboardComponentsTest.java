@@ -221,8 +221,8 @@ class IntegrationDashboardComponentsTest {
         }
 
         @Test
-        @DisplayName("각 타입별로 최대 5건까지만 남긴다")
-        void limitsToFivePerType() {
+        @DisplayName("건수 제한 없이 전부 최신순으로 반환한다")
+        void returnsAllNewestFirst() {
             List<ContractDashboardRowResponse> loans = java.util.stream.IntStream.rangeClosed(1, 7)
                     .mapToObj(i -> ContractDashboardRowResponse.builder()
                             .contractId((long) i)
@@ -237,8 +237,9 @@ class IntegrationDashboardComponentsTest {
             List<DashboardRecentTransactionResponse> result =
                     DashboardRecentTransactionAssembler.toRecentTransactions(contractDashboard, List.of());
 
-            assertThat(result).hasSize(5);
+            assertThat(result).hasSize(7);
             assertThat(result.get(0).getTargetId()).isEqualTo(7L);
+            assertThat(result.get(6).getTargetId()).isEqualTo(1L);
         }
 
         @Test
