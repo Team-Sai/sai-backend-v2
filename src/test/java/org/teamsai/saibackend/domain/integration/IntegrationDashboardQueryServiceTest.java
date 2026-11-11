@@ -330,7 +330,7 @@ class IntegrationDashboardQueryServiceTest {
     }
 
     @Test
-    void keepsFiveRecentTransactionsForEachType() {
+    void returnsAllRecentTransactionsWithoutLimit() {
         Long userId = 1L;
         LocalDateTime baseCreatedAt = LocalDateTime.of(2026, 8, 1, 10, 0);
         List<ContractDashboardRowResponse> loans = IntStream.rangeClosed(1, 5)
@@ -379,14 +379,14 @@ class IntegrationDashboardQueryServiceTest {
                 userId, YearMonth.of(2026, 8)
         );
 
-        assertThat(response.getRecentTransactions()).hasSize(10);
+        assertThat(response.getRecentTransactions()).hasSize(11);
         assertThat(response.getRecentTransactions())
                 .filteredOn(transaction -> transaction.getType() == PaymentTargetType.LOAN)
                 .hasSize(5);
         assertThat(response.getRecentTransactions())
                 .filteredOn(transaction -> transaction.getType() == PaymentTargetType.SETTLEMENT)
                 .extracting(transaction -> transaction.getTargetId())
-                .containsExactly(106L, 105L, 104L, 103L, 102L);
+                .containsExactly(106L, 105L, 104L, 103L, 102L, 101L);
     }
 
     private SettlementListResponse settlement(
