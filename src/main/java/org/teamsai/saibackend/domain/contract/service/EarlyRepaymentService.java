@@ -18,6 +18,7 @@ import org.teamsai.saibackend.domain.contract.repository.EarlyRepaymentRepositor
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.type.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.EarlyRepaymentMethod;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
@@ -38,6 +39,7 @@ import java.util.Optional;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -135,6 +137,11 @@ public class EarlyRepaymentService {
         LocalDate paidOn = deposit.getTransactionAt().toLocalDate();
         BigDecimal shortfall = shortfallOf(shortfallRows, paid);
         LocalDateTime now = LocalDateTime.now();
+
+        // 3-0. 회차 미리 내기: 밀린 회차 → 가까운 회차 순서로 원래 금액대로 채운다. (이자 재계산 없음)
+        if (request.prepay()) {
+            return prepay(contractId, deposit, request, shortfallRows, futureRows, paid, shortfall, now);
+        }
 
         RepaymentSchedule first = futureRows.isEmpty() ? null : futureRows.get(0);
         BigDecimal accrued = first == null ? BigDecimal.ZERO : accruedInterest(contract, all, first, paidOn);
@@ -294,6 +301,40 @@ public class EarlyRepaymentService {
         }
     }
 
+    /** 회차 미리 내기. 밀린 회차 → 앞으로 낼 회차 순서로 채우고, 모든 회차를 채우고 남으면 반환으로 남긴다. */
+    private EarlyRepaymentResponse prepay(Long contractId, BankTransaction deposit, EarlyRepaymentRequest request,
+                                          List<RepaymentSchedule> shortfallRows, List<RepaymentSchedule> futureRows,
+                                          Map<Long, BigDecimal> paid, BigDecimal shortfall, LocalDateTime now) {
+        List<RepaymentSchedule> rows = Stream.concat(shortfallRows.stream(), futureRows.stream()).toList();
+        if (rows.isEmpty()) {
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED.toException();
+        }
+
+        // 남은 회차를 모두 채우는 데 드는 돈 = 밀린 금액 + 앞으로 낼 회차 금액
+        BigDecimal owed = futureRows.stream()
+                .map(RepaymentSchedule::getTotalPaymentDue)
+                .reduce(shortfall, BigDecimal::add);
+        BigDecimal amount = deposit.getAmount();
+        BigDecimal toRows = amount.min(owed);
+        BigDecimal leftover = amount.subtract(toRows);
+        if (leftover.signum() > 0 && !request.returnExcess()) {
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_AMOUNT_INVALID.toException();
+        }
+
+        // 밀린 회차 채우기와 같은 방식: 다 채운 회차는 완료, 덜 채운 마지막 회차만 납부 기록
+        fillArrears(rows, paid, toRows, request.bankTransactionId(), now);
+        deposit.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+
+        EarlyRepayment saved = earlyRepaymentRepository.save(new EarlyRepayment(
+                contractId, request.bankTransactionId(), amount,
+                shortfall.min(toRows), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, now,
+                EarlyRepaymentMethod.PREPAY));
+        if (leftover.signum() > 0) {
+            depositReturnRepository.save(new DepositReturn(
+                    contractId, request.bankTransactionId(), leftover, deposit.getTransactionAt(), now));
+        }
+        return EarlyRepaymentResponse.from(saved);
+    }
 
     private void recalculate(LoanContractResponse contract, Long contractId,
                              List<RepaymentSchedule> futureRows, BigDecimal newPrincipal, LocalDate paidOn) {

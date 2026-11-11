@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS early_repayment (
     accrued_interest DECIMAL(15, 2) NOT NULL,
     fee_amount DECIMAL(15, 2) NOT NULL,
     principal_amount DECIMAL(15, 2) NOT NULL,
+    repayment_method VARCHAR(20) NOT NULL DEFAULT 'RECALCULATE',
     processed_at DATETIME NOT NULL,
     PRIMARY KEY (early_repayment_id),
     UNIQUE KEY uk_early_repayment_bank_transaction (bank_transaction_id),
