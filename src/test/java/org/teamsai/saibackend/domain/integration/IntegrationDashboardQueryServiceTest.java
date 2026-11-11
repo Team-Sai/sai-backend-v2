@@ -127,7 +127,7 @@ class IntegrationDashboardQueryServiceTest {
         assertThat(response.getRecentTransactions().get(0).getAmount())
                 .isEqualByComparingTo("3000000");
         assertThat(response.getRecentTransactions().get(0).getDetailUrl())
-                .isEqualTo("/contracts/15/contract-detail");
+                .isEqualTo("/contracts/15/schedule");
     }
 
     @Test

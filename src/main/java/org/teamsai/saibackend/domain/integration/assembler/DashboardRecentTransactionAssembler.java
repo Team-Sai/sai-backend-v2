@@ -63,7 +63,7 @@ public final class DashboardRecentTransactionAssembler {
                 .title(contract.getContractAlias())
                 .status(status)
                 .amount(zeroIfNull(contract.getPrincipalAmount()))
-                .detailUrl("/contracts/" + contract.getContractId() + "/contract-detail")
+                .detailUrl("/contracts/" + contract.getContractId() + "/schedule")
                 .createdAt(contract.getCreatedAt())
                 .build();
     }
