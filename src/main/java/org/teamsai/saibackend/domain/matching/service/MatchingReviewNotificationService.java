@@ -12,7 +12,10 @@ import org.teamsai.saibackend.domain.payment.service.PaymentObligationQueryServi
 import org.teamsai.saibackend.domain.settlement.support.SettlementPaymentStatusChecker;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -87,15 +90,21 @@ public class MatchingReviewNotificationService {
     private String createBothFoundContent(BankTransaction bankTransaction) {
         return resolveCounterpartyName(bankTransaction)
                 + "님의 "
-                + bankTransaction.getAmount().toPlainString()
+                + formatAmount(bankTransaction.getAmount())
                 + "원 입금에 정산과 차용증 후보가 모두 발견되었습니다.";
     }
 
     private String createUnresolvedSettlementContent(BankTransaction bankTransaction) {
         return resolveCounterpartyName(bankTransaction)
                 + "님의 "
-                + bankTransaction.getAmount().toPlainString()
+                + formatAmount(bankTransaction.getAmount())
                 + "원 입금이 정산 금액과 일치하지 않아 확인이 필요합니다.";
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        // 알림은 천 단위 쉼표가 있는 정수 원으로 표시하고, 소수 금액은 HALF_UP 반올림한다.
+        return String.format(Locale.KOREA, "%,d",
+                amount.setScale(0, RoundingMode.HALF_UP).toBigIntegerExact());
     }
 
     private String resolveCounterpartyName(BankTransaction bankTransaction) {
