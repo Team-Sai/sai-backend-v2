@@ -39,6 +39,12 @@ public class ContractChangeRequest {
     @Max(value = 31, message = "상환일은 31일 이하여야 합니다.")
     private Integer newRepaymentDate;
 
+    @Null(message = "특약사항은 변경 요청에서 바꿀 수 없습니다.")
     private String newTerms;
 
+    @AssertTrue(message = "만기일·이율·상환 방식·상환일 중 하나 이상을 변경해야 합니다.")
+    public boolean isAnyConditionChanged() {
+        return newMaturityDate != null || newInterestRate != null
+                || newRepaymentType != null || newRepaymentDate != null;
+    }
 }
