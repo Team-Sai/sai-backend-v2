@@ -20,10 +20,7 @@ import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleReposi
 import org.teamsai.saibackend.domain.contract.service.EarlyRepaymentService;
 import org.teamsai.saibackend.domain.contract.service.LoanContractService;
 import org.teamsai.saibackend.domain.contract.service.RepaymentScheduleGenerateService;
-import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
-import org.teamsai.saibackend.domain.contract.type.ContractStatus;
-import org.teamsai.saibackend.domain.contract.type.RepaymentMethod;
-import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
+import org.teamsai.saibackend.domain.contract.type.*;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
@@ -186,6 +183,34 @@ class EarlyRepaymentServiceTest {
         service.process(1L, 10L, new EarlyRepaymentRequest(99L));
 
         verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("회차 미리 내기는 가까운 회차부터 채우고 금액은 다시 계산하지 않는다")
+    void prepaysNearestRows() {
+        when(deposit.getAmount()).thenReturn(new BigDecimal("150000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L, false, EarlyRepaymentMethod.PREPAY));
+
+        assertThat(rows.get(0).getStatus()).isEqualTo(RepaymentScheduleStatus.PAID);
+        assertThat(rows.get(1).getStatus()).isEqualTo(RepaymentScheduleStatus.PENDING);
+        assertThat(rows.get(1).getTotalPaymentDue()).isEqualByComparingTo("100000");
+        verify(paymentRecordService).createConfirmedRecord(
+                eq(99L), eq(PaymentTargetType.LOAN), any(), eq(new BigDecimal("50000")), any());
+        verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("회차 미리 내기로 모든 회차를 채우고 남으면 반환으로 기록한다")
+    void prepayRecordsExcess() {
+        when(deposit.getAmount()).thenReturn(new BigDecimal("300100"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L, true, EarlyRepaymentMethod.PREPAY));
+
+        assertThat(rows).allMatch(row -> row.getStatus() == RepaymentScheduleStatus.PAID);
+        verify(depositReturnRepository).save(any());
     }
 
     private RepaymentSchedule row(int sequence, String remaining) {
