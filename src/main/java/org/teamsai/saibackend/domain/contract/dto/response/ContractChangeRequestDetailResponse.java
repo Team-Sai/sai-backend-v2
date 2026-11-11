@@ -23,11 +23,13 @@ public class ContractChangeRequestDetailResponse {
     private String currentRepaymentType;
     private String currentTerms;
     private BigDecimal currentMonthlyPayment;
+    private Integer currentRepaymentDay;
     private LocalDate newMaturityDate;
     private BigDecimal newInterestRate;
     private String newRepaymentType;
     private String newTerms;
     private BigDecimal newMonthlyPayment;
+    private Integer newRepaymentDay;
     private String changeReason;
     private Integer extendedMonths;
     private String returnReason;
