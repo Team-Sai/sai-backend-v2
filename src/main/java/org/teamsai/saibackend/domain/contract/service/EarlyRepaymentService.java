@@ -197,7 +197,8 @@ public class EarlyRepaymentService {
             // 앞 회차가 이미 그 날짜까지 이자를 받았으면(미리 냄·부분납부 완료), 그 날짜부터 다시 계산한다.
             LocalDate interestFrom = interestStart(contract, all, first);
             recalculate(contract, contractId, futureRows, balance.subtract(principalPart),
-                    interestFrom.isAfter(paidOn) ? interestFrom : paidOn);        }
+                    interestFrom.isAfter(paidOn) ? interestFrom : paidOn);
+        }
 
         deposit.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
 
