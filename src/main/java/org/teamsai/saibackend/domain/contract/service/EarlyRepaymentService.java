@@ -194,8 +194,10 @@ public class EarlyRepaymentService {
             first.fullPayment(now);
             repaymentScheduleRepository.deleteAll(futureRows.subList(1, futureRows.size()));
         } else {
-            recalculate(contract, contractId, futureRows, balance.subtract(principalPart), paidOn);
-        }
+            // 앞 회차가 이미 그 날짜까지 이자를 받았으면(미리 냄·부분납부 완료), 그 날짜부터 다시 계산한다.
+            LocalDate interestFrom = interestStart(contract, all, first);
+            recalculate(contract, contractId, futureRows, balance.subtract(principalPart),
+                    interestFrom.isAfter(paidOn) ? interestFrom : paidOn);        }
 
         deposit.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
 
@@ -381,15 +383,41 @@ public class EarlyRepaymentService {
 
     private BigDecimal accruedInterest(LoanContractResponse contract, List<RepaymentSchedule> all,
                                        RepaymentSchedule first, LocalDate paidOn) {
-        LocalDate previousDue = all.stream()
-                .filter(schedule -> schedule.getSequence() == first.getSequence() - 1)
-                .map(RepaymentSchedule::getDueDate)
-                .findFirst()
-                .orElse(contract.getStartDate());
-        LocalDate lastEarly = findLatestPaidOn(contract.getContractId()).orElse(previousDue);
-        LocalDate from = lastEarly.isAfter(previousDue) ? lastEarly : previousDue;
+        LocalDate from = interestStart(contract, all, first);
+        LocalDate lastEarly = findLatestPaidOn(contract.getContractId()).orElse(from);
+        if (lastEarly.isAfter(from)) {
+            from = lastEarly;
+        }
         return repaymentScheduleGenerateService.calculateDailyInterest(
                 balanceOf(first), contract.getInterestRate(), from, paidOn);
+    }
+
+    /**
+     * first 회차 이자가 시작되는 날 = 바로 앞 회차 날짜. 앞 회차가 없으면 계약 시작일.
+     * 변경된 계약은 회차가 1부터 다시 시작하므로, 이전 계약에서 마지막으로 낸 회차 날짜
+     * (그 뒤에 중도상환이 있으면 그날)를 쓴다. generateChangedSchedule과 같은 기준이다.
+     */
+    private LocalDate interestStart(LoanContractResponse contract, List<RepaymentSchedule> all,
+                                    RepaymentSchedule first) {
+        Optional<LocalDate> previousDue = all.stream()
+                .filter(schedule -> schedule.getSequence() == first.getSequence() - 1)
+                .map(RepaymentSchedule::getDueDate)
+                .findFirst();
+        if (previousDue.isPresent()) {
+            return previousDue.get();
+        }
+
+        Long previousId = contract.getPreviousContractId();
+        if (previousId == null) {
+            return contract.getStartDate();
+        }
+
+        LocalDate lastDue = repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(previousId).stream()
+                .filter(schedule -> schedule.getStatus() == RepaymentScheduleStatus.PAID)
+                .map(RepaymentSchedule::getDueDate)
+                .max(Comparator.naturalOrder())
+                .orElse(contract.getStartDate());
+        return findLatestPaidOn(previousId).filter(lastDue::isBefore).orElse(lastDue);
     }
 
     private Map<Long, BigDecimal> confirmedAmounts(List<RepaymentSchedule> schedules) {

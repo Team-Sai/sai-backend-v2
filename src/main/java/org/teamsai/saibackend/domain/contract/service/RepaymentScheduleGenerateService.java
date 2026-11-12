@@ -29,15 +29,13 @@ public class RepaymentScheduleGenerateService {
             Long contractId, RepaymentMethod repaymentType, BigDecimal principal,
             BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate, int repaymentDay
     ) {
-        Period period = Period.between(startDate, maturityDate);
-
-        // 1개월 미만 계약은 지금처럼 막는다.
-        if (period.getYears() * 12 + period.getMonths() <= 0) {
+        // 회차 수는 달력의 달 차이로 센다. (11/13 ~ 2/12처럼 하루 모자라도 12월·1월·2월 3회차)
+        // 새 계약의 '최소 1개월'은 요청 검증(LoanContractRequest.isValidMinimumPeriod)이 맡는다.
+        // 여기서 Period로 다시 막으면 계약 변경(남은 회차 다시 만들기)이 마지막 달에 실패한다.
+        int months = (int) ChronoUnit.MONTHS.between(YearMonth.from(startDate), YearMonth.from(maturityDate));
+        if (months <= 0) {
             throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
         }
-
-        // 회차 수는 달력의 달 차이로 센다. (11/13 ~ 2/12처럼 하루 모자라도 12월·1월·2월 3회차)
-        int months = (int) ChronoUnit.MONTHS.between(YearMonth.from(startDate), YearMonth.from(maturityDate));
 
         List<LocalDate> dueDates = calculateDueDates(startDate, maturityDate, repaymentDay, months);
 
