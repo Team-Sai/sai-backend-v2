@@ -19,6 +19,14 @@ import java.util.Optional;
 import java.util.Set;
 
 public interface SettlementRepository extends JpaRepository<Settlement,Long> {
+    @Query("""
+        SELECT s FROM Settlement s
+        JOIN FETCH s.recurringSettlement r
+        WHERE r.recurringSettlementId IN :recurringIds
+        ORDER BY s.cycleDate ASC, s.settlementId ASC
+        """)
+    List<Settlement> findAllByRecurringIds(@Param("recurringIds") Collection<Long> recurringIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT s

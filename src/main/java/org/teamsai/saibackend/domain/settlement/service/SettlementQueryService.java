@@ -26,6 +26,7 @@ import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionService;
 
+import org.teamsai.saibackend.domain.settlement.support.SettlementCycleNumbers;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,12 +44,11 @@ public class SettlementQueryService {
 
     @Transactional(readOnly = true)
     public List<SettlementListResponse> getSettlementList(Long userId) {
-        return settlementRepository.findAllAccessibleByUserId(
-                        userId,
-                        SettlementParticipantStatus.ACTIVE
-                )
-                .stream()
-                .map(settlement -> toListResponse(settlement, userId))
+        List<Settlement> settlements = settlementRepository.findAllAccessibleByUserId(
+                userId, SettlementParticipantStatus.ACTIVE);
+        Map<Long, Integer> cycleNumbers = readCycleNumbers(settlements);
+        return settlements.stream()
+                .map(settlement -> toListResponse(settlement, userId, cycleNumbers))
                 .toList();
     }
 
@@ -72,9 +72,10 @@ public class SettlementQueryService {
                                 .toList()
                 );
 
+        Map<Long, Integer> cycleNumbers = readCycleNumbers(settlements);
         return settlements.stream()
                 .map(settlement -> new SettlementWithPaymentStatusResponse(
-                        toListResponse(settlement, userId),
+                        toListResponse(settlement, userId, cycleNumbers),
                         SettlementAssembler.toPaymentStatusResponse(
                                 settlement,
                                 buildPaymentObligationResponses(
@@ -88,9 +89,19 @@ public class SettlementQueryService {
                 .toList();
     }
 
+    private Map<Long, Integer> readCycleNumbers(List<Settlement> settlements) {
+        Set<Long> recurringIds = settlements.stream()
+                .filter(s -> s.getRecurringSettlement() != null)
+                .map(s -> s.getRecurringSettlement().getRecurringSettlementId())
+                .collect(Collectors.toSet());
+        return recurringIds.isEmpty() ? Map.of()
+                : SettlementCycleNumbers.index(settlementRepository.findAllByRecurringIds(recurringIds));
+    }
+
     private SettlementListResponse toListResponse(
             Settlement settlement,
-            Long userId
+            Long userId,
+            Map<Long, Integer> cycleNumbers
     ) {
         RecurringSettlement recurringSettlement =
                 settlement.getRecurringSettlement();
@@ -122,6 +133,7 @@ public class SettlementQueryService {
                 recurringSettlement != null
                         ? recurringSettlement.getRecurringSettlementId()
                         : null,
+                cycleNumbers.get(settlement.getSettlementId()),
                 settlement.getCreatedAt()
         );
     }
