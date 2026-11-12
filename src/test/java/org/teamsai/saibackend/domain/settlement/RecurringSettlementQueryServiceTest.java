@@ -142,6 +142,7 @@ class RecurringSettlementQueryServiceTest {
     private Settlement cycle(Long settlementId, LocalDate cycleDate, SettlementStatus status) {
         return Settlement.builder()
                 .settlementId(settlementId)
+                .recurringSettlement(recurringSettlement())
                 .cycleDate(cycleDate)
                 .settlementStatus(status)
                 .build();

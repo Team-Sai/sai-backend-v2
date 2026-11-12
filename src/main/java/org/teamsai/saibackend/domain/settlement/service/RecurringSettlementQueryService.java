@@ -15,6 +15,7 @@ import org.teamsai.saibackend.domain.settlement.repository.SettlementParticipant
 import org.teamsai.saibackend.domain.settlement.repository.SettlementRepository;
 import org.teamsai.saibackend.domain.settlement.type.SettlementParticipantStatus;
 
+import org.teamsai.saibackend.domain.settlement.support.SettlementCycleNumbers;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -75,6 +76,7 @@ public class RecurringSettlementQueryService {
         Map<Long, SettlementPaymentStatusResponse> paymentStatusBySettlementId =
                 settlementQueryService.readPaymentStatuses(visibleSettlements, userId);
 
+        Map<Long, Integer> cycleNumbers = SettlementCycleNumbers.index(settlements);
         List<RecurringSettlementCycleResponse> cycles = new ArrayList<>();
 
 
@@ -90,7 +92,7 @@ public class RecurringSettlementQueryService {
             cycles.add(
                     SettlementAssembler.toCycleResponse(
                             settlement,
-                            i + 1,
+                            cycleNumbers.get(settlement.getSettlementId()),
                             paymentStatus
                     )
             );

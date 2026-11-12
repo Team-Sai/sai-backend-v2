@@ -50,6 +50,31 @@ class SettlementQueryServiceTest {
     private SettlementQueryService settlementQueryService;
 
     @Test
+    @DisplayName("중간 회차부터 참여해도 전체 회차 기준 번호를 반환한다")
+    void recurringCycleNumberIncludesInaccessibleEarlierCycles() {
+        var recurring = org.teamsai.saibackend.domain.settlement.entity.RecurringSettlement.builder()
+                .recurringSettlementId(100L).build();
+        var owner = User.builder().userId(OWNER_ID).build();
+        Settlement first = Settlement.builder().settlementId(10L).recurringSettlement(recurring)
+                .cycleDate(LocalDate.of(2026, 1, 1)).build();
+        Settlement second = Settlement.builder().settlementId(20L).recurringSettlement(recurring)
+                .owner(owner).title("생활비").settlementType(SettlementType.RECURRING)
+                .settlementStatus(SettlementStatus.IN_PROGRESS)
+                .cycleDate(LocalDate.of(2026, 2, 1)).build();
+        given(settlementRepository.findAllAccessibleByUserId(MEMBER_ID, SettlementParticipantStatus.ACTIVE))
+                .willReturn(List.of(second));
+        given(settlementRepository.findAllByRecurringIds(java.util.Set.of(100L)))
+                .willReturn(List.of(second, first));
+
+        var result = settlementQueryService.getSettlementList(MEMBER_ID);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).cycleNo()).isEqualTo(2);
+        assertThat(result.get(0).title()).isEqualTo("생활비");
+        verify(settlementRepository).findAllByRecurringIds(java.util.Set.of(100L));
+    }
+
+    @Test
     @DisplayName("사용자의 정산 목록을 조회한다")
     void getSettlementListSuccess() {
         Settlement settlement1 =

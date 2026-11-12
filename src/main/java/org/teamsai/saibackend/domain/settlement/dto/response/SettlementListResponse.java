@@ -19,6 +19,7 @@ public record SettlementListResponse(
         LocalDate endDate,
         LocalDate cycleDate,
         Long recurringSettlementId,
+        Integer cycleNo,
         @JsonIgnore LocalDateTime createdAt
 ) {
 }
