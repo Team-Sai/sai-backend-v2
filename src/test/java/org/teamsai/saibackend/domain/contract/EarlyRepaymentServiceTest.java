@@ -67,7 +67,8 @@ class EarlyRepaymentServiceTest {
         when(loanContractService.findContract(1L, 10L)).thenReturn(LoanContractResponse.builder()
                 .creditorId(10L).status(ContractStatus.COMPLETED)
                 .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL).interestRate(BigDecimal.ZERO)
-                .startDate(LocalDate.of(2026, 11, 20)).debtorName("홍길동")
+                .startDate(LocalDate.of(2026, 11, 20)).createdAt(LocalDateTime.of(2026, 11, 20, 0, 0))
+                .debtorName("홍길동")
                 .contractDisplayId("LC-1").build());
         ContractAccount account = mock(ContractAccount.class, RETURNS_DEEP_STUBS);
         when(account.getLinkedAccount().getLinkedAccountId()).thenReturn(7L);
@@ -236,6 +237,66 @@ class EarlyRepaymentServiceTest {
         ArgumentCaptor<DepositReturn> returned = ArgumentCaptor.forClass(DepositReturn.class);
         verify(depositReturnRepository).save(returned.capture());
         assertThat(returned.getValue().getAmount()).isEqualByComparingTo("10000");
+    }
+
+    @Test
+    @DisplayName("지급일 전이라도 계약을 만든 뒤 들어온 입금은 처리할 수 있다")
+    void acceptsDepositBeforeStartDateAfterCreated() {
+        when(loanContractService.findContract(1L, 10L)).thenReturn(LoanContractResponse.builder()
+                .creditorId(10L).status(ContractStatus.COMPLETED)
+                .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL).interestRate(BigDecimal.ZERO)
+                .startDate(LocalDate.of(2026, 12, 10)).createdAt(LocalDateTime.of(2026, 11, 20, 0, 0))
+                .debtorName("홍길동").contractDisplayId("LC-1").build());
+        when(deposit.getAmount()).thenReturn(new BigDecimal("150000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L));
+
+        verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("변경된 계약의 첫 회차 이자는 이전 계약의 마지막 납부 회차부터 센다")
+    void changedContractAccruesFromPreviousLastPaidDue() {
+        when(loanContractService.findContract(1L, 10L)).thenReturn(LoanContractResponse.builder()
+                .contractId(1L).previousContractId(2L)
+                .creditorId(10L).status(ContractStatus.COMPLETED)
+                .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL).interestRate(new BigDecimal("12"))
+                .startDate(LocalDate.of(2026, 1, 1)).createdAt(LocalDateTime.of(2026, 11, 20, 0, 0))
+                .debtorName("홍길동").contractDisplayId("LC-2-1").build());
+        RepaymentSchedule previousPaid = new RepaymentSchedule(2L, 10, LocalDate.of(2026, 11, 20),
+                new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("100000"),
+                new BigDecimal("300000"), RepaymentScheduleStatus.PAID, LocalDateTime.now());
+        when(repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(2L)).thenReturn(List.of(previousPaid));
+        when(deposit.getAmount()).thenReturn(new BigDecimal("150000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        var saved = service.process(1L, 10L, new EarlyRepaymentRequest(99L));
+
+        // 11/20 ~ 12/1 = 11일 치 (고치기 전에는 1/1부터 334일 치)
+        BigDecimal expected = repaymentScheduleGenerateService.calculateDailyInterest(
+                new BigDecimal("300000"), new BigDecimal("12"), LocalDate.of(2026, 11, 20), LocalDate.of(2026, 12, 1));
+        assertThat(saved.accruedInterest()).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    @DisplayName("앞 회차를 미리 냈으면 남은 회차 이자는 그 회차 날짜부터 다시 계산한다")
+    void recalculatesFromPreviousDueWhenPaidEarly() {
+        when(loanContractService.findContract(1L, 10L)).thenReturn(LoanContractResponse.builder()
+                .creditorId(10L).status(ContractStatus.COMPLETED)
+                .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL).interestRate(new BigDecimal("12"))
+                .startDate(LocalDate.of(2026, 11, 20)).createdAt(LocalDateTime.of(2026, 11, 20, 0, 0))
+                .debtorName("홍길동").contractDisplayId("LC-1").build());
+        rows.get(0).fullPayment(LocalDateTime.of(2026, 11, 25, 10, 0)); // 1회차(12/20)를 미리 냄
+        when(deposit.getAmount()).thenReturn(new BigDecimal("100000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L));
+
+        // 2회차(1/20) 이자: 남은 원금 10만 원, 12/20부터 31일 치 (고치기 전에는 입금일 12/1부터 50일 치)
+        BigDecimal expected = repaymentScheduleGenerateService.calculateDailyInterest(
+                new BigDecimal("100000"), new BigDecimal("12"), LocalDate.of(2026, 12, 20), LocalDate.of(2027, 1, 20));
+        assertThat(rows.get(1).getInterestDue()).isEqualByComparingTo(expected);
     }
 
     private RepaymentSchedule row(int sequence, String remaining) {
