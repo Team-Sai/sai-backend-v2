@@ -54,12 +54,55 @@ public class PaymentRecordService {
             BigDecimal amount,
             SourceType sourceType
     ){
+        return createConfirmedRecord(
+                bankTransactionId,
+                paymentTargetType,
+                targetId,
+                amount,
+                sourceType,
+                true
+        );
+    }
+
+    /**
+     * Creates a record after the caller has already checked that the bank
+     * transaction has no payment record. The unique constraint remains the
+     * final guard against a concurrent duplicate insert.
+     */
+    @Transactional
+    public Long createConfirmedRecordAfterDuplicateCheck(
+            Long bankTransactionId,
+            PaymentTargetType paymentTargetType,
+            Long targetId,
+            BigDecimal amount,
+            SourceType sourceType
+    ) {
+        return createConfirmedRecord(
+                bankTransactionId,
+                paymentTargetType,
+                targetId,
+                amount,
+                sourceType,
+                false
+        );
+    }
+
+    private Long createConfirmedRecord(
+            Long bankTransactionId,
+            PaymentTargetType paymentTargetType,
+            Long targetId,
+            BigDecimal amount,
+            SourceType sourceType,
+            boolean validateDuplicate
+    ) {
         validateBankTransactionId(bankTransactionId);
         validateTarget(paymentTargetType, targetId);
         validateAmount(amount);
         validateSourceType(sourceType);
 
-        validateNotDuplicateBankTransaction(bankTransactionId);
+        if (validateDuplicate) {
+            validateNotDuplicateBankTransaction(bankTransactionId);
+        }
 
         PaymentRecord paymentRecord =
                 new PaymentRecord(
@@ -74,7 +117,7 @@ public class PaymentRecordService {
 
         try {
             PaymentRecord savedPaymentRecord =
-                    paymentRecordRepository.saveAndFlush(paymentRecord);
+                    paymentRecordRepository.save(paymentRecord);
 
             return savedPaymentRecord.getPaymentRecordId();
 

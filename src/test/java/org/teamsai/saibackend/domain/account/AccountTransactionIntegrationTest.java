@@ -24,6 +24,7 @@ import org.teamsai.saibackend.domain.account.service.*;
 import org.teamsai.saibackend.domain.link.service.*;
 import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
+import org.teamsai.saibackend.domain.transaction.repository.JdbcBankTransactionBulkRepository;
 import org.teamsai.saibackend.domain.transaction.service.BankTransactionPersistenceService;
 import org.teamsai.saibackend.domain.user.entity.User;
 import org.teamsai.saibackend.domain.user.repository.UserRepository;
@@ -64,7 +65,9 @@ class AccountTransactionIntegrationTest {
             LinkedBankAccountRepository.class, BankTransactionRepository.class})
     @Import({AccountLinkCoordinateService.class, AccountLinkService.class, LinkOperationStoreService.class,
             UserLinkLockService.class, LinkedAccountWriteService.class, LinkedBankAccountService.class,
-            UserService.class, AccountService.class, BankTransactionPersistenceService.class})
+            UserService.class, AccountService.class, SyncAccountReadService.class,
+            BankTransactionPersistenceService.class,
+            JdbcBankTransactionBulkRepository.class})
     static class Config {}
 
     @Autowired UserRepository users;

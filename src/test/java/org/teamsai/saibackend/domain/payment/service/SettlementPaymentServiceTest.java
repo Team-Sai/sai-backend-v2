@@ -159,15 +159,42 @@ class SettlementPaymentServiceTest {
                 new BigDecimal("32000")
         );
 
-        verify(paymentRecordService).createConfirmedRecord(
+        verify(paymentRecordService).createConfirmedRecordAfterDuplicateCheck(
                 101L,
                 PaymentTargetType.SETTLEMENT,
                 10L,
                 new BigDecimal("30000"),
                 SourceType.MANUAL
         );
+        verify(paymentRecordService).existsByBankTransactionId(101L);
         assertThat(obligation.getPaymentStatus())
                 .isEqualTo(PaymentStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("이미 납부 기록이 있으면 납부 의무를 잠그기 전에 중복으로 거부한다")
+    void rejectsDuplicatePaymentBeforeLockingObligation() {
+        SettlementPaymentService settlementPaymentService =
+                new SettlementPaymentService(
+                        paymentObligationRepository,
+                        paymentRecordService
+                );
+        given(paymentRecordService.existsByBankTransactionId(101L))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> settlementPaymentService.applyAutoMatchedPayment(
+                10L,
+                101L,
+                new BigDecimal("10000")
+        )).isInstanceOfSatisfying(
+                org.teamsai.saibackend.global.exception.DomainException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(PaymentErrorCode.DUPLICATE_PAYMENT_RECORD)
+        );
+
+        verify(paymentObligationRepository, never()).findByIdForUpdate(10L);
+        verify(paymentRecordService, never())
+                .createConfirmedRecordAfterDuplicateCheck(any(), any(), any(), any(), any());
     }
 
     @Test

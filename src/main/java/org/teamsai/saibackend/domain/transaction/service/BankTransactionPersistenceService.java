@@ -8,7 +8,7 @@ import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
 import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
 import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.entity.BankTransaction;
-import org.teamsai.saibackend.domain.transaction.repository.BankTransactionRepository;
+import org.teamsai.saibackend.domain.transaction.repository.BankTransactionBulkRepository;
 import org.teamsai.saibackend.domain.transaction.type.BankTransactionType;
 
 import java.time.LocalDateTime;
@@ -20,7 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BankTransactionPersistenceService {
 
-    private final BankTransactionRepository bankTransactionRepository;
+    private final BankTransactionBulkRepository bankTransactionBulkRepository;
     private final LinkedBankAccountService linkedBankAccountService;
 
     @Transactional
@@ -33,21 +33,12 @@ public class BankTransactionPersistenceService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        for (BankTransactionDTO tx : transactions) {
-            BankTransaction transaction = toEntity(linkedAccountId, tx, now);
+        List<BankTransaction> entities = transactions.stream()
+                .map(tx -> toEntity(linkedAccountId, tx, now))
+                .toList();
 
-            // 동기화에서는 저장 ID가 필요 없으므로 중복을 허용하는 저장만 실행한다.
-            bankTransactionRepository.insertIfAbsent(
-                    transaction.getLinkedAccountId(),
-                    transaction.getExternalTransactionId(),
-                    transaction.getAmount(),
-                    transaction.getTransactionType().name(),
-                    transaction.getTransactionAt(),
-                    transaction.getCounterpartyName(),
-                    transaction.getMemo(),
-                    transaction.getSyncedAt()
-            );
-        }
+        // 모든 묶음과 커서 갱신은 이 메서드의 동일 트랜잭션에 참여한다.
+        bankTransactionBulkRepository.insertAllIfAbsent(entities);
 
         BankTransactionDTO latestTransaction =
                 transactions.stream()

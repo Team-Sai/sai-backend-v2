@@ -6,12 +6,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
+import org.teamsai.saibackend.domain.account.dto.SyncAccountContext;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
-import org.teamsai.saibackend.domain.account.service.LinkedBankAccountService;
+import org.teamsai.saibackend.domain.account.service.SyncAccountReadService;
 import org.teamsai.saibackend.domain.transaction.dto.BankTransactionDTO;
 import org.teamsai.saibackend.domain.transaction.exception.RetryableBankTransactionFetchException;
-import org.teamsai.saibackend.domain.user.service.UserService;
 import org.teamsai.saibackend.global.client.MockBankClient;
 
 import java.net.ConnectException;
@@ -23,9 +22,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TransactionSyncService {
 
-    private final LinkedBankAccountService linkedBankAccountService;
+    private final SyncAccountReadService syncAccountReadService;
     private final MockBankClient mockBankClient;
-    private final UserService userService;
     private final BankTransactionPersistenceService bankTransactionPersistenceService;
 
     /**
@@ -34,32 +32,37 @@ public class TransactionSyncService {
     **/
 
     public int syncTransactions(Long userId, Long linkedAccountId) {
-        LinkedBankAccount linkedAccount = linkedBankAccountService.getLinkedAccount(linkedAccountId);
+        SyncAccountContext context =
+                syncAccountReadService.getContext(linkedAccountId);
 
-        validateOwnership(userId, linkedAccount);
+        validateOwnership(userId, context.userId(), linkedAccountId);
 
-        String userKey = userService.getUserKeyByUserId(linkedAccount.getUserId());
-
-        Long lastSyncedId = linkedBankAccountService.getLastSyncedTransactionId(linkedAccountId);
+        Long lastSyncedId = context.lastSyncedTransactionId();
         long afterTransactionId = lastSyncedId == null ? 0L : lastSyncedId;
 
         List<BankTransactionDTO> transactions = fetchTransactions(
                 linkedAccountId,
-                linkedAccount.getAccountId(),
-                userKey,
+                context.bankAccountId(),
+                context.userKey(),
                 afterTransactionId
         );
+
+        if(transactions.isEmpty()) {
+            log.info("[TransactionSyncService] 신규 거래내역 없음 - linkedAccountId: {}, afterTransactionId: {}",
+                    linkedAccountId, afterTransactionId);
+            return 0;
+        }
 
         return bankTransactionPersistenceService.
                 saveAndAdvanceCursor(linkedAccountId, transactions);
     }
 
-    private void validateOwnership(Long userId, LinkedBankAccount linkedAccount) {
-        if (!linkedAccount.getUserId().equals(userId)) {
+    private void validateOwnership(Long userId, Long ownerId, Long linkedAccountId) {
+        if (!ownerId.equals(userId)) {
             log.warn(
                     "[TransactionSyncService] 소유자가 아닌 계좌 동기화 시도 - " +
                             "requesterId: {}, linkedAccountId: {}",
-                    userId, linkedAccount.getLinkedAccountId()
+                    userId, linkedAccountId
             );
             throw AccountErrorCode.ACCOUNT_ACCESS_DENIED.toException();
         }

@@ -1,22 +1,30 @@
 package org.teamsai.saibackend.domain.payment.service;
 
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
+import org.teamsai.saibackend.domain.payment.exception.PaymentErrorCode;
 import org.teamsai.saibackend.domain.payment.repository.PaymentRecordRepository;
 import org.teamsai.saibackend.domain.payment.type.PaymentTargetType;
 import org.teamsai.saibackend.domain.payment.type.RecordStatus;
 import org.teamsai.saibackend.domain.payment.type.SourceType;
+import org.teamsai.saibackend.global.exception.DomainException;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -216,7 +224,7 @@ class PaymentRecordServiceTest {
         ).willReturn(1L);
 
         given(
-                paymentRecordRepository.saveAndFlush(
+                paymentRecordRepository.save(
                         any(PaymentRecord.class)
                 )
         ).willReturn(savedRecord);
@@ -241,9 +249,108 @@ class PaymentRecordServiceTest {
                 );
 
         verify(paymentRecordRepository)
-                .saveAndFlush(
+                .save(
                         any(PaymentRecord.class)
                 );
+        verify(paymentRecordRepository, never()).flush();
+        verify(paymentRecordRepository, never()).saveAndFlush(any(PaymentRecord.class));
+    }
+
+    @Test
+    @DisplayName("중복 검증을 마친 거래는 존재 조회 없이 확정 납부 기록을 저장한다")
+    void createConfirmedRecordAfterDuplicateCheckSkipsExistenceQuery() {
+        Long bankTransactionId = 100L;
+        PaymentRecord savedRecord = org.mockito.Mockito.mock(PaymentRecord.class);
+        given(savedRecord.getPaymentRecordId()).willReturn(1L);
+        given(paymentRecordRepository.save(any(PaymentRecord.class)))
+                .willReturn(savedRecord);
+
+        Long result = paymentRecordService.createConfirmedRecordAfterDuplicateCheck(
+                bankTransactionId,
+                PaymentTargetType.SETTLEMENT,
+                1L,
+                new BigDecimal("10000"),
+                SourceType.AUTO_MATCH
+        );
+
+        assertThat(result).isEqualTo(1L);
+        verify(paymentRecordRepository, never())
+                .existsByBankTransactionId(bankTransactionId);
+        verify(paymentRecordRepository)
+                .save(any(PaymentRecord.class));
+        verify(paymentRecordRepository, never()).flush();
+        verify(paymentRecordRepository, never()).saveAndFlush(any(PaymentRecord.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("두 저장 진입점 모두 save의 유니크 제약 예외를 중복 납부 오류로 변환한다")
+    void saveMapsUniqueConstraintViolation(boolean duplicateAlreadyChecked) {
+        ConstraintViolationException constraintViolation =
+                new ConstraintViolationException(
+                        "duplicate payment record",
+                        new SQLException("duplicate key"),
+                        "uk_payment_record_bank_transaction"
+                );
+        given(paymentRecordRepository.save(any(PaymentRecord.class)))
+                .willThrow(new DataIntegrityViolationException(
+                        "duplicate payment record",
+                        constraintViolation
+                ));
+
+        assertThatThrownBy(() -> createThroughEntryPoint(duplicateAlreadyChecked))
+                .isInstanceOfSatisfying(
+                        DomainException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(PaymentErrorCode.DUPLICATE_PAYMENT_RECORD)
+                );
+    }
+
+    @Test
+    @DisplayName("사전 조회에서 발견한 중복은 INSERT를 시도하지 않는다")
+    void existingPaymentIsRejectedBeforeSave() {
+        given(paymentRecordRepository.existsByBankTransactionId(100L)).willReturn(true);
+
+        assertThatThrownBy(() -> createThroughEntryPoint(false))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(PaymentErrorCode.DUPLICATE_PAYMENT_RECORD));
+        verify(paymentRecordRepository, never()).save(any(PaymentRecord.class));
+        verify(paymentRecordRepository, never()).saveAndFlush(any(PaymentRecord.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("다른 제약 위반을 중복 납부로 바꾸지 않고 원래 예외로 전파한다")
+    void savePreservesUnrelatedConstraintViolation(boolean duplicateAlreadyChecked) {
+        var failure = new DataIntegrityViolationException("other constraint",
+                new ConstraintViolationException("other constraint", new SQLException("check failed"),
+                        "chk_payment_amount"));
+        given(paymentRecordRepository.save(any(PaymentRecord.class))).willThrow(failure);
+
+        assertThatThrownBy(() -> createThroughEntryPoint(duplicateAlreadyChecked)).isSameAs(failure);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("제약 이름을 확인할 수 없는 무결성 오류는 중복 납부로 오인하지 않는다")
+    void savePreservesUnclassifiedIntegrityViolation(boolean duplicateAlreadyChecked) {
+        var failure = new DataIntegrityViolationException("unclassified integrity failure");
+        given(paymentRecordRepository.save(any(PaymentRecord.class))).willThrow(failure);
+
+        assertThatThrownBy(() -> createThroughEntryPoint(duplicateAlreadyChecked)).isSameAs(failure);
+    }
+
+    // Repository mocks test service exception mapping, not real IDENTITY INSERT timing or rollback.
+    private Long createThroughEntryPoint(boolean duplicateAlreadyChecked) {
+        if (duplicateAlreadyChecked) {
+            return paymentRecordService.createConfirmedRecordAfterDuplicateCheck(
+                    100L, PaymentTargetType.SETTLEMENT, 1L,
+                    new BigDecimal("10000"), SourceType.AUTO_MATCH);
+        }
+        return paymentRecordService.createConfirmedRecord(
+                100L, PaymentTargetType.LOAN, 1L,
+                new BigDecimal("10000"), SourceType.MANUAL);
     }
 
     private PaymentRecord createRecord(

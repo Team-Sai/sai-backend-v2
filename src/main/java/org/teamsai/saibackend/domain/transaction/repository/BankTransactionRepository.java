@@ -97,7 +97,7 @@ public interface BankTransactionRepository
     );
 
     @Query("""
-            SELECT bt
+            SELECT bt.bankTransactionId
             FROM BankTransaction bt
             WHERE bt.linkedAccountId = :linkedAccountId
               AND bt.processingStatus = :processingStatus
@@ -105,7 +105,7 @@ public interface BankTransactionRepository
             ORDER BY bt.transactionAt ASC,
                      bt.bankTransactionId ASC
             """)
-    List<BankTransaction> findPendingDepositsByLinkedAccountId(
+    List<Long> findPendingDepositIdsByLinkedAccountId(
             @Param("linkedAccountId")
             Long linkedAccountId,
 

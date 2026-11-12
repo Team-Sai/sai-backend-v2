@@ -89,7 +89,7 @@ public class SettlementPaymentService {
 
         validatePaymentAmount(paymentAmount);
 
-        paymentRecordService.createConfirmedRecord(
+        paymentRecordService.createConfirmedRecordAfterDuplicateCheck(
                 bankTransactionId,
                 PaymentTargetType.SETTLEMENT,
                 paymentObligationId,

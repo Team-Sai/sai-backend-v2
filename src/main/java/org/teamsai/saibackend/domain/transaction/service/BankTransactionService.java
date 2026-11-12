@@ -2,6 +2,7 @@ package org.teamsai.saibackend.domain.transaction.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.teamsai.saibackend.domain.account.entity.LinkedBankAccount;
 import org.teamsai.saibackend.domain.account.exception.AccountErrorCode;
@@ -63,10 +64,10 @@ public class BankTransactionService {
         );
     }
 
-    public List<BankTransaction> findPendingDepositsByLinkedAccountId(
+    public List<Long> findPendingDepositIdsByLinkedAccountId(
             Long linkedAccountId
     ) {
-        return bankTransactionRepository.findPendingDepositsByLinkedAccountId(
+        return bankTransactionRepository.findPendingDepositIdsByLinkedAccountId(
                 linkedAccountId,
                 BankTransactionProcessingStatus.PENDING,
                 BankTransactionType.DEPOSIT
@@ -134,6 +135,23 @@ public class BankTransactionService {
             Long linkedAccountId
     ) {
         return bankTransactionQueryRepository.findRetryCandidates(linkedAccountId);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void updateStatusForLockedTransaction(
+            BankTransaction lockedTransaction,
+            BankTransactionProcessingStatus currentStatus,
+            BankTransactionProcessingStatus nextStatus
+    ) {
+        validateStatusTransition(currentStatus, nextStatus);
+
+        if (lockedTransaction.getProcessingStatus() != currentStatus) {
+            throw BankTransactionErrorCode
+                    .BANK_TRANSACTION_STATUS_UPDATE_FAILED
+                    .toException();
+        }
+
+        lockedTransaction.changeProcessingStatus(nextStatus);
     }
 
     @Transactional

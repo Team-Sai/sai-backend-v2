@@ -124,6 +124,7 @@ public class LinkedBankAccountService {
                 .orElseThrow(AccountErrorCode.LINKED_ACCOUNT_NOT_FOUND::toException);
     }
 
+    @Transactional(readOnly = true)
     public Long getLastSyncedTransactionId(Long linkedAccountId) {
         return linkedBankAccountRepository.findLastSyncedTransactionIdById(linkedAccountId);
     }
@@ -173,6 +174,17 @@ public class LinkedBankAccountService {
                         )
                                 && account.getConnectionStatus() == AVAILABLE
                 );
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> getLinkedAccountIdsForSync(Long userId){
+        if(userId == null){
+            return Collections.emptyList();
+        }
+        return linkedBankAccountRepository.findLinkedAccountIdsForSync(
+                userId,
+                AVAILABLE
+        );
     }
 
     private AccountDetailResponse fetchAccountDetail(

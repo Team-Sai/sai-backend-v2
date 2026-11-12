@@ -22,6 +22,24 @@ class LinkedBankAccountServiceTest {
  final LinkedAccountWriteService writer=mock(LinkedAccountWriteService.class);
  final LinkedBankAccountService service=new LinkedBankAccountService(repository,users,bank,mock(EntityManager.class),writer);
  AccountDetailResponse detail(Long id){return new AccountDetailResponse(id,"088","masked","name","holder",BigDecimal.TEN,"ACTIVE",null,null);}
+ @Test void syncTargetsUseAvailableLinkedIdsWithoutBuildingDisplayResponses(){
+  when(repository.findLinkedAccountIdsForSync(1L,ConnectionStatus.AVAILABLE))
+   .thenReturn(List.of(101L,203L));
+  assertThat(service.getLinkedAccountIdsForSync(1L)).containsExactly(101L,203L);
+  verify(repository).findLinkedAccountIdsForSync(1L,ConnectionStatus.AVAILABLE);
+  verifyNoMoreInteractions(repository);
+  verifyNoInteractions(users,bank,writer);
+ }
+ @Test void nullSyncUserDoesNotQueryRepository(){
+  assertThat(service.getLinkedAccountIdsForSync(null)).isEmpty();
+  verifyNoInteractions(repository,users,bank,writer);
+ }
+ @Test void noAvailableSyncAccountsReturnsEmptyList(){
+  when(repository.findLinkedAccountIdsForSync(1L,ConnectionStatus.AVAILABLE)).thenReturn(List.of());
+  assertThat(service.getLinkedAccountIdsForSync(1L)).isEmpty();
+  verify(repository).findLinkedAccountIdsForSync(1L,ConnectionStatus.AVAILABLE);
+  verifyNoMoreInteractions(repository);
+ }
  @Test void unchangedCursorIsAcceptedWhenAccountExists(){
   when(repository.advanceCursorAndBalance(1L, 11L, BigDecimal.TEN)).thenReturn(0);
   when(repository.existsById(1L)).thenReturn(true);
