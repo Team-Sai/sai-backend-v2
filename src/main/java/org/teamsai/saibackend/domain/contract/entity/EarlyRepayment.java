@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.teamsai.saibackend.domain.contract.type.EarlyRepaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -40,12 +41,23 @@ public class EarlyRepayment {
     @Column(name = "principal_amount", precision = 15, scale = 2, nullable = false)
     private BigDecimal principalAmount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "repayment_method", length = 20, nullable = false)
+    private EarlyRepaymentMethod method;
+
     @Column(name = "processed_at", nullable = false)
     private LocalDateTime processedAt;
 
     public EarlyRepayment(Long contractId, Long bankTransactionId, BigDecimal amount,
                           BigDecimal shortfallAmount, BigDecimal accruedInterest, BigDecimal feeAmount,
                           BigDecimal principalAmount, LocalDateTime processedAt) {
+        this(contractId, bankTransactionId, amount, shortfallAmount, accruedInterest, feeAmount,
+                principalAmount, processedAt, EarlyRepaymentMethod.RECALCULATE);
+    }
+
+    public EarlyRepayment(Long contractId, Long bankTransactionId, BigDecimal amount,
+                          BigDecimal shortfallAmount, BigDecimal accruedInterest, BigDecimal feeAmount,
+                          BigDecimal principalAmount, LocalDateTime processedAt, EarlyRepaymentMethod method) {
         this.contractId = contractId;
         this.bankTransactionId = bankTransactionId;
         this.amount = amount;
@@ -54,5 +66,6 @@ public class EarlyRepayment {
         this.feeAmount = feeAmount;
         this.principalAmount = principalAmount;
         this.processedAt = processedAt;
+        this.method = method;
     }
 }

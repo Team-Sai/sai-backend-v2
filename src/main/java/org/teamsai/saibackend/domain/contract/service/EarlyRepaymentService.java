@@ -18,6 +18,7 @@ import org.teamsai.saibackend.domain.contract.repository.EarlyRepaymentRepositor
 import org.teamsai.saibackend.domain.contract.repository.RepaymentScheduleRepository;
 import org.teamsai.saibackend.domain.contract.type.ContractAccountStatus;
 import org.teamsai.saibackend.domain.contract.type.ContractStatus;
+import org.teamsai.saibackend.domain.contract.type.EarlyRepaymentMethod;
 import org.teamsai.saibackend.domain.contract.type.RepaymentScheduleStatus;
 import org.teamsai.saibackend.domain.payment.entity.PaymentRecord;
 import org.teamsai.saibackend.domain.payment.service.PaymentRecordService;
@@ -38,6 +39,7 @@ import java.util.Optional;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -136,6 +138,11 @@ public class EarlyRepaymentService {
         BigDecimal shortfall = shortfallOf(shortfallRows, paid);
         LocalDateTime now = LocalDateTime.now();
 
+        // 3-0. 회차 미리 내기: 밀린 회차 → 가까운 회차 순서로 원래 금액대로 채운다. (이자 재계산 없음)
+        if (request.prepay()) {
+            return prepay(contractId, deposit, request, shortfallRows, futureRows, paid, shortfall, now);
+        }
+
         RepaymentSchedule first = futureRows.isEmpty() ? null : futureRows.get(0);
         BigDecimal accrued = first == null ? BigDecimal.ZERO : accruedInterest(contract, all, first, paidOn);
         BigDecimal amount = deposit.getAmount();
@@ -187,7 +194,10 @@ public class EarlyRepaymentService {
             first.fullPayment(now);
             repaymentScheduleRepository.deleteAll(futureRows.subList(1, futureRows.size()));
         } else {
-            recalculate(contract, contractId, futureRows, balance.subtract(principalPart), paidOn);
+            // 앞 회차가 이미 그 날짜까지 이자를 받았으면(미리 냄·부분납부 완료), 그 날짜부터 다시 계산한다.
+            LocalDate interestFrom = interestStart(contract, all, first);
+            recalculate(contract, contractId, futureRows, balance.subtract(principalPart),
+                    interestFrom.isAfter(paidOn) ? interestFrom : paidOn);
         }
 
         deposit.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
@@ -294,6 +304,40 @@ public class EarlyRepaymentService {
         }
     }
 
+    /** 회차 미리 내기. 밀린 회차 → 앞으로 낼 회차 순서로 채우고, 모든 회차를 채우고 남으면 반환으로 남긴다. */
+    private EarlyRepaymentResponse prepay(Long contractId, BankTransaction deposit, EarlyRepaymentRequest request,
+                                          List<RepaymentSchedule> shortfallRows, List<RepaymentSchedule> futureRows,
+                                          Map<Long, BigDecimal> paid, BigDecimal shortfall, LocalDateTime now) {
+        List<RepaymentSchedule> rows = Stream.concat(shortfallRows.stream(), futureRows.stream()).toList();
+        if (rows.isEmpty()) {
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_NOT_ALLOWED.toException();
+        }
+
+        // 남은 회차를 모두 채우는 데 드는 돈 = 밀린 금액 + 앞으로 낼 회차 금액
+        BigDecimal owed = futureRows.stream()
+                .map(RepaymentSchedule::getTotalPaymentDue)
+                .reduce(shortfall, BigDecimal::add);
+        BigDecimal amount = deposit.getAmount();
+        BigDecimal toRows = amount.min(owed);
+        BigDecimal leftover = amount.subtract(toRows);
+        if (leftover.signum() > 0 && !request.returnExcess()) {
+            throw RepaymentScheduleErrorCode.EARLY_REPAYMENT_AMOUNT_INVALID.toException();
+        }
+
+        // 밀린 회차 채우기와 같은 방식: 다 채운 회차는 완료, 덜 채운 마지막 회차만 납부 기록
+        fillArrears(rows, paid, toRows, request.bankTransactionId(), now);
+        deposit.changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
+
+        EarlyRepayment saved = earlyRepaymentRepository.save(new EarlyRepayment(
+                contractId, request.bankTransactionId(), amount,
+                shortfall.min(toRows), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, now,
+                EarlyRepaymentMethod.PREPAY));
+        if (leftover.signum() > 0) {
+            depositReturnRepository.save(new DepositReturn(
+                    contractId, request.bankTransactionId(), leftover, deposit.getTransactionAt(), now));
+        }
+        return EarlyRepaymentResponse.from(saved);
+    }
 
     private void recalculate(LoanContractResponse contract, Long contractId,
                              List<RepaymentSchedule> futureRows, BigDecimal newPrincipal, LocalDate paidOn) {
@@ -340,15 +384,41 @@ public class EarlyRepaymentService {
 
     private BigDecimal accruedInterest(LoanContractResponse contract, List<RepaymentSchedule> all,
                                        RepaymentSchedule first, LocalDate paidOn) {
-        LocalDate previousDue = all.stream()
-                .filter(schedule -> schedule.getSequence() == first.getSequence() - 1)
-                .map(RepaymentSchedule::getDueDate)
-                .findFirst()
-                .orElse(contract.getStartDate());
-        LocalDate lastEarly = findLatestPaidOn(contract.getContractId()).orElse(previousDue);
-        LocalDate from = lastEarly.isAfter(previousDue) ? lastEarly : previousDue;
+        LocalDate from = interestStart(contract, all, first);
+        LocalDate lastEarly = findLatestPaidOn(contract.getContractId()).orElse(from);
+        if (lastEarly.isAfter(from)) {
+            from = lastEarly;
+        }
         return repaymentScheduleGenerateService.calculateDailyInterest(
                 balanceOf(first), contract.getInterestRate(), from, paidOn);
+    }
+
+    /**
+     * first 회차 이자가 시작되는 날 = 바로 앞 회차 날짜. 앞 회차가 없으면 계약 시작일.
+     * 변경된 계약은 회차가 1부터 다시 시작하므로, 이전 계약에서 마지막으로 낸 회차 날짜
+     * (그 뒤에 중도상환이 있으면 그날)를 쓴다. generateChangedSchedule과 같은 기준이다.
+     */
+    private LocalDate interestStart(LoanContractResponse contract, List<RepaymentSchedule> all,
+                                    RepaymentSchedule first) {
+        Optional<LocalDate> previousDue = all.stream()
+                .filter(schedule -> schedule.getSequence() == first.getSequence() - 1)
+                .map(RepaymentSchedule::getDueDate)
+                .findFirst();
+        if (previousDue.isPresent()) {
+            return previousDue.get();
+        }
+
+        Long previousId = contract.getPreviousContractId();
+        if (previousId == null) {
+            return contract.getStartDate();
+        }
+
+        LocalDate lastDue = repaymentScheduleRepository.findByContractIdOrderBySequenceAsc(previousId).stream()
+                .filter(schedule -> schedule.getStatus() == RepaymentScheduleStatus.PAID)
+                .map(RepaymentSchedule::getDueDate)
+                .max(Comparator.naturalOrder())
+                .orElse(contract.getStartDate());
+        return findLatestPaidOn(previousId).filter(lastDue::isBefore).orElse(lastDue);
     }
 
     private Map<Long, BigDecimal> confirmedAmounts(List<RepaymentSchedule> schedules) {
@@ -391,7 +461,7 @@ public class EarlyRepaymentService {
 
     private boolean isEligibleDeposit(LoanContractResponse contract, BankTransaction deposit) {
         return normalizeName(contract.getDebtorName()).equals(normalizeName(deposit.getCounterpartyName()))
-                && !deposit.getTransactionAt().toLocalDate().isBefore(contract.getStartDate())
+                && !deposit.getTransactionAt().isBefore(contract.getCreatedAt()) // 자동 매칭과 같은 기준: 계약을 만든 뒤 입금
                 && !Boolean.FALSE.equals(memoMatches(contract, deposit)); // 다른 차용증 번호가 적힌 입금은 제외
     }
 

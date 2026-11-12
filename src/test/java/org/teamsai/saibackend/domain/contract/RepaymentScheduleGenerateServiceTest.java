@@ -274,6 +274,16 @@ class RepaymentScheduleGenerateServiceTest {
     }
 
     @Test
+    @DisplayName("만기일의 날짜가 지급일보다 작아도 매월 회차를 빠뜨리지 않는다")
+    void generate_keepsEveryMonthWhenMaturityDayIsSmaller() {
+        List<RepaymentSchedule> schedules = generateWithDates(
+                RepaymentMethod.EQUAL_PRINCIPAL_AND_INTEREST, LocalDate.of(2026, 11, 13), LocalDate.of(2027, 2, 12), 1);
+
+        assertThat(schedules).extracting(RepaymentSchedule::getDueDate).containsExactly(
+                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 1, 1), LocalDate.of(2027, 2, 12));
+    }
+
+    @Test
     @DisplayName("그 달에 상환일이 없으면 말일로 하고 다음 달에는 상환일로 돌아온다")
     void generate_clampsToLastDayOfMonth() {
         List<RepaymentSchedule> schedules = generateWithDates(
@@ -332,7 +342,7 @@ class RepaymentScheduleGenerateServiceTest {
     }
 
     @Test
-    @DisplayName("기간에 잔여 일수가 있어도 회차 수를 유지하고 마지막 회차는 최종 변제기일이다")
+    @DisplayName("기간에 잔여 일수가 있어도 매월 회차를 만들고 마지막 회차는 최종 변제기일이다")
     void generate_keepsRoundCountWhenPeriodHasRemainingDays() {
         List<RepaymentSchedule> schedules = generateWithDates(
                 RepaymentMethod.EQUAL_PRINCIPAL, LocalDate.of(2027, 1, 10), LocalDate.of(2027, 6, 5), 25);
@@ -343,6 +353,7 @@ class RepaymentScheduleGenerateServiceTest {
                         LocalDate.of(2027, 2, 25),
                         LocalDate.of(2027, 3, 25),
                         LocalDate.of(2027, 4, 25),
+                        LocalDate.of(2027, 5, 25),
                         LocalDate.of(2027, 6, 5)
                 );
     }

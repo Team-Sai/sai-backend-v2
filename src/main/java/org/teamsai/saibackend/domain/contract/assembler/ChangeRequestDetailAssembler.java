@@ -46,6 +46,9 @@ public final class ChangeRequestDetailAssembler {
                 .returnReason(changeRequest.getReturnReason())
                 .currentMonthlyPayment(currentMonthlyPayment)
                 .newMonthlyPayment(newMonthlyPayment)
+                .currentRepaymentDay(contract.getRepaymentDay())
+                .newRepaymentDay(changeRequest.getNewRepaymentDate() != null
+                        ? changeRequest.getNewRepaymentDate() : contract.getRepaymentDay())
                 .build();
     }
 
