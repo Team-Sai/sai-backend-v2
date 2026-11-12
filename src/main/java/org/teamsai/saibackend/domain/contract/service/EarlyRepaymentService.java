@@ -432,7 +432,7 @@ public class EarlyRepaymentService {
 
     private boolean isEligibleDeposit(LoanContractResponse contract, BankTransaction deposit) {
         return normalizeName(contract.getDebtorName()).equals(normalizeName(deposit.getCounterpartyName()))
-                && !deposit.getTransactionAt().toLocalDate().isBefore(contract.getStartDate())
+                && !deposit.getTransactionAt().isBefore(contract.getCreatedAt()) // 자동 매칭과 같은 기준: 계약을 만든 뒤 입금
                 && !Boolean.FALSE.equals(memoMatches(contract, deposit)); // 다른 차용증 번호가 적힌 입금은 제외
     }
 

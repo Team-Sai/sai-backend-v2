@@ -67,7 +67,8 @@ class EarlyRepaymentServiceTest {
         when(loanContractService.findContract(1L, 10L)).thenReturn(LoanContractResponse.builder()
                 .creditorId(10L).status(ContractStatus.COMPLETED)
                 .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL).interestRate(BigDecimal.ZERO)
-                .startDate(LocalDate.of(2026, 11, 20)).debtorName("홍길동")
+                .startDate(LocalDate.of(2026, 11, 20)).createdAt(LocalDateTime.of(2026, 11, 20, 0, 0))
+                .debtorName("홍길동")
                 .contractDisplayId("LC-1").build());
         ContractAccount account = mock(ContractAccount.class, RETURNS_DEEP_STUBS);
         when(account.getLinkedAccount().getLinkedAccountId()).thenReturn(7L);
@@ -236,6 +237,22 @@ class EarlyRepaymentServiceTest {
         ArgumentCaptor<DepositReturn> returned = ArgumentCaptor.forClass(DepositReturn.class);
         verify(depositReturnRepository).save(returned.capture());
         assertThat(returned.getValue().getAmount()).isEqualByComparingTo("10000");
+    }
+
+    @Test
+    @DisplayName("지급일 전이라도 계약을 만든 뒤 들어온 입금은 처리할 수 있다")
+    void acceptsDepositBeforeStartDateAfterCreated() {
+        when(loanContractService.findContract(1L, 10L)).thenReturn(LoanContractResponse.builder()
+                .creditorId(10L).status(ContractStatus.COMPLETED)
+                .repaymentType(RepaymentMethod.EQUAL_PRINCIPAL).interestRate(BigDecimal.ZERO)
+                .startDate(LocalDate.of(2026, 12, 10)).createdAt(LocalDateTime.of(2026, 11, 20, 0, 0))
+                .debtorName("홍길동").contractDisplayId("LC-1").build());
+        when(deposit.getAmount()).thenReturn(new BigDecimal("150000"));
+        when(earlyRepaymentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.process(1L, 10L, new EarlyRepaymentRequest(99L));
+
+        verify(deposit).changeProcessingStatus(BankTransactionProcessingStatus.APPLIED);
     }
 
     private RepaymentSchedule row(int sequence, String remaining) {

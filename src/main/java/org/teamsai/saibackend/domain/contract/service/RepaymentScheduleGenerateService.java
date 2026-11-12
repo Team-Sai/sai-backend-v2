@@ -30,11 +30,14 @@ public class RepaymentScheduleGenerateService {
             BigDecimal annualInterestRate, LocalDate startDate, LocalDate maturityDate, int repaymentDay
     ) {
         Period period = Period.between(startDate, maturityDate);
-        int months = period.getYears() * 12 + period.getMonths();
 
-        if (months <= 0) {
+        // 1개월 미만 계약은 지금처럼 막는다.
+        if (period.getYears() * 12 + period.getMonths() <= 0) {
             throw RepaymentScheduleErrorCode.INVALID_CONTRACT_PERIOD.toException();
         }
+
+        // 회차 수는 달력의 달 차이로 센다. (11/13 ~ 2/12처럼 하루 모자라도 12월·1월·2월 3회차)
+        int months = (int) ChronoUnit.MONTHS.between(YearMonth.from(startDate), YearMonth.from(maturityDate));
 
         List<LocalDate> dueDates = calculateDueDates(startDate, maturityDate, repaymentDay, months);
 
